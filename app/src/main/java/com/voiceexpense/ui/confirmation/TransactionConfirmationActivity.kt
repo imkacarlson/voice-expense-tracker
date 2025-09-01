@@ -4,12 +4,14 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.lifecycle.lifecycleScope
 import com.voiceexpense.R
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.speech.SpeechRecognitionService
 import com.voiceexpense.data.repository.TransactionRepository
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class TransactionConfirmationActivity : AppCompatActivity() {
@@ -37,8 +39,10 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val asr = SpeechRecognitionService()
         speak.setOnClickListener {
             // In real app, start listening and feed transcript; here we demo a sample correction
-            asr.transcribeDebug("actually 25.00").collect(this) { text ->
-                viewModel.applyCorrection(text)
+            lifecycleScope.launch {
+                asr.transcribeDebug("actually 25.00").collect { text ->
+                    viewModel.applyCorrection(text)
+                }
             }
         }
     }
