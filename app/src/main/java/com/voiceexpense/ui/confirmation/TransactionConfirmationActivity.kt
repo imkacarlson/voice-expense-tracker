@@ -9,6 +9,7 @@ import com.voiceexpense.R
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.speech.SpeechRecognitionService
 import com.voiceexpense.data.repository.TransactionRepository
+import com.voiceexpense.worker.enqueueSyncNow
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -32,7 +33,10 @@ class TransactionConfirmationActivity : AppCompatActivity() {
 
         title.text = getString(R.string.app_name)
 
-        confirm.setOnClickListener { viewModel.confirm() }
+        confirm.setOnClickListener {
+            viewModel.confirm()
+            enqueueSyncNow(this)
+        }
         cancel.setOnClickListener { viewModel.cancel(); finish() }
 
         // Placeholder voice correction using ASR debug

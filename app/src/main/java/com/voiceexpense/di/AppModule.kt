@@ -5,6 +5,8 @@ import androidx.room.Room
 import com.squareup.moshi.Moshi
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.EncryptedPrefsStore
+import com.voiceexpense.auth.TokenProvider
+import com.voiceexpense.auth.StaticTokenProvider
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.speech.AudioRecordingManager
 import com.voiceexpense.ai.speech.SpeechRecognitionService
@@ -31,7 +33,8 @@ object AppModule {
     @Provides fun provideDao(db: AppDatabase): TransactionDao = db.transactionDao()
 
     @Provides @Singleton
-    fun provideRepo(dao: TransactionDao): TransactionRepository = TransactionRepository(dao)
+    fun provideRepo(dao: TransactionDao, sheets: SheetsClient, auth: AuthRepository): TransactionRepository =
+        TransactionRepository(dao, sheets, auth)
 
     @Provides @Singleton fun provideMoshi(): Moshi = Moshi.Builder().build()
 
@@ -46,8 +49,10 @@ object AppModule {
     @Provides @Singleton
     fun provideAuth(@ApplicationContext ctx: Context): AuthRepository = AuthRepository(EncryptedPrefsStore(ctx))
 
+    @Provides @Singleton
+    fun provideTokenProvider(): TokenProvider = StaticTokenProvider()
+
     @Provides fun provideAudio(): AudioRecordingManager = AudioRecordingManager()
     @Provides fun provideAsr(): SpeechRecognitionService = SpeechRecognitionService()
     @Provides fun provideParser(): TransactionParser = TransactionParser()
 }
-

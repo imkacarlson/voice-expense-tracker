@@ -3,7 +3,6 @@ package com.voiceexpense.worker
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Data
 import androidx.work.ListenableWorker
-import androidx.work.testing.TestListenableWorkerBuilder
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.InMemoryStore
@@ -53,15 +52,12 @@ class SyncWorkerTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
         val dao = FakeDao()
-        val repo = TransactionRepository(dao)
         val sheets = FakeSheetsClient(succeed = true)
         val auth = AuthRepository(InMemoryStore()).apply { setAccessToken("t") }
-        AppServices.dao = dao
-        AppServices.repo = repo
-        AppServices.sheets = sheets
-        AppServices.auth = auth
-        AppServices.spreadsheetId = "id"
-        AppServices.sheetName = "Sheet1"
+        val repo = TransactionRepository(dao, sheets, auth).apply {
+            spreadsheetId = "id"
+            sheetName = "Sheet1"
+        }
 
         val txn = Transaction(
             userLocalDate = LocalDate.now(),
@@ -80,9 +76,22 @@ class SyncWorkerTest {
         )
         dao.upsert(txn)
 
-        val worker = TestListenableWorkerBuilder<SyncWorker>(context)
-            .setInputData(Data.EMPTY)
-            .build()
+        // Build WorkerParameters manually for direct construction
+        val params = androidx.work.WorkerParameters(
+            0,
+            Data.EMPTY,
+            emptyList(),
+            androidx.work.WorkerParameters.RuntimeExtras(),
+            1,
+            1,
+            androidx.work.ForegroundUpdater { _, _ -> },
+            androidx.work.impl.utils.SynchronousExecutor(),
+            androidx.work.WorkTaskExecutor(
+                androidx.work.impl.utils.SynchronousExecutor(),
+                androidx.work.impl.utils.SynchronousExecutor()
+            )
+        )
+        val worker = SyncWorker(context, params, repo)
         val result = worker.doWork()
         assertThat(result).isEqualTo(ListenableWorker.Result.success())
         val updated = dao.getById(txn.id)!!

@@ -43,6 +43,8 @@ class AuthRepository(
 ) {
     companion object {
         private const val KEY_ACCESS_TOKEN = "access_token"
+        private const val KEY_ACCOUNT_NAME = "account_name"
+        private const val KEY_ACCOUNT_EMAIL = "account_email"
     }
 
     suspend fun getAccessToken(): String {
@@ -53,8 +55,18 @@ class AuthRepository(
         store.putString(KEY_ACCESS_TOKEN, token)
     }
 
+    suspend fun setAccount(accountName: String?, email: String?) {
+        if (accountName != null) store.putString(KEY_ACCOUNT_NAME, accountName) else store.remove(KEY_ACCOUNT_NAME)
+        if (email != null) store.putString(KEY_ACCOUNT_EMAIL, email) else store.remove(KEY_ACCOUNT_EMAIL)
+    }
+
+    suspend fun getAccountEmail(): String? = store.getString(KEY_ACCOUNT_EMAIL)
+
+    suspend fun isSignedIn(): Boolean = store.getString(KEY_ACCOUNT_EMAIL)?.isNotBlank() == true
+
     suspend fun signOut() {
         store.remove(KEY_ACCESS_TOKEN)
+        store.remove(KEY_ACCOUNT_NAME)
+        store.remove(KEY_ACCOUNT_EMAIL)
     }
 }
-
