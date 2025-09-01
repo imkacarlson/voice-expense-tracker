@@ -3,15 +3,8 @@ package com.voiceexpense.worker
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Data
 import androidx.work.ListenableWorker
-import androidx.work.WorkerParameters
 import androidx.work.WorkerFactory
-import androidx.work.ProgressUpdater
-import androidx.work.ForegroundUpdater
-import androidx.work.ForegroundInfo
-import androidx.work.impl.utils.SynchronousExecutor
-import androidx.work.impl.utils.taskexecutor.TaskExecutor
-import com.google.common.util.concurrent.Futures
-import java.util.UUID
+import androidx.work.testing.TestListenableWorkerBuilder
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.InMemoryStore
@@ -85,34 +78,19 @@ class SyncWorkerTest {
         )
         dao.upsert(txn)
 
-        // Build WorkerParameters manually with synchronous executors
-        val exec = SynchronousExecutor()
-        val taskExecutor = object : TaskExecutor {
-            override fun getMainThreadExecutor() = exec
-            override fun getBackgroundExecutor() = exec
-            override fun postToMainThread(runnable: Runnable) { runnable.run() }
-            override fun isMainThread(): Boolean = true
-        }
-        val params = WorkerParameters(
-            UUID.randomUUID(),
-            Data.EMPTY,
-            emptySet(),
-            WorkerParameters.RuntimeExtras(),
-            1,
-            exec,
-            taskExecutor,
-            WorkerFactory.getDefaultWorkerFactory(),
-            object : ProgressUpdater { override fun updateProgress(id: UUID, data: Data) {} },
-            object : ForegroundUpdater {
-                override fun setForegroundAsync(
-                    context: android.content.Context,
-                    id: UUID,
-                    foregroundInfo: ForegroundInfo
-                ) = Futures.immediateVoidFuture()
-            }
-        )
-        val worker = SyncWorker(context, params, repo)
-        val result = worker.doWork()
+        // Use TestListenableWorkerBuilder with a custom WorkerFactory to inject repo
+        val worker = TestListenableWorkerBuilder<SyncWorker>(context)
+            .setWorkerFactory(object : WorkerFactory() {
+                override fun createWorker(
+                    appContext: android.content.Context,
+                    workerClassName: String,
+                    workerParameters: androidx.work.WorkerParameters
+                ): androidx.work.ListenableWorker? {
+                    return SyncWorker(appContext, workerParameters, repo)
+                }
+            })
+            .build()
+        val result = worker.startWork().get()
         assertThat(result).isEqualTo(ListenableWorker.Result.success())
         val updated = dao.getById(txn.id)!!
         assertThat(updated.status).isEqualTo(TransactionStatus.POSTED)
