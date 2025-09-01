@@ -79,6 +79,13 @@ class SyncWorkerTest {
         dao.upsert(txn)
 
         // Use TestListenableWorkerBuilder with a custom WorkerFactory to inject repo
+        // Pre-populate SharedPreferences used by worker
+        val prefs = context.getSharedPreferences(com.voiceexpense.ui.common.SettingsKeys.PREFS, android.content.Context.MODE_PRIVATE)
+        prefs.edit()
+            .putString(com.voiceexpense.ui.common.SettingsKeys.SPREADSHEET_ID, "id")
+            .putString(com.voiceexpense.ui.common.SettingsKeys.SHEET_NAME, "Sheet1")
+            .apply()
+
         val worker = TestListenableWorkerBuilder<SyncWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {
                 override fun createWorker(

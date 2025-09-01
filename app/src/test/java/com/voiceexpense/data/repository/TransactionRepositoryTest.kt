@@ -15,7 +15,22 @@ import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
 
-class RepoDaoFake : TransactionDao by com.voiceexpense.worker.FakeDao()
+class RepoDaoFake : TransactionDao {
+    private val base = com.voiceexpense.worker.FakeDao()
+    override suspend fun upsert(transaction: Transaction) = base.upsert(transaction)
+    override suspend fun upsertAll(transactions: List<Transaction>) = base.upsertAll(transactions)
+    override suspend fun update(transaction: Transaction): Int = base.update(transaction)
+    override suspend fun getById(id: String): Transaction? = base.getById(id)
+    override suspend fun deleteById(id: String): Int = base.deleteById(id)
+    override fun observeAll() = base.observeAll()
+    override fun observeByStatus(status: TransactionStatus) = base.observeByStatus(status)
+    override suspend fun getByStatus(status: TransactionStatus): List<Transaction> = base.getByStatus(status)
+    override suspend fun updateStatus(id: String, newStatus: TransactionStatus): Int = base.updateStatus(id, newStatus)
+    override suspend fun setPosted(id: String, ref: com.voiceexpense.data.model.SheetReference, newStatus: TransactionStatus): Int {
+        val current = base.getById(id) ?: return 0
+        return base.update(current.copy(status = newStatus, sheetRef = ref))
+    }
+}
 
 class TransactionRepositoryTest {
     private val dao = RepoDaoFake()
