@@ -3,6 +3,15 @@ package com.voiceexpense.worker
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Data
 import androidx.work.ListenableWorker
+import androidx.work.WorkerParameters
+import androidx.work.WorkerFactory
+import androidx.work.ProgressUpdater
+import androidx.work.ForegroundUpdater
+import androidx.work.ForegroundInfo
+import androidx.work.impl.utils.SynchronousExecutor
+import androidx.work.impl.utils.taskexecutor.TaskExecutor
+import com.google.common.util.concurrent.Futures
+import java.util.UUID
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.InMemoryStore
@@ -76,20 +85,31 @@ class SyncWorkerTest {
         )
         dao.upsert(txn)
 
-        // Build WorkerParameters manually for direct construction
-        val params = androidx.work.WorkerParameters(
-            0,
+        // Build WorkerParameters manually with synchronous executors
+        val exec = SynchronousExecutor()
+        val taskExecutor = object : TaskExecutor {
+            override fun getMainThreadExecutor() = exec
+            override fun getBackgroundExecutor() = exec
+            override fun postToMainThread(runnable: Runnable) { runnable.run() }
+            override fun isMainThread(): Boolean = true
+        }
+        val params = WorkerParameters(
+            UUID.randomUUID(),
             Data.EMPTY,
-            emptyList(),
-            androidx.work.WorkerParameters.RuntimeExtras(),
+            emptySet(),
+            WorkerParameters.RuntimeExtras(),
             1,
-            1,
-            androidx.work.ForegroundUpdater { _, _ -> },
-            androidx.work.impl.utils.SynchronousExecutor(),
-            androidx.work.WorkTaskExecutor(
-                androidx.work.impl.utils.SynchronousExecutor(),
-                androidx.work.impl.utils.SynchronousExecutor()
-            )
+            exec,
+            taskExecutor,
+            WorkerFactory.getDefaultWorkerFactory(),
+            object : ProgressUpdater { override fun updateProgress(id: UUID, data: Data) {} },
+            object : ForegroundUpdater {
+                override fun setForegroundAsync(
+                    context: android.content.Context,
+                    id: UUID,
+                    foregroundInfo: ForegroundInfo
+                ) = Futures.immediateVoidFuture()
+            }
         )
         val worker = SyncWorker(context, params, repo)
         val result = worker.doWork()
