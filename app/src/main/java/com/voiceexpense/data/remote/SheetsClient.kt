@@ -6,7 +6,7 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.converter.moshi.MoshiConverterFactory
 
-class SheetsClient(
+open class SheetsClient(
     private val baseUrl: String = "https://sheets.googleapis.com",
     client: OkHttpClient? = null,
     moshi: Moshi = Moshi.Builder().build()
@@ -24,7 +24,7 @@ class SheetsClient(
         .build()
         .create(SheetsApi::class.java)
 
-    suspend fun appendRow(
+    open suspend fun appendRow(
         accessToken: String,
         spreadsheetId: String,
         sheetName: String,
@@ -41,4 +41,3 @@ class SheetsClient(
         }
     }
 }
-
