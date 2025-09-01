@@ -1,10 +1,9 @@
 package com.voiceexpense.worker
 
-import android.content.Context
 import androidx.test.core.app.ApplicationProvider
 import androidx.work.Data
 import androidx.work.ListenableWorker
-import androidx.work.WorkerParameters
+import androidx.work.testing.TestListenableWorkerBuilder
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.InMemoryStore
@@ -48,12 +47,7 @@ class FakeSheetsClient(var succeed: Boolean = true) : SheetsClient() {
 class SyncWorkerTest {
     @Test
     fun queuedTransactions_postedOnSuccess() = runBlocking {
-        val context = ApplicationProvider.getApplicationContext<Context>()
-        val params = WorkerParameters(
-            0, Data.EMPTY, emptyList(), WorkerParameters.RuntimeExtras(), 1, 1,
-            androidx.work.ForegroundUpdater { _, _ -> }, androidx.work.impl.utils.SynchronousExecutor(),
-            androidx.work.WorkTaskExecutor(androidx.work.impl.utils.SynchronousExecutor(), androidx.work.impl.utils.SynchronousExecutor())
-        )
+        val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
         val dao = FakeDao()
         val repo = TransactionRepository(dao)
@@ -83,11 +77,12 @@ class SyncWorkerTest {
         )
         dao.upsert(txn)
 
-        val worker = SyncWorker(context, params)
+        val worker = TestListenableWorkerBuilder<SyncWorker>(context)
+            .setInputData(Data.EMPTY)
+            .build()
         val result = worker.doWork()
         assertThat(result).isEqualTo(ListenableWorker.Result.success())
         val updated = dao.getById(txn.id)!!
         assertThat(updated.status).isEqualTo(TransactionStatus.POSTED)
     }
 }
-
