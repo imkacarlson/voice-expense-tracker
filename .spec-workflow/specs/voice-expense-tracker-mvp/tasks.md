@@ -1,6 +1,6 @@
 # Tasks Document
 
-- [ ] 0. Establish testing stack and policy
+- [x] 0. Establish testing stack and policy
   - File: app/build.gradle.kts; app/src/test/java/com/voiceexpense/testutil/*; app/src/androidTest/java/com/voiceexpense/testutil/*
   - Add test deps: JUnit, Robolectric, Espresso, MockK, Turbine, Truth (or AssertJ), Coroutines test
   - Configure testOptions (unitTests.returnDefaultValues=true), JVM target, and runner for androidTest
@@ -10,7 +10,7 @@
   - _Leverage: tech.md Testing Strategy_
   - _Requirements: Non-functional: Reliability/Testing_
 
-- [ ] 1. Initialize Android project and module
+- [x] 1. Initialize Android project and module
   - File: project root (Gradle wrappers, settings)
   - Create Kotlin Android app (minSdk 34 target), package `com.voiceexpense`
   - Add dependencies: Hilt, Room, WorkManager, Retrofit/OkHttp, Play Services Auth, ML Kit Speech, ML Kit GenAI, Kotlin coroutines
@@ -18,7 +18,7 @@
   - _Leverage: tech.md Build & Dependencies_
   - _Requirements: All (foundation)_
 
-- [ ] 2. Add manifest, permissions, and baseline resources
+- [x] 2. Add manifest, permissions, and baseline resources
   - File: app/src/main/AndroidManifest.xml
   - Declare permissions: RECORD_AUDIO, FOREGROUND_SERVICE, INTERNET; add app widget provider and service declarations; notification channel meta
   - Purpose: Enable voice service, widget, and network sync
