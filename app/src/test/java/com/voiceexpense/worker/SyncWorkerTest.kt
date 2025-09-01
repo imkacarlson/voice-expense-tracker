@@ -17,6 +17,8 @@ import com.voiceexpense.data.repository.TransactionRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.math.BigDecimal
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import java.time.LocalDate
 
 class FakeDao : TransactionDao {
@@ -44,6 +46,7 @@ class FakeSheetsClient(var succeed: Boolean = true) : SheetsClient() {
     }
 }
 
+@RunWith(RobolectricTestRunner::class)
 class SyncWorkerTest {
     @Test
     fun queuedTransactions_postedOnSuccess() = runBlocking {

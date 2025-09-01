@@ -44,7 +44,10 @@ android {
     }
 
     testOptions {
-        unitTests.isReturnDefaultValues = true
+        unitTests {
+            isReturnDefaultValues = true
+            isIncludeAndroidResources = true
+        }
     }
 }
 
@@ -67,6 +70,9 @@ dependencies {
 
     // WorkManager
     implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // Hilt integration for WorkManager (DI for Workers)
+    implementation("androidx.hilt:hilt-work:1.2.0")
+    kapt("androidx.hilt:hilt-compiler:1.2.0")
 
     // Retrofit/OkHttp
     implementation("com.squareup.retrofit2:retrofit:2.11.0")

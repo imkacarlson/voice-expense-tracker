@@ -7,12 +7,15 @@ import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
 import kotlinx.coroutines.runBlocking
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.LocalDate
 
+@RunWith(RobolectricTestRunner::class)
 class TransactionDaoTest {
     private lateinit var db: AppDatabase
     private lateinit var dao: TransactionDao
@@ -56,4 +59,3 @@ class TransactionDaoTest {
         assertThat(posted.map { it.id }).contains(txn.id)
     }
 }
-
