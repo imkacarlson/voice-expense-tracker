@@ -1,0 +1,118 @@
+package com.voiceexpense.service.voice
+
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationManager
+import android.app.Service
+import android.content.Context
+import android.content.Intent
+import android.os.IBinder
+import androidx.core.app.NotificationCompat
+import com.voiceexpense.ai.parsing.ParsingContext
+import com.voiceexpense.ai.parsing.TransactionParser
+import com.voiceexpense.ai.speech.AudioRecordingManager
+import com.voiceexpense.ai.speech.SpeechRecognitionService
+import com.voiceexpense.data.model.Transaction
+import com.voiceexpense.data.model.TransactionStatus
+import com.voiceexpense.data.model.TransactionType
+import com.voiceexpense.data.repository.TransactionRepository
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.launch
+import java.math.BigDecimal
+import java.time.LocalDate
+
+@AndroidEntryPoint
+class VoiceRecordingService : Service() {
+    companion object {
+        const val CHANNEL_ID = "voice_recording"
+        const val NOTIF_ID = 1001
+        const val ACTION_START = "com.voiceexpense.action.START"
+        const val ACTION_STOP = "com.voiceexpense.action.STOP"
+        const val ACTION_DRAFT_READY = "com.voiceexpense.action.DRAFT_READY"
+        const val EXTRA_TRANSACTION_ID = "transaction_id"
+    }
+
+    private val scope = CoroutineScope(Dispatchers.Default)
+    private var job: Job? = null
+
+    @Inject lateinit var audio: AudioRecordingManager
+    @Inject lateinit var asr: SpeechRecognitionService
+    @Inject lateinit var parser: TransactionParser
+    @Inject lateinit var repo: TransactionRepository
+
+    override fun onBind(intent: Intent?): IBinder? = null
+
+    override fun onCreate() {
+        super.onCreate()
+        createChannel()
+        // Dependencies injected by Hilt
+    }
+
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        when (intent?.action) {
+            ACTION_START -> startCapture()
+            ACTION_STOP -> stopCapture()
+        }
+        return START_STICKY
+    }
+
+    private fun startCapture() {
+        startForeground(NOTIF_ID, notification("Listening…"))
+        job?.cancel()
+        job = scope.launch {
+            // Safety timeout to avoid battery drain
+            val timeoutJob = launch { kotlinx.coroutines.delay(20_000); stopCapture() }
+            // For now, emit a debug transcript directly; hook up AudioRecordingManager later
+            asr.transcribeDebug("Expense 12.34 at Merchant").collectLatest { text ->
+                val parsed = parser.parse(text, ParsingContext(defaultDate = LocalDate.now()))
+                val txn = Transaction(
+                    userLocalDate = parsed.userLocalDate,
+                    amountUsd = parsed.amountUsd ?: BigDecimal("0.00"),
+                    merchant = parsed.merchant.ifBlank { "Unknown" },
+                    description = parsed.description,
+                    type = when (parsed.type) {
+                        "Income" -> TransactionType.Income
+                        "Transfer" -> TransactionType.Transfer
+                        else -> TransactionType.Expense
+                    },
+                    expenseCategory = parsed.expenseCategory,
+                    incomeCategory = parsed.incomeCategory,
+                    tags = parsed.tags,
+                    account = parsed.account,
+                    splitOverallChargedUsd = parsed.splitOverallChargedUsd,
+                    note = parsed.note,
+                    confidence = parsed.confidence,
+                    status = TransactionStatus.DRAFT
+                )
+                repo.saveDraft(txn)
+                sendBroadcast(Intent(ACTION_DRAFT_READY).putExtra(EXTRA_TRANSACTION_ID, txn.id))
+                stopCapture()
+            }
+            timeoutJob.cancel()
+        }
+    }
+
+    private fun stopCapture() {
+        job?.cancel()
+        stopForeground(STOP_FOREGROUND_REMOVE)
+        stopSelf()
+    }
+
+    private fun createChannel() {
+        val mgr = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val channel = NotificationChannel(CHANNEL_ID, "Voice Recording", NotificationManager.IMPORTANCE_LOW)
+        mgr.createNotificationChannel(channel)
+    }
+
+    private fun notification(text: String): Notification = NotificationCompat.Builder(this, CHANNEL_ID)
+        .setContentTitle("Voice Expense")
+        .setContentText(text)
+        .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+        .setOngoing(true)
+        .build()
+}

@@ -1,4 +1,13 @@
 <resources>
     <string name="app_name">Voice Expense</string>
+    <string name="confirm">Confirm</string>
+    <string name="cancel">Cancel</string>
+    <string name="speak_correction">Speak Correction</string>
+    <string name="draft_transaction">Draft transaction</string>
+    <string name="widget_tap_to_capture">Tap to start voice capture</string>
+    <string name="settings_title">Settings</string>
+    <string name="spreadsheet_id">Spreadsheet ID</string>
+    <string name="sheet_name">Sheet name</string>
+    <string name="known_accounts">Known accounts (comma-separated)</string>
+    <string name="save">Save</string>
 </resources>
-

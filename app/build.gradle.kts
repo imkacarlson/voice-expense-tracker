@@ -70,6 +70,7 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-moshi:2.11.0")
     implementation("com.squareup.okhttp3:logging-interceptor:4.12.0")
+    testImplementation("com.squareup.okhttp3:mockwebserver:4.12.0")
 
     // Play Services Auth (Google Sign-In)
     implementation("com.google.android.gms:play-services-auth:21.2.0")
@@ -89,8 +90,13 @@ dependencies {
     testImplementation("app.cash.turbine:turbine:1.1.0")
     testImplementation("org.robolectric:robolectric:4.11.1")
 
+    // Security (EncryptedSharedPreferences)
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
+
+    // WorkManager testing
+    testImplementation("androidx.work:work-testing:2.9.1")
+
     androidTestImplementation("androidx.test.ext:junit:1.2.1")
     androidTestImplementation("androidx.test.espresso:espresso-core:3.6.1")
     androidTestImplementation("com.google.truth:truth:1.4.4")
 }
-
