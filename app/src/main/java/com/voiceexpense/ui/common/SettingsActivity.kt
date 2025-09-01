@@ -40,6 +40,17 @@ class SettingsActivity : AppCompatActivity() {
         sheet.setText(prefs.getString(SettingsKeys.SHEET_NAME, "Sheet1"))
         accounts.setText(prefs.getString(SettingsKeys.KNOWN_ACCOUNTS, ""))
 
+        fun updateGatingMessage() {
+            val hasSheetConfig = !prefs.getString(SettingsKeys.SPREADSHEET_ID, "").isNullOrBlank() &&
+                    !prefs.getString(SettingsKeys.SHEET_NAME, "").isNullOrBlank()
+            val acct = GoogleSignIn.getLastSignedInAccount(this)
+            gating.text = when {
+                !hasSheetConfig -> getString(R.string.sync_gating_message_default)
+                acct == null -> getString(R.string.sync_gating_message_need_sign_in)
+                else -> getString(R.string.sync_gating_message_ready, prefs.getString(SettingsKeys.SHEET_NAME, "") ?: "")
+            }
+        }
+
         save.setOnClickListener {
             val ss = spreadsheet.text.toString().trim()
             val sh = sheet.text.toString().trim()
@@ -90,17 +101,6 @@ class SettingsActivity : AppCompatActivity() {
                 updateAuthStatus(null)
                 android.widget.Toast.makeText(this, R.string.info_sign_in_required, android.widget.Toast.LENGTH_SHORT).show()
                 updateGatingMessage()
-            }
-        }
-
-        fun updateGatingMessage() {
-            val hasSheetConfig = !prefs.getString(SettingsKeys.SPREADSHEET_ID, "").isNullOrBlank() &&
-                    !prefs.getString(SettingsKeys.SHEET_NAME, "").isNullOrBlank()
-            val acct = GoogleSignIn.getLastSignedInAccount(this)
-            gating.text = when {
-                !hasSheetConfig -> getString(R.string.sync_gating_message_default)
-                acct == null -> getString(R.string.sync_gating_message_need_sign_in)
-                else -> getString(R.string.sync_gating_message_ready, prefs.getString(SettingsKeys.SHEET_NAME, "") ?: "")
             }
         }
 
