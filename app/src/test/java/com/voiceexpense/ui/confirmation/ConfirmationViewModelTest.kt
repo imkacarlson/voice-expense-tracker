@@ -9,12 +9,15 @@ import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.data.repository.TransactionRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
+import org.junit.Rule
+import com.voiceexpense.testutil.MainDispatcherRule
 import java.math.BigDecimal
 import java.time.LocalDate
 
 class FakeDao2 : TransactionDao by com.voiceexpense.worker.FakeDao()
 
 class ConfirmationViewModelTest {
+    @get:Rule val mainRule = MainDispatcherRule()
     @Test
     fun applyCorrection_updatesAmount() = runBlocking {
         val dao = com.voiceexpense.worker.FakeDao()
