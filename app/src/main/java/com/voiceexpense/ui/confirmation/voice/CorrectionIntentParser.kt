@@ -17,13 +17,6 @@ class CorrectionIntentParser {
         if (lc in setOf("cancel", "discard")) return CorrectionIntent.Cancel
         if (lc in setOf("repeat", "again", "say again")) return CorrectionIntent.Repeat
 
-        // Type
-        when {
-            lc.contains("expense") -> return CorrectionIntent.SetType(TransactionType.Expense)
-            lc.contains("income") -> return CorrectionIntent.SetType(TransactionType.Income)
-            lc.contains("transfer") -> return CorrectionIntent.SetType(TransactionType.Transfer)
-        }
-
         // Amounts (share and overall charged)
         // Heuristic: if phrase contains "overall" treat as overall charged
         val number = Regex("(\\d+)(?:\\.(\\d{1,2}))?").find(lc)?.value
@@ -45,12 +38,19 @@ class CorrectionIntentParser {
             return CorrectionIntent.SetDescription(it.groupValues[2].trim())
         }
 
-        // Categories
+        // Categories (check before generic type detection to avoid matching the word 'income'/'expense')
         Regex("^(category|expense category)\\s+(.+)$", RegexOption.IGNORE_CASE).find(raw)?.let {
             return CorrectionIntent.SetExpenseCategory(it.groupValues[2].trim())
         }
         Regex("^(income category)\\s+(.+)$", RegexOption.IGNORE_CASE).find(raw)?.let {
             return CorrectionIntent.SetIncomeCategory(it.groupValues[2].trim())
+        }
+
+        // Type (generic)
+        when {
+            lc.contains("expense") -> return CorrectionIntent.SetType(TransactionType.Expense)
+            lc.contains("income") -> return CorrectionIntent.SetType(TransactionType.Income)
+            lc.contains("transfer") -> return CorrectionIntent.SetType(TransactionType.Transfer)
         }
 
         // Tags (append by default, replace if phrase starts with replace tags)
@@ -80,4 +80,3 @@ class CorrectionIntentParser {
         return CorrectionIntent.Unknown(raw)
     }
 }
-

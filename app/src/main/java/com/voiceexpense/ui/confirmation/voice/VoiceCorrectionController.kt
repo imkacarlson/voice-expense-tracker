@@ -21,7 +21,7 @@ class VoiceCorrectionController(
     private val tts: TtsEngine,
     private val parser: CorrectionIntentParser,
     private val renderer: PromptRenderer,
-    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Main)
+    private val scope: CoroutineScope = CoroutineScope(Dispatchers.Default)
 ) {
     private var debug: Boolean = false
     private var current: Transaction? = null
