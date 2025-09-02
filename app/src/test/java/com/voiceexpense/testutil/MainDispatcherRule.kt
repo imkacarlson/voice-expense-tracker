@@ -3,8 +3,8 @@ package com.voiceexpense.testutil
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.test.TestDispatcher
-import kotlinx.coroutines.test.StandardTestDispatcher
 import kotlinx.coroutines.test.TestCoroutineScheduler
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
 import kotlinx.coroutines.test.resetMain
 import kotlinx.coroutines.test.setMain
 import org.junit.rules.TestWatcher
@@ -12,11 +12,11 @@ import org.junit.runner.Description
 
 @OptIn(ExperimentalCoroutinesApi::class)
 class MainDispatcherRule(
-    val testDispatcher: TestDispatcher = StandardTestDispatcher()
+    private val _scheduler: TestCoroutineScheduler = TestCoroutineScheduler(),
+    val testDispatcher: TestDispatcher = UnconfinedTestDispatcher(_scheduler)
 ) : TestWatcher() {
 
-    val scheduler: TestCoroutineScheduler
-        get() = (testDispatcher as StandardTestDispatcher).scheduler
+    val scheduler: TestCoroutineScheduler get() = _scheduler
 
     override fun starting(description: Description?) {
         Dispatchers.setMain(testDispatcher)
@@ -26,5 +26,5 @@ class MainDispatcherRule(
         Dispatchers.resetMain()
     }
 
-    fun advanceUntilIdle() { scheduler.advanceUntilIdle() }
+    fun advanceUntilIdle() { _scheduler.advanceUntilIdle() }
 }
