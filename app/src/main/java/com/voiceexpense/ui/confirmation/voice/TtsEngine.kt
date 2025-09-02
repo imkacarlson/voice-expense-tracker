@@ -12,7 +12,7 @@ import kotlinx.coroutines.withContext
 open class TtsEngine {
     @Volatile private var stopped: Boolean = false
 
-    suspend fun speak(text: String) = withContext(Dispatchers.Default) {
+    open suspend fun speak(text: String) = withContext(Dispatchers.Default) {
         stopped = false
         // Simulate speaking time; 15ms per character capped.
         val millis = text.length.coerceAtMost(160) * 15L
