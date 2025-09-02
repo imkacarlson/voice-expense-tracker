@@ -5,7 +5,7 @@ import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
 import kotlinx.coroutines.ExperimentalCoroutinesApi
-import kotlinx.coroutines.flow.first
+import app.cash.turbine.test
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.math.BigDecimal
@@ -38,13 +38,19 @@ class VoiceCorrectionControllerTest {
             tts = InstantTts(), parser = CorrectionIntentParser(), renderer = PromptRenderer()
         )
         controller.start(draft())
-        controller.onTranscript("merchant Starbucks")
-        val updated = controller.updates.first()
-        assertThat(updated.merchant).isEqualTo("Starbucks")
 
-        controller.onTranscript("yes")
-        val confirmed = controller.confirmed.first()
-        assertThat(confirmed.merchant).isEqualTo("Starbucks")
+        controller.updates.test {
+            controller.onTranscript("merchant Starbucks")
+            val updated = awaitItem()
+            assertThat(updated.merchant).isEqualTo("Starbucks")
+            cancelAndIgnoreRemainingEvents()
+        }
+
+        controller.confirmed.test {
+            controller.onTranscript("yes")
+            val confirmed = awaitItem()
+            assertThat(confirmed.merchant).isEqualTo("Starbucks")
+            cancelAndIgnoreRemainingEvents()
+        }
     }
 }
-
