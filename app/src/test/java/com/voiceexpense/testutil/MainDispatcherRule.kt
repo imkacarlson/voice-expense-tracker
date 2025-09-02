@@ -27,4 +27,5 @@ class MainDispatcherRule(
     }
 
     fun advanceUntilIdle() { _scheduler.advanceUntilIdle() }
+    fun runCurrent() { _scheduler.runCurrent() }
 }

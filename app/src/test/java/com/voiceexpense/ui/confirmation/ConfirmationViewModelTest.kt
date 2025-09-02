@@ -50,9 +50,9 @@ class ConfirmationViewModelTest {
             status = TransactionStatus.DRAFT
         )
         vm.setDraft(t)
-        mainRule.advanceUntilIdle()
+        mainRule.runCurrent()
         vm.applyCorrection("actually 2.50")
-        mainRule.advanceUntilIdle()
+        mainRule.runCurrent()
         val updated = vm.transaction.value!!
         assertThat(updated.amountUsd?.toPlainString()).isEqualTo("2.50")
         assertThat(updated.correctionsCount).isEqualTo(1)
@@ -86,9 +86,9 @@ class ConfirmationViewModelTest {
         )
         dao.upsert(t)
         vm.setDraft(t)
-        mainRule.advanceUntilIdle()
+        mainRule.runCurrent()
         vm.confirm()
-        mainRule.advanceUntilIdle()
+        mainRule.runCurrent()
         val updated = dao.getById(t.id)!!
         // confirm() marks CONFIRMED then enqueues for sync
         assertThat(updated.status).isEqualTo(TransactionStatus.QUEUED)
