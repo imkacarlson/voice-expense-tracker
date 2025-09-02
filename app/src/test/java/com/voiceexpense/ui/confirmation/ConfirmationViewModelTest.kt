@@ -9,7 +9,6 @@ import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.data.repository.TransactionRepository
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.test.StandardTestDispatcher
 import com.voiceexpense.ui.confirmation.voice.CorrectionIntentParser
 import com.voiceexpense.ui.confirmation.voice.PromptRenderer
 import com.voiceexpense.ui.confirmation.voice.TtsEngine
@@ -28,12 +27,11 @@ class ConfirmationViewModelTest {
     fun applyCorrection_updatesAmount() = runBlocking {
         val dao = com.voiceexpense.worker.FakeDao()
         val repo = TransactionRepository(dao)
-        val testDispatcher = (mainRule.testDispatcher as StandardTestDispatcher)
         val controller = VoiceCorrectionController(
             tts = object : TtsEngine() { override suspend fun speak(text: String) { /* no-op */ } },
             parser = CorrectionIntentParser(),
             renderer = PromptRenderer(),
-            scope = CoroutineScope(testDispatcher)
+            scope = CoroutineScope(mainRule.testDispatcher)
         )
         val vm = ConfirmationViewModel(repo, TransactionParser(), controller)
         val t = Transaction(
@@ -52,9 +50,9 @@ class ConfirmationViewModelTest {
             status = TransactionStatus.DRAFT
         )
         vm.setDraft(t)
-        testDispatcher.scheduler.advanceUntilIdle()
+        mainRule.advanceUntilIdle()
         vm.applyCorrection("actually 2.50")
-        testDispatcher.scheduler.advanceUntilIdle()
+        mainRule.advanceUntilIdle()
         val updated = vm.transaction.value!!
         assertThat(updated.amountUsd?.toPlainString()).isEqualTo("2.50")
         assertThat(updated.correctionsCount).isEqualTo(1)
@@ -64,12 +62,11 @@ class ConfirmationViewModelTest {
     fun confirm_enqueues() = runBlocking {
         val dao = com.voiceexpense.worker.FakeDao()
         val repo = TransactionRepository(dao)
-        val testDispatcher = (mainRule.testDispatcher as StandardTestDispatcher)
         val controller = VoiceCorrectionController(
             tts = object : TtsEngine() { override suspend fun speak(text: String) { /* no-op */ } },
             parser = CorrectionIntentParser(),
             renderer = PromptRenderer(),
-            scope = CoroutineScope(testDispatcher)
+            scope = CoroutineScope(mainRule.testDispatcher)
         )
         val vm = ConfirmationViewModel(repo, TransactionParser(), controller)
         val t = Transaction(
@@ -89,9 +86,9 @@ class ConfirmationViewModelTest {
         )
         dao.upsert(t)
         vm.setDraft(t)
-        testDispatcher.scheduler.advanceUntilIdle()
+        mainRule.advanceUntilIdle()
         vm.confirm()
-        testDispatcher.scheduler.advanceUntilIdle()
+        mainRule.advanceUntilIdle()
         val updated = dao.getById(t.id)!!
         // confirm() marks CONFIRMED then enqueues for sync
         assertThat(updated.status).isEqualTo(TransactionStatus.QUEUED)
