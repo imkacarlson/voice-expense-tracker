@@ -14,6 +14,10 @@ import com.voiceexpense.data.local.AppDatabase
 import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.remote.SheetsClient
 import com.voiceexpense.data.repository.TransactionRepository
+import com.voiceexpense.ui.confirmation.voice.CorrectionIntentParser
+import com.voiceexpense.ui.confirmation.voice.PromptRenderer
+import com.voiceexpense.ui.confirmation.voice.TtsEngine
+import com.voiceexpense.ui.confirmation.voice.VoiceCorrectionController
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -55,4 +59,14 @@ object AppModule {
     @Provides fun provideAudio(): AudioRecordingManager = AudioRecordingManager()
     @Provides fun provideAsr(): SpeechRecognitionService = SpeechRecognitionService()
     @Provides fun provideParser(): TransactionParser = TransactionParser()
+
+    // Voice correction loop components
+    @Provides fun provideCorrectionIntentParser(): CorrectionIntentParser = CorrectionIntentParser()
+    @Provides fun providePromptRenderer(): PromptRenderer = PromptRenderer()
+    @Provides fun provideTtsEngine(): TtsEngine = TtsEngine()
+    @Provides fun provideVoiceCorrectionController(
+        tts: TtsEngine,
+        cip: CorrectionIntentParser,
+        renderer: PromptRenderer
+    ): VoiceCorrectionController = VoiceCorrectionController(tts = tts, parser = cip, renderer = renderer)
 }

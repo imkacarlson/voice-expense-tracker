@@ -19,6 +19,7 @@ object SettingsKeys {
     const val SPREADSHEET_ID = "spreadsheet_id"
     const val SHEET_NAME = "sheet_name"
     const val KNOWN_ACCOUNTS = "known_accounts" // comma-separated labels
+    const val DEBUG_LOGS = "debug_logs" // developer toggle for verbose local logs
 }
 
 class SettingsActivity : AppCompatActivity() {

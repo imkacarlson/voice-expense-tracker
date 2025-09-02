@@ -8,6 +8,10 @@ import androidx.lifecycle.lifecycleScope
 import com.voiceexpense.R
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.speech.SpeechRecognitionService
+import com.voiceexpense.ui.confirmation.voice.CorrectionIntentParser
+import com.voiceexpense.ui.confirmation.voice.PromptRenderer
+import com.voiceexpense.ui.confirmation.voice.TtsEngine
+import com.voiceexpense.ui.confirmation.voice.VoiceCorrectionController
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.worker.enqueueSyncNow
 import dagger.hilt.android.AndroidEntryPoint
@@ -24,7 +28,15 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         setContentView(R.layout.activity_transaction_confirmation)
 
         // Basic wiring without DI; replaced by Hilt later
-        viewModel = ConfirmationViewModel(repo, TransactionParser())
+        val controller = VoiceCorrectionController(
+            tts = TtsEngine(),
+            parser = CorrectionIntentParser(),
+            renderer = PromptRenderer()
+        )
+        viewModel = ConfirmationViewModel(repo, TransactionParser(), controller)
+        // Enable debug logs if developer toggle is set
+        val prefs = getSharedPreferences(com.voiceexpense.ui.common.SettingsKeys.PREFS, android.content.Context.MODE_PRIVATE)
+        controller.setDebug(prefs.getBoolean(com.voiceexpense.ui.common.SettingsKeys.DEBUG_LOGS, false))
 
         val title: TextView = findViewById(R.id.txn_title)
         val confirm: Button = findViewById(R.id.btn_confirm)
@@ -41,7 +53,10 @@ class TransactionConfirmationActivity : AppCompatActivity() {
 
         // Placeholder voice correction using ASR debug
         val asr = SpeechRecognitionService()
+        // Subscribe to TTS prompt events (no-op here; real app would speak)
+        lifecycleScope.launch { viewModel.ttsEvents.collect { /* hook TTS */ } }
         speak.setOnClickListener {
+            viewModel.interruptTts()
             // In real app, start listening and feed transcript; here we demo a sample correction
             lifecycleScope.launch {
                 asr.transcribeDebug("actually 25.00").collect { text ->
