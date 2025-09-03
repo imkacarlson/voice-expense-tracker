@@ -39,6 +39,8 @@ class VoiceRecordingService : Service() {
 
     private val scope = CoroutineScope(Dispatchers.Default)
     private var job: Job? = null
+    private var lastLaunchedId: String? = null
+    private var lastLaunchAt: Long = 0L
 
     @Inject lateinit var audio: AudioRecordingManager
     @Inject lateinit var asr: SpeechRecognitionService
@@ -90,7 +92,19 @@ class VoiceRecordingService : Service() {
                     status = TransactionStatus.DRAFT
                 )
                 repo.saveDraft(txn)
+                // Notify listeners (optional)
                 sendBroadcast(Intent(ACTION_DRAFT_READY).putExtra(EXTRA_TRANSACTION_ID, txn.id))
+                // Debounce duplicate launches for the same id
+                val now = System.currentTimeMillis()
+                val shouldLaunch = lastLaunchedId != txn.id || (now - lastLaunchAt) > 2000
+                if (shouldLaunch) {
+                    val confirmIntent = Intent(applicationContext, com.voiceexpense.ui.confirmation.TransactionConfirmationActivity::class.java)
+                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        .putExtra(EXTRA_TRANSACTION_ID, txn.id)
+                    startActivity(confirmIntent)
+                    lastLaunchedId = txn.id
+                    lastLaunchAt = now
+                }
                 stopCapture()
             }
             timeoutJob.cancel()

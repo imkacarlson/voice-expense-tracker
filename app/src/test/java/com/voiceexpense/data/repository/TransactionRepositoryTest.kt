@@ -140,4 +140,14 @@ class TransactionRepositoryTest {
         confidence = 1f,
         status = TransactionStatus.DRAFT
     )
+
+    @Test
+    fun getById_returnsInsertedDraftOrNull() = runBlocking {
+        val t = base()
+        dao.upsert(t)
+        val found = repo.getById(t.id)
+        assertThat(found?.id).isEqualTo(t.id)
+        val missing = repo.getById("nope")
+        assertThat(missing).isNull()
+    }
 }

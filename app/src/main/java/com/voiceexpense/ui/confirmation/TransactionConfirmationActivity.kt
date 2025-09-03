@@ -1,6 +1,7 @@
 package com.voiceexpense.ui.confirmation
 
 import android.os.Bundle
+import android.widget.Toast
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
@@ -44,6 +45,24 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val speak: Button = findViewById(R.id.btn_speak)
 
         title.text = getString(R.string.app_name)
+
+        // Load draft by id if provided
+        val id = intent?.getStringExtra(com.voiceexpense.service.voice.VoiceRecordingService.EXTRA_TRANSACTION_ID)
+        if (id.isNullOrBlank()) {
+            Toast.makeText(this, R.string.error_open_draft_failed, Toast.LENGTH_SHORT).show()
+            finish()
+            return
+        }
+
+        lifecycleScope.launch {
+            val draft = repo.getById(id)
+            if (draft == null) {
+                Toast.makeText(this@TransactionConfirmationActivity, R.string.error_open_draft_failed, Toast.LENGTH_SHORT).show()
+                finish()
+                return@launch
+            }
+            viewModel.setDraft(draft)
+        }
 
         confirm.setOnClickListener {
             viewModel.confirm()

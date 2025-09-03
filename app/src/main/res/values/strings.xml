@@ -24,4 +24,5 @@
     <string name="info_settings_saved">Settings saved.</string>
     <string name="error_sign_in_required">Sign in required to post to Google Sheets.</string>
     <string name="error_token_fetch_failed">Could not get sign-in token. Try again later.</string>
+    <string name="error_open_draft_failed">Could not open draft. Please try again.</string>
 </resources>
