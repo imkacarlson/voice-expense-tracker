@@ -41,7 +41,11 @@ class SyncWorkerAuthTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
         val dao = FakeDao()
-        val auth = AuthRepository(InMemoryStore()).apply { setAccount("user", "user@example.com"); setAccessToken("t") }
+        val auth = AuthRepository(InMemoryStore())
+        runBlockingUnit {
+            auth.setAccount("user", "user@example.com")
+            auth.setAccessToken("t")
+        }
         val repo = TransactionRepository(dao, SheetsSuccess(), auth, FakeTokenProvider2("t")).apply {
             spreadsheetId = "id"; sheetName = "Sheet1"
         }
@@ -84,4 +88,3 @@ class SyncWorkerAuthTest {
 
 // Helper to call suspend in test without coroutines-test in this file
 private fun runBlockingUnit(block: suspend () -> Unit) = kotlinx.coroutines.runBlocking { block() }
-
