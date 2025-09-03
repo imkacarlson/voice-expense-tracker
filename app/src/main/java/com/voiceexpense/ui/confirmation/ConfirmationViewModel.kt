@@ -50,8 +50,7 @@ class ConfirmationViewModel(
             if (number != null && !utterance.contains("overall", ignoreCase = true)) {
                 runCatching { java.math.BigDecimal(number) }.getOrNull()?.let { amt ->
                     _transaction.value = current.copy(
-                        amountUsd = amt,
-                        correctionsCount = current.correctionsCount + 1
+                        amountUsd = amt
                     )
                 }
             }

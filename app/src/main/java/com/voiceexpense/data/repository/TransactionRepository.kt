@@ -52,10 +52,6 @@ class TransactionRepository(
         var posted = 0
         var failed = 0
         val accountEmail = authRepo.getAccountEmail() ?: ""
-        if (accountEmail.isBlank()) {
-            // No signed-in account; skip all posts but keep queued
-            return SyncResult(attempted = queued.size, posted = 0, failed = queued.size)
-        }
         val scope = "https://www.googleapis.com/auth/spreadsheets"
         var token = tokens.getAccessToken(accountEmail, scope)
         for (t in queued) {

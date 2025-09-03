@@ -5,6 +5,7 @@ import androidx.room.Room
 import com.squareup.moshi.Moshi
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.EncryptedPrefsStore
+import com.voiceexpense.auth.InMemoryStore
 import com.voiceexpense.auth.TokenProvider
 import com.voiceexpense.auth.GoogleIdentityTokenProvider
 import com.voiceexpense.ai.parsing.TransactionParser
@@ -55,7 +56,12 @@ object AppModule {
     fun provideSheets(client: OkHttpClient, moshi: Moshi): SheetsClient = SheetsClient(client = client, moshi = moshi)
 
     @Provides @Singleton
-    fun provideAuth(@ApplicationContext ctx: Context): AuthRepository = AuthRepository(EncryptedPrefsStore(ctx))
+    fun provideAuth(@ApplicationContext ctx: Context): AuthRepository = try {
+        AuthRepository(EncryptedPrefsStore(ctx))
+    } catch (t: Throwable) {
+        // Robolectric/host unit tests don't have AndroidKeyStore; fall back to in-memory store
+        AuthRepository(InMemoryStore())
+    }
 
     @Provides @Singleton
     fun provideTokenProvider(@ApplicationContext ctx: Context, auth: com.voiceexpense.auth.AuthRepository): TokenProvider =
