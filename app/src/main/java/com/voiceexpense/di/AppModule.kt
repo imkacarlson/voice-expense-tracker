@@ -6,7 +6,7 @@ import com.squareup.moshi.Moshi
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.EncryptedPrefsStore
 import com.voiceexpense.auth.TokenProvider
-import com.voiceexpense.auth.StaticTokenProvider
+import com.voiceexpense.auth.GoogleIdentityTokenProvider
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.speech.AudioRecordingManager
 import com.voiceexpense.ai.speech.SpeechRecognitionService
@@ -37,8 +37,12 @@ object AppModule {
     @Provides fun provideDao(db: AppDatabase): TransactionDao = db.transactionDao()
 
     @Provides @Singleton
-    fun provideRepo(dao: TransactionDao, sheets: SheetsClient, auth: AuthRepository): TransactionRepository =
-        TransactionRepository(dao, sheets, auth)
+    fun provideRepo(
+        dao: TransactionDao,
+        sheets: SheetsClient,
+        auth: AuthRepository,
+        tokenProvider: com.voiceexpense.auth.TokenProvider
+    ): TransactionRepository = TransactionRepository(dao, sheets, auth, tokenProvider)
 
     @Provides @Singleton fun provideMoshi(): Moshi = Moshi.Builder().build()
 
@@ -54,7 +58,8 @@ object AppModule {
     fun provideAuth(@ApplicationContext ctx: Context): AuthRepository = AuthRepository(EncryptedPrefsStore(ctx))
 
     @Provides @Singleton
-    fun provideTokenProvider(): TokenProvider = StaticTokenProvider()
+    fun provideTokenProvider(@ApplicationContext ctx: Context, auth: com.voiceexpense.auth.AuthRepository): TokenProvider =
+        GoogleIdentityTokenProvider(ctx, auth)
 
     @Provides fun provideAudio(): AudioRecordingManager = AudioRecordingManager()
     @Provides fun provideAsr(): SpeechRecognitionService = SpeechRecognitionService()

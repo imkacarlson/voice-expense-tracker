@@ -2,6 +2,7 @@ package com.voiceexpense.data.repository
 
 import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.auth.AuthRepository
+import com.voiceexpense.auth.TokenProvider
 import com.voiceexpense.data.model.SheetReference
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
@@ -16,7 +17,8 @@ data class SyncResult(val attempted: Int, val posted: Int, val failed: Int)
 class TransactionRepository(
     private val dao: TransactionDao,
     private val sheets: SheetsClient? = null,
-    private val auth: AuthRepository? = null
+    private val auth: AuthRepository? = null,
+    private val tokenProvider: TokenProvider? = null
 ) {
     private val timestampFormatter: DateTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneOffset.UTC)
     private val dateFormatter: DateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE
@@ -43,13 +45,19 @@ class TransactionRepository(
     suspend fun syncPending(): SyncResult {
         val sheetsClient = sheets ?: error("SheetsClient not provided")
         val authRepo = auth ?: error("AuthRepository not provided")
+        val tokens = tokenProvider ?: error("TokenProvider not provided")
         require(spreadsheetId.isNotBlank() && sheetName.isNotBlank()) { "Spreadsheet configuration missing" }
 
         val queued = dao.getByStatus(TransactionStatus.QUEUED)
         var posted = 0
         var failed = 0
-        val tokenInitial = authRepo.getAccessToken()
-        var token = tokenInitial
+        val accountEmail = authRepo.getAccountEmail() ?: ""
+        if (accountEmail.isBlank()) {
+            // No signed-in account; skip all posts but keep queued
+            return SyncResult(attempted = queued.size, posted = 0, failed = queued.size)
+        }
+        val scope = "https://www.googleapis.com/auth/spreadsheets"
+        var token = tokens.getAccessToken(accountEmail, scope)
         for (t in queued) {
             val row = mapToSheetRow(t)
             val first = sheetsClient.appendRow(token, spreadsheetId, sheetName, row)
@@ -57,8 +65,9 @@ class TransactionRepository(
                 val ex = first.exceptionOrNull()
                 val is401 = ex?.message?.contains("HTTP 401") == true
                 if (is401) {
-                    // Invalidate and attempt one refresh path (future TokenProvider integration)
-                    // For now, token remains same; caller should ensure valid token
+                    // Invalidate and attempt one refresh
+                    tokens.invalidateToken(accountEmail, scope)
+                    token = tokens.getAccessToken(accountEmail, scope)
                     val retry = sheetsClient.appendRow(token, spreadsheetId, sheetName, row)
                     retry
                 } else first

@@ -5,6 +5,12 @@ import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
+import dagger.hilt.android.AndroidEntryPoint
+import javax.inject.Inject
+import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.launch
+import com.voiceexpense.auth.AuthRepository
+import com.voiceexpense.auth.TokenProvider
 import com.voiceexpense.R
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
@@ -22,7 +28,10 @@ object SettingsKeys {
     const val DEBUG_LOGS = "debug_logs" // developer toggle for verbose local logs
 }
 
+@AndroidEntryPoint
 class SettingsActivity : AppCompatActivity() {
+    @Inject lateinit var authRepository: AuthRepository
+    @Inject lateinit var tokenProvider: TokenProvider
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
@@ -91,7 +100,17 @@ class SettingsActivity : AppCompatActivity() {
             val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
             val account = task.result
             updateAuthStatus(account)
-            // Token retrieval and secure storage handled in AuthRepository in later tasks
+            // Persist account and optionally warm token in background
+            lifecycleScope.launch {
+                authRepository.setAccount(accountName = account?.displayName, email = account?.email)
+                account?.email?.let { email ->
+                    // Warm token for Sheets scope (provider handles actual fetching/caching)
+                    runCatching {
+                        tokenProvider.getAccessToken(email, "https://www.googleapis.com/auth/spreadsheets")
+                    }
+                }
+                updateGatingMessage()
+            }
         }
 
         signIn.setOnClickListener {
@@ -99,9 +118,16 @@ class SettingsActivity : AppCompatActivity() {
         }
         signOut.setOnClickListener {
             signInClient.signOut().addOnCompleteListener {
-                updateAuthStatus(null)
-                android.widget.Toast.makeText(this, R.string.info_sign_in_required, android.widget.Toast.LENGTH_SHORT).show()
-                updateGatingMessage()
+                lifecycleScope.launch {
+                    // Clear stored credentials and invalidate any cached token
+                    authRepository.signOut()
+                    existing?.email?.let { email ->
+                        runCatching { tokenProvider.invalidateToken(email, "https://www.googleapis.com/auth/spreadsheets") }
+                    }
+                    updateAuthStatus(null)
+                    android.widget.Toast.makeText(this@SettingsActivity, R.string.info_sign_in_required, android.widget.Toast.LENGTH_SHORT).show()
+                    updateGatingMessage()
+                }
             }
         }
 

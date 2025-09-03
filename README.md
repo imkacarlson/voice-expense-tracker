@@ -28,7 +28,8 @@ App Structure
 
 Configuration
 - Settings screen: set Spreadsheet ID, Sheet Name, and Known Accounts.
-- OAuth: Uses EncryptedSharedPreferences; add Google Sign-In integration before release.
+- Google Sign-In: Required for posting to Google Sheets (scope: `https://www.googleapis.com/auth/spreadsheets`). Open Settings and tap Sign in.
+- OAuth storage: Access tokens and account info stored in EncryptedSharedPreferences.
 
 Testing
 - Unit tests: `./gradlew testDebugUnitTest`
@@ -37,5 +38,10 @@ Testing
 
 Notes
 - ASR and parsing use placeholders for now; replace with ML Kit Speech and GenAI Gemini Nano.
-- Sync requires a valid Google access token and spreadsheet configuration.
+- Sync requires a valid Google access token and spreadsheet configuration. If unsigned or token invalid, transactions remain queued and WorkManager retries after sign-in.
 
+Sign-In & Sync Checklist
+- Spreadsheet: Enter Spreadsheet ID and Sheet Name in Settings.
+- Sign-In: Tap Sign in and choose your Google account. Status updates to the signed-in email.
+- Permissions: App requests only the Google Sheets scope for posting.
+- Ready State: Settings shows “Sync ready” when both sheet config and sign-in are complete.

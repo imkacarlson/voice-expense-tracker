@@ -22,4 +22,6 @@
     <string name="error_missing_sheet_config">Enter Spreadsheet ID and Sheet name to enable sync.</string>
     <string name="info_sign_in_required">Sign in required to post transactions.</string>
     <string name="info_settings_saved">Settings saved.</string>
+    <string name="error_sign_in_required">Sign in required to post to Google Sheets.</string>
+    <string name="error_token_fetch_failed">Could not get sign-in token. Try again later.</string>
 </resources>

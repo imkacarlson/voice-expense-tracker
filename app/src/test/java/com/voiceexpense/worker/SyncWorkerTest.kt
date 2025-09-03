@@ -56,7 +56,7 @@ class SyncWorkerTest {
         val dao = FakeDao()
         val sheets = FakeSheetsClient(succeed = true)
         val auth = AuthRepository(InMemoryStore()).apply { setAccessToken("t") }
-        val repo = TransactionRepository(dao, sheets, auth).apply {
+        val repo = TransactionRepository(dao, sheets, auth, com.voiceexpense.auth.StaticTokenProvider("t")).apply {
             spreadsheetId = "id"
             sheetName = "Sheet1"
         }

@@ -103,8 +103,8 @@ class TransactionRepositoryTest {
         }
 
         val sheets = FakeSheets()
-        val auth = AuthRepository(InMemoryStore()).apply { setAccessToken("token") }
-        val repo2 = TransactionRepository(dao, sheets, auth).apply {
+        val auth = AuthRepository(InMemoryStore()).apply { setAccessToken("token"); setAccount("user","user@example.com") }
+        val repo2 = TransactionRepository(dao, sheets, auth, com.voiceexpense.auth.StaticTokenProvider("token")).apply {
             spreadsheetId = "sheetId"
             sheetName = "Sheet1"
         }
