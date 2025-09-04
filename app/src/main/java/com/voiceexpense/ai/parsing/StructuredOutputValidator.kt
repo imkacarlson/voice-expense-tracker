@@ -49,7 +49,7 @@ object StructuredOutputValidator {
     fun sanitizeAmounts(parsed: ParsedResult): ParsedResult {
         fun normalize(v: BigDecimal?): BigDecimal? = v?.let {
             val nonNeg = if (it < BigDecimal.ZERO) it.negate() else it
-            nonNeg.setScale(2, BigDecimal.ROUND_HALF_UP)
+            nonNeg.setScale(2, java.math.RoundingMode.HALF_UP)
         }
 
         return parsed.copy(
