@@ -1,6 +1,7 @@
 package com.voiceexpense.ai.parsing
 
 import org.json.JSONObject
+import org.json.JSONArray
 import java.math.BigDecimal
 
 data class ValidationResult(val valid: Boolean, val error: String? = null)
@@ -28,17 +29,17 @@ object StructuredOutputValidator {
         return try {
             val obj = JSONObject(json)
 
-            // tags when present should be a JSON array of strings
+            // tags when present should be a JSON array of strings (no coercion)
             if (obj.has("tags") && !obj.isNull("tags")) {
-                try {
-                    val arr = obj.getJSONArray("tags")
-                    for (i in 0 until arr.length()) {
-                        if (arr.isNull(i) || arr.optString(i, null) == null) {
-                            return ValidationResult(false, "tags must be array of strings")
-                        }
-                    }
-                } catch (t: Throwable) {
+                val raw: Any? = obj.opt("tags")
+                if (raw !is JSONArray) {
                     return ValidationResult(false, "tags must be array")
+                }
+                val arr = raw
+                for (i in 0 until arr.length()) {
+                    if (arr.isNull(i) || arr.optString(i, null) == null) {
+                        return ValidationResult(false, "tags must be array of strings")
+                    }
                 }
             }
 
