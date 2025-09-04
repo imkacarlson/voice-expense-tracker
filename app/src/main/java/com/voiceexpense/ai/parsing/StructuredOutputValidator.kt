@@ -38,9 +38,20 @@ object StructuredOutputValidator {
                 }
             }
 
-            // tags when present should be array
-            if (obj.has("tags") && !obj.isNull("tags") && !obj.get("tags").toString().startsWith("[")) {
-                return ValidationResult(false, "tags must be array")
+            // tags when present should be a JSON array of strings
+            if (obj.has("tags") && !obj.isNull("tags")) {
+                try {
+                    val arr = obj.getJSONArray("tags")
+                    // Optional: basic element type check
+                    for (i in 0 until arr.length()) {
+                        // treat non-string values as invalid
+                        if (arr.isNull(i) || arr.optString(i, null) == null) {
+                            return ValidationResult(false, "tags must be array of strings")
+                        }
+                    }
+                } catch (t: Throwable) {
+                    return ValidationResult(false, "tags must be array")
+                }
             }
 
             ValidationResult(true)
