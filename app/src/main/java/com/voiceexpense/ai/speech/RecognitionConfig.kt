@@ -29,6 +29,7 @@ sealed class RecognitionError {
     data class Api(val code: Int, val message: String) : RecognitionError()
     data object Timeout : RecognitionError()
     data object NoPermission : RecognitionError()
+    // Added for devices where ASR is not available
+    data class Unavailable(val message: String) : RecognitionError()
     data class Other(val message: String) : RecognitionError()
 }
-

@@ -59,7 +59,8 @@ object StructuredOutputValidator {
         return parsed.copy(
             amountUsd = normalize(parsed.amountUsd),
             splitOverallChargedUsd = normalize(parsed.splitOverallChargedUsd),
-            merchant = parsed.merchant?.trim().takeUnless { it.isNullOrEmpty() },
+            // merchant is non-nullable in ParsedResult; keep trimmed value
+            merchant = parsed.merchant.trim(),
             description = parsed.description?.trim().takeUnless { it.isNullOrEmpty() },
             note = parsed.note?.trim().takeUnless { it.isNullOrEmpty() }
         )

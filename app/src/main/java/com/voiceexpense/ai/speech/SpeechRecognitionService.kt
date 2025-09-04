@@ -9,6 +9,8 @@ import android.speech.SpeechRecognizer
 import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.callbackFlow
+import kotlinx.coroutines.flow.flow
+import kotlinx.coroutines.delay
 
 class SpeechRecognitionService(private val context: Context) {
 
@@ -83,6 +85,16 @@ class SpeechRecognitionService(private val context: Context) {
         awaitClose {
             stopListening()
         }
+    }
+
+    /**
+     * Debug helper used by the confirmation screen to simulate a transcript.
+     * Emits the provided text once and completes.
+     */
+    fun transcribeDebug(text: String): Flow<String> = flow {
+        // small delay to simulate async behavior
+        delay(50)
+        emit(text)
     }
 
     fun stopListening() {
