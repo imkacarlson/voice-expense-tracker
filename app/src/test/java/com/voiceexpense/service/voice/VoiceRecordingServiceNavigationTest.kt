@@ -20,7 +20,8 @@ class VoiceRecordingServiceNavigationTest {
         val service = controller.create().get()
 
         val start = Intent(app, VoiceRecordingService::class.java).apply { action = VoiceRecordingService.ACTION_START }
-        controller.startCommand(0, 0, start)
+        // Start the service with the ACTION_START intent
+        service.onStartCommand(start, /*flags=*/0, /*startId=*/0)
 
         // Allow background coroutine to run
         Thread.sleep(100)
@@ -36,4 +37,3 @@ class VoiceRecordingServiceNavigationTest {
         controller.destroy()
     }
 }
-
