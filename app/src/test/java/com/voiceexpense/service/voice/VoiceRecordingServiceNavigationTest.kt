@@ -33,8 +33,9 @@ class VoiceRecordingServiceNavigationTest {
         }
         // There should be a started activity with the TransactionConfirmationActivity component
         assertThat(intent).isNotNull()
-        assertThat(intent.component?.className).isEqualTo(TransactionConfirmationActivity::class.java.name)
-        val id = intent.getStringExtra(VoiceRecordingService.EXTRA_TRANSACTION_ID)
+        val started = intent!!
+        assertThat(started.component?.className).isEqualTo(TransactionConfirmationActivity::class.java.name)
+        val id = started.getStringExtra(VoiceRecordingService.EXTRA_TRANSACTION_ID)
         assertThat(id).isNotEmpty()
 
         controller.destroy()
