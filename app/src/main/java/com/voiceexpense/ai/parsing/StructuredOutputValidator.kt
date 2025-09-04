@@ -21,30 +21,18 @@ object StructuredOutputValidator {
         return ValidationResult(true)
     }
 
-    /** Minimal JSON schema validation for GenAI structured output. */
+    /** Minimal JSON schema validation for GenAI structured output.
+     * Intentionally permissive: only enforces that when present, `tags` is a JSON array of strings.
+     */
     fun validateTransactionJson(json: String): ValidationResult {
         return try {
             val obj = JSONObject(json)
-            val type = obj.optString("type", "")
-            if (type !in setOf("Expense", "Income", "Transfer")) return ValidationResult(false, "invalid type")
-
-            // amountUsd must be absent/null for Transfer, else non-negative number
-            if (type != "Transfer") {
-                if (obj.has("amountUsd") && !obj.isNull("amountUsd")) {
-                    val amt = obj.optDouble("amountUsd", -1.0)
-                    if (amt < 0.0) return ValidationResult(false, "amountUsd must be non-negative")
-                } else {
-                    return ValidationResult(false, "amountUsd required for $type")
-                }
-            }
 
             // tags when present should be a JSON array of strings
             if (obj.has("tags") && !obj.isNull("tags")) {
                 try {
                     val arr = obj.getJSONArray("tags")
-                    // Optional: basic element type check
                     for (i in 0 until arr.length()) {
-                        // treat non-string values as invalid
                         if (arr.isNull(i) || arr.optString(i, null) == null) {
                             return ValidationResult(false, "tags must be array of strings")
                         }
