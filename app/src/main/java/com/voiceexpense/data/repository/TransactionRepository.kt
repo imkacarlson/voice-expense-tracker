@@ -37,6 +37,9 @@ class TransactionRepository(
         dao.update(existing.copy(status = TransactionStatus.QUEUED))
     }.map { Unit }
 
+    // Lookup a transaction by id (used by confirmation Activity to load the draft)
+    suspend fun getById(tId: String): Transaction? = dao.getById(tId)
+
     // Spreadsheet configuration (to be set by caller, e.g., Worker/Settings)
     var spreadsheetId: String = ""
     var sheetName: String = ""
