@@ -23,11 +23,14 @@ class VoiceRecordingServiceNavigationTest {
         // Start the service with the ACTION_START intent
         service.onStartCommand(start, /*flags=*/0, /*startId=*/0)
 
-        // Allow background coroutine to run
-        Thread.sleep(100)
-
         val shadowApp = Shadows.shadowOf(app)
-        val intent = shadowApp.nextStartedActivity
+        // Poll a few times to allow async coroutine to issue startActivity
+        var intent: Intent? = null
+        repeat(20) {
+            intent = shadowApp.nextStartedActivity
+            if (intent != null) return@repeat
+            Thread.sleep(50)
+        }
         // There should be a started activity with the TransactionConfirmationActivity component
         assertThat(intent).isNotNull()
         assertThat(intent.component?.className).isEqualTo(TransactionConfirmationActivity::class.java.name)
