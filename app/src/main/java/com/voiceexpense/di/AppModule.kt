@@ -8,9 +8,6 @@ import com.voiceexpense.auth.EncryptedPrefsStore
 import com.voiceexpense.auth.InMemoryStore
 import com.voiceexpense.auth.TokenProvider
 import com.voiceexpense.auth.GoogleIdentityTokenProvider
-import com.voiceexpense.ai.parsing.TransactionParser
-import com.voiceexpense.ai.speech.AudioRecordingManager
-import com.voiceexpense.ai.speech.SpeechRecognitionService
 import com.voiceexpense.data.local.AppDatabase
 import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.remote.SheetsClient
@@ -66,10 +63,6 @@ object AppModule {
     @Provides @Singleton
     fun provideTokenProvider(@ApplicationContext ctx: Context, auth: com.voiceexpense.auth.AuthRepository): TokenProvider =
         GoogleIdentityTokenProvider(ctx, auth)
-
-    @Provides fun provideAudio(): AudioRecordingManager = AudioRecordingManager()
-    @Provides fun provideAsr(): SpeechRecognitionService = SpeechRecognitionService()
-    @Provides fun provideParser(): TransactionParser = TransactionParser()
 
     // Voice correction loop components
     @Provides fun provideCorrectionIntentParser(): CorrectionIntentParser = CorrectionIntentParser()

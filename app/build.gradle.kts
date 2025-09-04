@@ -84,9 +84,19 @@ dependencies {
     // Play Services Auth (Google Sign-In)
     implementation("com.google.android.gms:play-services-auth:21.2.0")
 
-    // ML Kit Speech and GenAI (placeholders, actual artifacts may vary)
-    // implementation("com.google.mlkit:speech-recognition:17.0.0")
-    // implementation("com.google.mlkit:genai-nano:0.0.1")
+    // ML Kit / On-device AI
+    // Speech recognition uses Android's built-in SpeechRecognizer API (no extra dep).
+    // To enable ML Kit GenAI or other ML Kit components, set coordinates in gradle.properties:
+    //   ML_KIT_SPEECH_COORDINATE=
+    //   ML_KIT_GENAI_COORDINATE=
+    // Examples (verify against official docs before use):
+    //   ML_KIT_GENAI_COORDINATE=com.google.mlkit:entity-extraction:16.0.0
+    // These are conditionally applied to avoid broken sync if unset.
+    val mlKitSpeechCoordinate = (project.findProperty("ML_KIT_SPEECH_COORDINATE") as String?)?.takeIf { it.isNotBlank() }
+    val mlKitGenAiCoordinate = (project.findProperty("ML_KIT_GENAI_COORDINATE") as String?)?.takeIf { it.isNotBlank() }
+
+    mlKitSpeechCoordinate?.let { implementation(it) }
+    mlKitGenAiCoordinate?.let { implementation(it) }
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

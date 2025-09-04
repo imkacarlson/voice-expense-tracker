@@ -60,5 +60,22 @@ class TransactionParserTest {
         val v = StructuredOutputValidator.validate(res)
         assertThat(v.valid).isFalse()
     }
-}
 
+    @Test
+    fun parsesExpenseExample() = runBlocking {
+        val res = parser.parse("I spent 23 at Starbucks for coffee")
+        assertThat(res.type).isEqualTo("Expense")
+    }
+
+    @Test
+    fun jsonValidatorValidAndInvalidTags() {
+        val valid = """
+            {"amountUsd": 23.0, "merchant":"Starbucks", "type":"Expense", "tags":["Coffee"], "confidence":0.9}
+        """.trimIndent()
+        val invalid = """
+            {"amountUsd": 23.0, "merchant":"Starbucks", "type":"Expense", "tags":"Coffee", "confidence":0.9}
+        """.trimIndent()
+        assertThat(StructuredOutputValidator.validateTransactionJson(valid).valid).isTrue()
+        assertThat(StructuredOutputValidator.validateTransactionJson(invalid).valid).isFalse()
+    }
+}

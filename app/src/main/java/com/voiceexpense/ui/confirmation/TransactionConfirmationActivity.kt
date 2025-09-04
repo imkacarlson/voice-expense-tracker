@@ -62,6 +62,10 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 return@launch
             }
             viewModel.setDraft(draft)
+            if (draft.confidence < 0.7f) {
+                title.text = getString(R.string.app_name) + "  •  Verify highlighted fields"
+                Toast.makeText(this@TransactionConfirmationActivity, "Low confidence — please verify fields.", Toast.LENGTH_LONG).show()
+            }
         }
 
         confirm.setOnClickListener {
@@ -71,7 +75,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         cancel.setOnClickListener { viewModel.cancel(); finish() }
 
         // Placeholder voice correction using ASR debug
-        val asr = SpeechRecognitionService()
+        val asr = SpeechRecognitionService(this)
         // Subscribe to TTS prompt events (no-op here; real app would speak)
         lifecycleScope.launch { viewModel.ttsEvents.collect { /* hook TTS */ } }
         speak.setOnClickListener {

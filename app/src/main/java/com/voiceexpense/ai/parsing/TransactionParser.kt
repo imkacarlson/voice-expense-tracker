@@ -1,13 +1,25 @@
 package com.voiceexpense.ai.parsing
 
+import com.voiceexpense.ai.model.ModelManager
+import org.json.JSONObject
 import java.math.BigDecimal
 
-class TransactionParser {
-    // Placeholder: Replace with ML Kit GenAI Gemini Nano integration.
+class TransactionParser(private val modelManager: ModelManager = ModelManager()) {
+    // Placeholder for ML Kit GenAI (Gemini Nano) integration. Structured for easy swap-in.
     suspend fun parse(text: String, context: ParsingContext = ParsingContext()): ParsedResult {
-        // Extremely naive defaults to make the pipeline testable before model integration
-        val isIncome = text.lowercase().contains("income") || text.lowercase().contains("paycheck")
-        val isTransfer = text.lowercase().contains("transfer")
+        // Attempt GenAI path when model is ready (future hook)
+        if (modelManager.isModelReady()) {
+            val json = runCatching { runGenAi(text, context) }.getOrNull()
+            if (!json.isNullOrBlank()) {
+                val vr = StructuredOutputValidator.validateTransactionJson(json)
+                if (vr.valid) return mapJsonToParsedResult(json, context)
+            }
+        }
+
+        // Fallback heuristic parser (keeps app functional pre-GenAI)
+        val lower = text.lowercase()
+        val isIncome = lower.contains("income") || lower.contains("paycheck")
+        val isTransfer = lower.contains("transfer")
         val type = when {
             isTransfer -> "Transfer"
             isIncome -> "Income"
@@ -15,20 +27,70 @@ class TransactionParser {
         }
         val amountRegex = Regex("(\\d+)(?:\\.(\\d{1,2}))?")
         val amount = amountRegex.find(text)?.value?.let { BigDecimal(it) }
-        return ParsedResult(
+        val base = ParsedResult(
             amountUsd = if (type == "Transfer") null else amount,
-            merchant = if (type == "Expense") "Unknown" else "",
+            merchant = if (type == "Expense") guessMerchant(text, context) ?: "Unknown" else "",
             description = null,
             type = type,
             expenseCategory = if (type == "Expense") "Uncategorized" else null,
             incomeCategory = if (type == "Income") "Salary" else null,
-            tags = emptyList(),
+            tags = extractTags(text),
             userLocalDate = context.defaultDate,
-            account = null,
-            splitOverallChargedUsd = null,
+            account = extractAccount(text, context),
+            splitOverallChargedUsd = extractOverall(text),
             note = null,
             confidence = 0.5f
         )
+        return StructuredOutputValidator.sanitizeAmounts(base)
+    }
+
+    // Stub: Build prompt and call on-device GenAI (to be implemented when ML Kit GenAI is available)
+    private suspend fun runGenAi(text: String, context: ParsingContext): String {
+        // Use ParsingPrompts.SYSTEM_PROMPT and context examples in a real integration
+        // Return strict JSON string per schema
+        return ""
+    }
+
+    private fun mapJsonToParsedResult(json: String, context: ParsingContext): ParsedResult {
+        val o = JSONObject(json)
+        fun dec(name: String): BigDecimal? =
+            if (o.has(name) && !o.isNull(name)) o.optDouble(name).let { d ->
+                if (d.isNaN()) null else BigDecimal(d.toString())
+            } else null
+
+        val result = ParsedResult(
+            amountUsd = dec("amountUsd"),
+            merchant = o.optString("merchant", "").ifBlank { "Unknown" },
+            description = o.optString("description", null),
+            type = o.optString("type", "Expense"),
+            expenseCategory = o.optString("expenseCategory", null),
+            incomeCategory = o.optString("incomeCategory", null),
+            tags = o.optJSONArray("tags")?.let { arr -> (0 until arr.length()).map { arr.optString(it) } } ?: emptyList(),
+            userLocalDate = context.defaultDate,
+            account = o.optString("account", null),
+            splitOverallChargedUsd = dec("splitOverallChargedUsd"),
+            note = o.optString("note", null),
+            confidence = o.optDouble("confidence", 0.7).toFloat()
+        )
+        return StructuredOutputValidator.sanitizeAmounts(result)
+    }
+
+    private fun guessMerchant(text: String, context: ParsingContext): String? {
+        return context.recentMerchants.firstOrNull { text.contains(it, ignoreCase = true) }
+    }
+
+    private fun extractTags(text: String): List<String> {
+        val idx = text.indexOf("tags:", ignoreCase = true)
+        if (idx == -1) return emptyList()
+        return text.substring(idx + 5).split(',', ';').map { it.trim() }.filter { it.isNotEmpty() }
+    }
+
+    private fun extractAccount(text: String, context: ParsingContext): String? {
+        return context.knownAccounts.firstOrNull { text.contains(it.filter { ch -> ch.isDigit() }, ignoreCase = true) || text.contains(it, ignoreCase = true) }
+    }
+
+    private fun extractOverall(text: String): BigDecimal? {
+        val match = Regex("overall charged (\\d+(?:\\.\\d{1,2})?)", RegexOption.IGNORE_CASE).find(text)
+        return match?.groups?.get(1)?.value?.let { BigDecimal(it) }
     }
 }
-

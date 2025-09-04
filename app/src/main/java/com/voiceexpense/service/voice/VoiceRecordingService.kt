@@ -11,6 +11,8 @@ import androidx.core.app.NotificationCompat
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.speech.AudioRecordingManager
+import com.voiceexpense.ai.speech.RecognitionConfig
+import com.voiceexpense.ai.speech.RecognitionResult
 import com.voiceexpense.ai.speech.SpeechRecognitionService
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
@@ -69,45 +71,69 @@ class VoiceRecordingService : Service() {
         job = scope.launch {
             // Safety timeout to avoid battery drain
             val timeoutJob = launch { kotlinx.coroutines.delay(20_000); stopCapture() }
-            // For now, emit a debug transcript directly; hook up AudioRecordingManager later
-            asr.transcribeDebug("Expense 12.34 at Merchant").collectLatest { text ->
-                val parsed = parser.parse(text, ParsingContext(defaultDate = LocalDate.now()))
-                val txn = Transaction(
-                    userLocalDate = parsed.userLocalDate,
-                    amountUsd = parsed.amountUsd ?: BigDecimal("0.00"),
-                    merchant = parsed.merchant.ifBlank { "Unknown" },
-                    description = parsed.description,
-                    type = when (parsed.type) {
-                        "Income" -> TransactionType.Income
-                        "Transfer" -> TransactionType.Transfer
-                        else -> TransactionType.Expense
-                    },
-                    expenseCategory = parsed.expenseCategory,
-                    incomeCategory = parsed.incomeCategory,
-                    tags = parsed.tags,
-                    account = parsed.account,
-                    splitOverallChargedUsd = parsed.splitOverallChargedUsd,
-                    note = parsed.note,
-                    confidence = parsed.confidence,
-                    status = TransactionStatus.DRAFT
-                )
-                repo.saveDraft(txn)
-                // Notify listeners (optional)
-                sendBroadcast(Intent(ACTION_DRAFT_READY).putExtra(EXTRA_TRANSACTION_ID, txn.id))
-                // Debounce duplicate launches for the same id
-                val now = System.currentTimeMillis()
-                val shouldLaunch = lastLaunchedId != txn.id || (now - lastLaunchAt) > 2000
-                if (shouldLaunch) {
-                    val confirmIntent = Intent(applicationContext, com.voiceexpense.ui.confirmation.TransactionConfirmationActivity::class.java)
-                        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                        .putExtra(EXTRA_TRANSACTION_ID, txn.id)
-                    startActivity(confirmIntent)
-                    lastLaunchedId = txn.id
-                    lastLaunchAt = now
+
+            // Optionally warm up audio path (no bytes consumed by SpeechRecognizer)
+            launch { audio.events().collect { /* no-op; ensures mic lifecycle */ } }
+
+            val config = RecognitionConfig(
+                languageCode = "en-US",
+                maxResults = 1,
+                partialResults = false,
+                offlineMode = true,
+                confidenceThreshold = 0.5f
+            )
+            asr.startListening(config).collectLatest { result ->
+                when (result) {
+                    is RecognitionResult.Success -> {
+                        handleTranscript(result.text)
+                        stopCapture()
+                    }
+                    is RecognitionResult.Error -> {
+                        // TODO: route user-friendly feedback based on error type
+                        stopCapture()
+                    }
+                    RecognitionResult.Complete -> stopCapture()
+                    else -> { /* Listening/Partial ignored here */ }
                 }
-                stopCapture()
             }
             timeoutJob.cancel()
+        }
+    }
+
+    private suspend fun handleTranscript(text: String) {
+        val parsed = parser.parse(text, ParsingContext(defaultDate = LocalDate.now()))
+        val txn = Transaction(
+            userLocalDate = parsed.userLocalDate,
+            amountUsd = parsed.amountUsd ?: BigDecimal("0.00"),
+            merchant = parsed.merchant.ifBlank { "Unknown" },
+            description = parsed.description,
+            type = when (parsed.type) {
+                "Income" -> TransactionType.Income
+                "Transfer" -> TransactionType.Transfer
+                else -> TransactionType.Expense
+            },
+            expenseCategory = parsed.expenseCategory,
+            incomeCategory = parsed.incomeCategory,
+            tags = parsed.tags,
+            account = parsed.account,
+            splitOverallChargedUsd = parsed.splitOverallChargedUsd,
+            note = parsed.note,
+            confidence = parsed.confidence,
+            status = TransactionStatus.DRAFT
+        )
+        repo.saveDraft(txn)
+        // Notify listeners (optional)
+        sendBroadcast(Intent(ACTION_DRAFT_READY).putExtra(EXTRA_TRANSACTION_ID, txn.id))
+        // Debounce duplicate launches for the same id
+        val now = System.currentTimeMillis()
+        val shouldLaunch = lastLaunchedId != txn.id || (now - lastLaunchAt) > 2000
+        if (shouldLaunch) {
+            val confirmIntent = Intent(applicationContext, com.voiceexpense.ui.confirmation.TransactionConfirmationActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                .putExtra(EXTRA_TRANSACTION_ID, txn.id)
+            startActivity(confirmIntent)
+            lastLaunchedId = txn.id
+            lastLaunchAt = now
         }
     }
 
