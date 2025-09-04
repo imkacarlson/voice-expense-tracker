@@ -31,10 +31,10 @@ object StructuredOutputValidator {
 
             // tags when present should be a JSON array of strings (no coercion)
             if (obj.has("tags") && !obj.isNull("tags")) {
-                val arr: JSONArray = obj.optJSONArray("tags")
-                    ?: return ValidationResult(false, "tags must be array")
-                for (i in 0 until arr.length()) {
-                    val v: Any? = arr.opt(i)
+                val raw: Any? = obj.opt("tags")
+                if (raw !is JSONArray) return ValidationResult(false, "tags must be array")
+                for (i in 0 until raw.length()) {
+                    val v: Any? = raw.opt(i)
                     if (v !is String) return ValidationResult(false, "tags must be array of strings")
                 }
             }
