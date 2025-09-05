@@ -4,7 +4,10 @@ import com.voiceexpense.ai.model.ModelManager
 import org.json.JSONObject
 import java.math.BigDecimal
 
-class TransactionParser(private val modelManager: ModelManager = ModelManager()) {
+class TransactionParser(
+    private val modelManager: ModelManager = ModelManager(),
+    private val mlKit: MlKitClient = MlKitClient()
+) {
     // Placeholder for ML Kit GenAI (Gemini Nano) integration. Structured for easy swap-in.
     suspend fun parse(text: String, context: ParsingContext = ParsingContext()): ParsedResult {
         // Attempt GenAI path when model is ready (future hook)
@@ -44,11 +47,25 @@ class TransactionParser(private val modelManager: ModelManager = ModelManager())
         return StructuredOutputValidator.sanitizeAmounts(base)
     }
 
-    // Stub: Build prompt and call on-device GenAI (to be implemented when ML Kit GenAI is available)
+    // Build prompt and call on-device GenAI via MlKitClient
     private suspend fun runGenAi(text: String, context: ParsingContext): String {
-        // Use ParsingPrompts.SYSTEM_PROMPT and context examples in a real integration
-        // Return strict JSON string per schema
-        return ""
+        val status = mlKit.ensureReady()
+        if (status !is MlKitClient.Status.Available) return ""
+
+        val system = TransactionPrompts.SYSTEM_INSTRUCTION
+        val examples = TransactionPrompts.EXAMPLE_UTTERANCES.joinToString("\n") { "- $it" }
+        val composedPrompt = buildString {
+            appendLine(system)
+            appendLine()
+            appendLine("Examples:")
+            appendLine(examples)
+            appendLine()
+            append("Input: ")
+            append(text)
+        }
+
+        val result = mlKit.rewrite(composedPrompt)
+        return result.getOrNull() ?: ""
     }
 
     private fun mapJsonToParsedResult(json: String, context: ParsingContext): ParsedResult {

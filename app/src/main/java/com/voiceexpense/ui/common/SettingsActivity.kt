@@ -19,6 +19,7 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
 import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContracts
+import com.voiceexpense.ai.model.ModelManager
 
 object SettingsKeys {
     const val PREFS = "settings"
@@ -45,6 +46,9 @@ class SettingsActivity : AppCompatActivity() {
         val signOut: Button = findViewById(R.id.btn_sign_out)
         val authStatus: android.widget.TextView = findViewById(R.id.text_auth_status)
         val gating: android.widget.TextView = findViewById(R.id.text_sync_gating)
+        val aiStatus: android.widget.TextView = findViewById(R.id.text_ai_status)
+        val openSetup: Button = findViewById(R.id.btn_open_setup_guide)
+        val modelManager = ModelManager()
 
         spreadsheet.setText(prefs.getString(SettingsKeys.SPREADSHEET_ID, ""))
         sheet.setText(prefs.getString(SettingsKeys.SHEET_NAME, "Sheet1"))
@@ -75,6 +79,10 @@ class SettingsActivity : AppCompatActivity() {
                 .apply()
             android.widget.Toast.makeText(this, R.string.info_settings_saved, android.widget.Toast.LENGTH_SHORT).show()
             updateGatingMessage()
+        }
+
+        openSetup.setOnClickListener {
+            startActivity(android.content.Intent(this, com.voiceexpense.ui.setup.SetupGuidePage::class.java))
         }
 
         // Configure Google Sign-In for Sheets scope (consent UI only; token handling added later)
@@ -132,5 +140,15 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         updateGatingMessage()
+
+        // Probe AI status lazily
+        lifecycleScope.launch {
+            when (val s = modelManager.ensureModelAvailable()) {
+                is ModelManager.ModelStatus.Ready -> aiStatus.text = getString(R.string.setup_guide_status_ready)
+                is ModelManager.ModelStatus.Downloading -> aiStatus.text = getString(R.string.setup_guide_status_downloading)
+                is ModelManager.ModelStatus.Unavailable -> aiStatus.text = getString(R.string.setup_guide_status_unavailable, s.reason)
+                is ModelManager.ModelStatus.Error -> aiStatus.text = getString(R.string.setup_guide_status_error, s.throwable.message ?: "unknown")
+            }
+        }
     }
 }

@@ -25,4 +25,13 @@
     <string name="error_sign_in_required">Sign in required to post to Google Sheets.</string>
     <string name="error_token_fetch_failed">Could not get sign-in token. Try again later.</string>
     <string name="error_open_draft_failed">Could not open draft. Please try again.</string>
+    
+    <!-- Setup guide -->
+    <string name="setup_guide_title">On-device AI Setup</string>
+    <string name="setup_guide_steps">1. Ensure your device supports on-device AI (AICore / Gemini Nano).&#10;2. Update to the latest Google Play services.&#10;3. Connect to Wi‑Fi and open this page to allow initial model preparation.&#10;4. Tap “Test AI setup” to verify availability.</string>
+    <string name="setup_guide_test_button">Test AI setup</string>
+    <string name="setup_guide_status_ready">On-device AI is ready.</string>
+    <string name="setup_guide_status_downloading">Preparing on-device AI model (keep the app in foreground).</string>
+    <string name="setup_guide_status_unavailable">On-device AI unavailable: %1$s</string>
+    <string name="setup_guide_status_error">AI setup error: %1$s</string>
 </resources>

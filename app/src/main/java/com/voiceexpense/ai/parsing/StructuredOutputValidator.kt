@@ -67,6 +67,45 @@ object StructuredOutputValidator {
         }
     }
 
+    /**
+     * ML Kit responses may include surrounding prose or markdown code fences.
+     * Attempt to extract the first complete JSON object payload robustly.
+     */
+    fun normalizeMlKitJson(text: String): String {
+        // Strip common markdown fences
+        val stripped = text
+            .replace("```json", "```")
+            .replace("```JSON", "```")
+            .trim()
+
+        val fenceRegex = Regex("```+(.*?)```+", RegexOption.DOT_MATCHES_ALL)
+        val fenced = fenceRegex.find(stripped)?.groupValues?.getOrNull(1)?.trim()
+        val candidate = fenced ?: stripped
+
+        // Extract first top-level JSON object by brace matching
+        var depth = 0
+        var start = -1
+        for ((i, ch) in candidate.withIndex()) {
+            if (ch == '{') {
+                if (depth == 0) start = i
+                depth++
+            } else if (ch == '}') {
+                depth--
+                if (depth == 0 && start >= 0) {
+                    return candidate.substring(start, i + 1)
+                }
+            }
+        }
+        return candidate
+    }
+
+    /** Validate a raw ML Kit text response, attempting recovery before validation. */
+    fun validateMlKitTransactionJson(text: String): ValidationResult {
+        val json = normalizeMlKitJson(text)
+        val res = validateTransactionJson(json)
+        return if (res.valid) res else ValidationResult(false, "mlkit: ${res.error}")
+    }
+
     /** Sanitize and normalize amounts and fields. */
     fun sanitizeAmounts(parsed: ParsedResult): ParsedResult {
         fun normalize(v: BigDecimal?): BigDecimal? = v?.let {

@@ -3,6 +3,7 @@ package com.voiceexpense.di
 import android.content.Context
 import com.voiceexpense.ai.model.ModelManager
 import com.voiceexpense.ai.parsing.TransactionParser
+import com.voiceexpense.ai.parsing.MlKitClient
 import com.voiceexpense.ai.speech.AudioRecordingManager
 import com.voiceexpense.ai.speech.SpeechRecognitionService
 import dagger.Module
@@ -24,7 +25,9 @@ object AiModule {
     @Provides
     fun provideAsr(@ApplicationContext ctx: Context): SpeechRecognitionService = SpeechRecognitionService(ctx)
 
-    @Provides
-    fun provideParser(mm: ModelManager): TransactionParser = TransactionParser(mm)
-}
+    @Provides @Singleton
+    fun provideMlKitClient(mm: ModelManager): MlKitClient = MlKitClient(mm)
 
+    @Provides
+    fun provideParser(mm: ModelManager, ml: MlKitClient): TransactionParser = TransactionParser(mm, ml)
+}

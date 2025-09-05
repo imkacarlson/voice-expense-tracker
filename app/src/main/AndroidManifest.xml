@@ -25,6 +25,7 @@
             android:name=".ui.confirmation.TransactionConfirmationActivity"
             android:exported="false"
             android:launchMode="singleTop" />
+        <activity android:name=".ui.setup.SetupGuidePage" />
         <activity android:name=".ui.common.SettingsActivity" />
 
         <service

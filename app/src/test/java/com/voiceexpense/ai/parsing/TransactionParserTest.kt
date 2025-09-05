@@ -2,6 +2,9 @@ package com.voiceexpense.ai.parsing
 
 import com.google.common.truth.Truth.assertThat
 import kotlinx.coroutines.runBlocking
+import io.mockk.coEvery
+import io.mockk.every
+import io.mockk.mockk
 import org.junit.Test
 import java.time.LocalDate
 
@@ -81,5 +84,45 @@ class TransactionParserTest {
         println("jsonValidator: valid(invalid)=${v2.valid} err=${v2.error}")
         assertThat(v1.valid).isTrue()
         assertThat(v2.valid).isFalse()
+    }
+}
+
+class TransactionParserGenAiTest {
+    @Test
+    fun genai_success_path_maps_json() = runBlocking {
+        val mm = mockk<com.voiceexpense.ai.model.ModelManager>()
+        every { mm.isModelReady() } returns true
+        // ensureModelAvailable may be called by MlKitClient.ensureReady(); simulate ready
+        coEvery { mm.ensureModelAvailable() } returns com.voiceexpense.ai.model.ModelManager.ModelStatus.Ready
+
+        val ml = mockk<MlKitClient>()
+        coEvery { ml.ensureReady() } returns MlKitClient.Status.Available
+        val json = """
+            {"amountUsd": 10.0, "merchant":"Cafe", "description":"latte", "type":"Expense", "expenseCategory":"Dining", "tags":["coffee"], "confidence":0.9}
+        """.trimIndent()
+        coEvery { ml.rewrite(any()) } returns Result.success(json)
+
+        val parser = TransactionParser(mm, ml)
+        val res = parser.parse("spent 10 at cafe")
+        assertThat(res.type).isEqualTo("Expense")
+        assertThat(res.merchant).isEqualTo("Cafe")
+        assertThat(res.amountUsd?.toPlainString()).isEqualTo("10.00")
+    }
+
+    @Test
+    fun genai_failure_falls_back_to_heuristic() = runBlocking {
+        val mm = mockk<com.voiceexpense.ai.model.ModelManager>()
+        every { mm.isModelReady() } returns true
+        coEvery { mm.ensureModelAvailable() } returns com.voiceexpense.ai.model.ModelManager.ModelStatus.Ready
+
+        val ml = mockk<MlKitClient>()
+        coEvery { ml.ensureReady() } returns MlKitClient.Status.Available
+        coEvery { ml.rewrite(any()) } returns Result.failure(IllegalStateException("bad output"))
+
+        val parser = TransactionParser(mm, ml)
+        val res = parser.parse("Income paycheck two thousand")
+        assertThat(res.type).isEqualTo("Income")
+        // income heuristic chooses Salary category by default
+        assertThat(res.incomeCategory).isEqualTo("Salary")
     }
 }

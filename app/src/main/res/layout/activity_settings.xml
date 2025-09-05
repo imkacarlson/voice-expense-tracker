@@ -76,5 +76,23 @@
             android:paddingTop="12dp"
             android:text="@string/sync_gating_message_default" />
 
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="12dp" />
+
+        <TextView
+            android:id="@+id/text_ai_status"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="On-device AI status: Unknown"
+            android:paddingBottom="8dp" />
+
+        <Button
+            android:id="@+id/btn_open_setup_guide"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/setup_guide_title" />
+
     </LinearLayout>
 </ScrollView>

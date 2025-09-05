@@ -1,10 +1,5 @@
 package com.voiceexpense.ai.model
 
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 
@@ -14,13 +9,10 @@ import kotlinx.coroutines.sync.withLock
  * wired to ML Kit / AICore when dependencies are available.
  */
 class ModelManager {
-    private val scope = CoroutineScope(Dispatchers.Default)
     private val mutex = Mutex()
 
     @Volatile
     private var ready: Boolean = false
-
-    private var prepareJob: Job? = null
 
     /** Model availability status. */
     sealed class ModelStatus {
@@ -40,20 +32,10 @@ class ModelManager {
     suspend fun ensureModelAvailable(): ModelStatus = mutex.withLock {
         if (ready) return ModelStatus.Ready
 
-        // Cancel any ongoing preparation to avoid overlap
-        prepareJob?.cancel()
-
-        // Placeholder for real AICore/ML Kit model check + download
-        // In a real implementation, inspect device AICore availability and
-        // trigger model download if needed, reporting progress to UI.
-        prepareJob = scope.launch {
-            // Simulated preparation latency
-            delay(200)
-            ready = true
-        }
-
-        // Optimistically report Downloading while job completes
-        return ModelStatus.Downloading
+        // Simplified: assume availability when called. Real implementation would
+        // check device capabilities and trigger model download if needed.
+        ready = true
+        return ModelStatus.Ready
     }
 
     fun isModelReady(): Boolean = ready
@@ -65,7 +47,6 @@ class ModelManager {
 
     fun unload() {
         ready = false
-        prepareJob?.cancel()
-        prepareJob = null
+        
     }
 }
