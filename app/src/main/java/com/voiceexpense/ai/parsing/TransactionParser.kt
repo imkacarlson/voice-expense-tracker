@@ -57,19 +57,21 @@ class TransactionParser(private val modelManager: ModelManager = ModelManager())
             if (o.has(name) && !o.isNull(name)) o.optDouble(name).let { d ->
                 if (d.isNaN()) null else BigDecimal(d.toString())
             } else null
+        fun optStringOrNull(name: String): String? =
+            if (o.has(name) && !o.isNull(name)) o.getString(name) else null
 
         val result = ParsedResult(
             amountUsd = dec("amountUsd"),
             merchant = o.optString("merchant", "").ifBlank { "Unknown" },
-            description = o.optString("description", null),
+            description = optStringOrNull("description"),
             type = o.optString("type", "Expense"),
-            expenseCategory = o.optString("expenseCategory", null),
-            incomeCategory = o.optString("incomeCategory", null),
+            expenseCategory = optStringOrNull("expenseCategory"),
+            incomeCategory = optStringOrNull("incomeCategory"),
             tags = o.optJSONArray("tags")?.let { arr -> (0 until arr.length()).map { arr.optString(it) } } ?: emptyList(),
             userLocalDate = context.defaultDate,
-            account = o.optString("account", null),
+            account = optStringOrNull("account"),
             splitOverallChargedUsd = dec("splitOverallChargedUsd"),
-            note = o.optString("note", null),
+            note = optStringOrNull("note"),
             confidence = o.optDouble("confidence", 0.7).toFloat()
         )
         return StructuredOutputValidator.sanitizeAmounts(result)

@@ -76,7 +76,15 @@ class RepositoryAuthTests {
         val dao = com.voiceexpense.worker.FakeDao()
         val auth = AuthRepository(InMemoryStore()) // no account set
         val tokenProvider = FakeTokenProvider("t")
-        val sheets = SheetsClient()
+        // Avoid real HTTP in unit tests; force a deterministic failure
+        val sheets = object : SheetsClient() {
+            override suspend fun appendRow(
+                accessToken: String,
+                spreadsheetId: String,
+                sheetName: String,
+                values: List<String>
+            ) = Result.failure<AppendResponse>(IllegalStateException("no account configured"))
+        }
         val repo = TransactionRepository(dao, sheets, auth, tokenProvider).apply {
             spreadsheetId = "id"; sheetName = "Sheet1"
         }

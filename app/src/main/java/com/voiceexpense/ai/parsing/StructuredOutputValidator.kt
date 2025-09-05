@@ -1,7 +1,7 @@
 package com.voiceexpense.ai.parsing
 
-import org.json.JSONObject
-import org.json.JSONArray
+import com.squareup.moshi.JsonReader
+import okio.Buffer
 import java.math.BigDecimal
 
 data class ValidationResult(val valid: Boolean, val error: String? = null)
@@ -23,25 +23,44 @@ object StructuredOutputValidator {
     }
 
     /** Minimal JSON schema validation for GenAI structured output.
-     * Intentionally permissive: only enforces that when present, `tags` is a JSON array of strings.
+     * Uses Moshi JsonReader to robustly inspect the `tags` field without relying on org.json behavior differences.
+     * Rule: if present and non-null, `tags` must be an array of strings (no nulls, no numbers/objects).
      */
     fun validateTransactionJson(json: String): ValidationResult {
         return try {
-            val obj = JSONObject(json)
-
-            // Enforce: if `tags` exists and is non-null, it MUST be a JSONArray of strings.
-            if (obj.has("tags")) {
-                if (!obj.isNull("tags")) {
-                    val any: Any = obj.get("tags")
-                    if (any !is JSONArray) return ValidationResult(false, "tags must be array")
-                    for (i in 0 until any.length()) {
-                        if (any.isNull(i)) return ValidationResult(false, "tags must be array of strings")
-                        val v = any.get(i)
-                        if (v !is String) return ValidationResult(false, "tags must be array of strings")
+            val reader = JsonReader.of(Buffer().writeUtf8(json))
+            if (reader.peek() != JsonReader.Token.BEGIN_OBJECT) {
+                return ValidationResult(false, "invalid json: not object")
+            }
+            reader.beginObject()
+            while (reader.hasNext()) {
+                val name = reader.nextName()
+                if (name == "tags") {
+                    when (reader.peek()) {
+                        JsonReader.Token.NULL -> {
+                            reader.nextNull<Unit>() // null is allowed
+                        }
+                        JsonReader.Token.BEGIN_ARRAY -> {
+                            reader.beginArray()
+                            while (reader.hasNext()) {
+                                when (reader.peek()) {
+                                    JsonReader.Token.NULL -> return ValidationResult(false, "tags must be array of strings")
+                                    JsonReader.Token.STRING -> reader.nextString()
+                                    else -> return ValidationResult(false, "tags must be array of strings")
+                                }
+                            }
+                            reader.endArray()
+                        }
+                        else -> {
+                            // Anything other than array/null is invalid for tags
+                            return ValidationResult(false, "tags must be array")
+                        }
                     }
+                } else {
+                    reader.skipValue()
                 }
             }
-
+            reader.endObject()
             ValidationResult(true)
         } catch (t: Throwable) {
             ValidationResult(false, "invalid json: ${t.message}")

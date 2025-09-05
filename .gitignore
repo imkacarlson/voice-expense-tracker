@@ -1,1 +1,35 @@
 .spec-workflow/approvals/
+
+# Gradle and build outputs
+/.gradle/
+/build/
+/app/build/
+/.kotlin/
+
+# Local machine config
+/local.properties
+
+# Android Studio / IntelliJ
+/.idea/
+*.iml
+
+# NDK / CMake
+/.externalNativeBuild/
+/.cxx/
+
+# OS / editor junk
+.DS_Store
+Thumbs.db
+*.log
+
+# APKs / bundles
+*.apk
+*.aab
+
+# Captures and miscellaneous
+/captures/
+.navigation/
+
+# Keep Gradle wrapper scripts and metadata tracked
+# (Do NOT ignore `gradlew`, `gradlew.bat`, or `gradle/wrapper`)
+gradle/wrapper/gradle-wrapper.jar

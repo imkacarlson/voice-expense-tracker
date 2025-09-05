@@ -75,7 +75,11 @@ class TransactionParserTest {
         val invalid = """
             {"amountUsd": 23.0, "merchant":"Starbucks", "type":"Expense", "tags":"Coffee", "confidence":0.9}
         """.trimIndent()
-        assertThat(StructuredOutputValidator.validateTransactionJson(valid).valid).isTrue()
-        assertThat(StructuredOutputValidator.validateTransactionJson(invalid).valid).isFalse()
+        val v1 = StructuredOutputValidator.validateTransactionJson(valid)
+        val v2 = StructuredOutputValidator.validateTransactionJson(invalid)
+        println("jsonValidator: valid(valid)=${v1.valid} err=${v1.error}")
+        println("jsonValidator: valid(invalid)=${v2.valid} err=${v2.error}")
+        assertThat(v1.valid).isTrue()
+        assertThat(v2.valid).isFalse()
     }
 }
