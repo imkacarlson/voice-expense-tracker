@@ -8,14 +8,21 @@ class TransactionParser(
     private val modelManager: ModelManager = ModelManager(),
     private val mlKit: MlKitClient
 ) {
+    private val hybrid by lazy {
+        com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser(
+            object : com.voiceexpense.ai.parsing.hybrid.GenAiGateway {
+                override fun isAvailable(): Boolean = mlKit.isAvailable()
+                override suspend fun structured(prompt: String): Result<String> = mlKit.structured(prompt)
+            }
+        )
+    }
     // Placeholder for ML Kit GenAI (Gemini Nano) integration. Structured for easy swap-in.
     suspend fun parse(text: String, context: ParsingContext = ParsingContext()): ParsedResult {
-        // Attempt GenAI path when model is ready (future hook)
+        // Attempt hybrid GenAI path when model is ready
         if (modelManager.isModelReady()) {
-            val json = runCatching { runGenAi(text, context) }.getOrNull()
-            if (!json.isNullOrBlank()) {
-                val vr = StructuredOutputValidator.validateTransactionJson(json)
-                if (vr.valid) return mapJsonToParsedResult(json, context)
+            val hybridRes = runCatching { hybrid.parse(text, context) }.getOrNull()
+            if (hybridRes != null && hybridRes.validated && hybridRes.method == com.voiceexpense.ai.parsing.hybrid.ProcessingMethod.AI) {
+                return hybridRes.result
             }
         }
 
@@ -47,26 +54,7 @@ class TransactionParser(
         return StructuredOutputValidator.sanitizeAmounts(base)
     }
 
-    // Build prompt and call on-device GenAI via MlKitClient
-    private suspend fun runGenAi(text: String, context: ParsingContext): String {
-        val status = mlKit.ensureReady()
-        if (status !is MlKitClient.Status.Available) return ""
-
-        val system = TransactionPrompts.SYSTEM_INSTRUCTION
-        val examples = TransactionPrompts.EXAMPLE_UTTERANCES.joinToString("\n") { "- $it" }
-        val composedPrompt = buildString {
-            appendLine(system)
-            appendLine()
-            appendLine("Examples:")
-            appendLine(examples)
-            appendLine()
-            append("Input: ")
-            append(text)
-        }
-
-        val result = mlKit.rewrite(composedPrompt)
-        return result.getOrNull() ?: ""
-    }
+    // Legacy GenAI path removed in favor of hybrid orchestrator
 
     private fun mapJsonToParsedResult(json: String, context: ParsingContext): ParsedResult {
         val o = JSONObject(json)

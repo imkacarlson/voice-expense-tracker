@@ -93,15 +93,13 @@ class TransactionParserGenAiTest {
     fun genai_success_path_maps_json() = runBlocking {
         val mm = mockk<com.voiceexpense.ai.model.ModelManager>()
         every { mm.isModelReady() } returns true
-        // ensureModelAvailable may be called by MlKitClient.ensureReady(); simulate ready
-        coEvery { mm.ensureModelAvailable() } returns com.voiceexpense.ai.model.ModelManager.ModelStatus.Ready
 
         val ml = mockk<MlKitClient>()
-        coEvery { ml.ensureReady() } returns MlKitClient.Status.Available
+        every { ml.isAvailable() } returns true
         val json = """
             {"amountUsd": 10.0, "merchant":"Cafe", "description":"latte", "type":"Expense", "expenseCategory":"Dining", "tags":["coffee"], "confidence":0.9}
         """.trimIndent()
-        coEvery { ml.rewrite(any()) } returns Result.success(json)
+        coEvery { ml.structured(any()) } returns Result.success(json)
 
         val parser = TransactionParser(mm, ml)
         val res = parser.parse("spent 10 at cafe")
@@ -114,11 +112,10 @@ class TransactionParserGenAiTest {
     fun genai_failure_falls_back_to_heuristic() = runBlocking {
         val mm = mockk<com.voiceexpense.ai.model.ModelManager>()
         every { mm.isModelReady() } returns true
-        coEvery { mm.ensureModelAvailable() } returns com.voiceexpense.ai.model.ModelManager.ModelStatus.Ready
 
         val ml = mockk<MlKitClient>()
-        coEvery { ml.ensureReady() } returns MlKitClient.Status.Available
-        coEvery { ml.rewrite(any()) } returns Result.failure(IllegalStateException("bad output"))
+        every { ml.isAvailable() } returns true
+        coEvery { ml.structured(any()) } returns Result.failure(IllegalStateException("bad output"))
 
         val parser = TransactionParser(mm, ml)
         val res = parser.parse("Income paycheck two thousand")

@@ -92,6 +92,38 @@ class MlKitClient(
         }
     }
 
+    /**
+     * Run a structured prompt expected to yield JSON. Performs basic post-processing
+     * to normalize potential fences and validates shape via StructuredOutputValidator.
+     */
+    suspend fun structured(prompt: String): Result<String> {
+        if (!initialized || !modelManager.isModelReady()) {
+            return Result.failure(IllegalStateException("GenAI model not ready"))
+        }
+
+        return try {
+            val rewriterOptions = RewriterOptions.builder(context)
+                .setOutputType(RewriterOptions.OutputType.REPHRASE)
+                .setLanguage(RewriterOptions.Language.ENGLISH)
+                .build()
+
+            val rewriter = Rewriting.getClient(rewriterOptions)
+            try {
+                val request = RewritingRequest.builder(prompt).build()
+                val raw = rewriter.runInference(request).await().results.firstOrNull()
+                    ?: return Result.failure(Exception("No results"))
+
+                val normalized = StructuredOutputValidator.normalizeMlKitJson(raw)
+                val vr = StructuredOutputValidator.validateTransactionJson(normalized)
+                if (vr.valid) Result.success(normalized) else Result.failure(Exception(vr.error ?: "invalid json"))
+            } finally {
+                try { rewriter.close() } catch (_: Throwable) {}
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     /** Release resources and unload model. */
     fun close() {
         initialized = false
