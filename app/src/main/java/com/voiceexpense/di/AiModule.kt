@@ -26,7 +26,7 @@ object AiModule {
     fun provideAsr(@ApplicationContext ctx: Context): SpeechRecognitionService = SpeechRecognitionService(ctx)
 
     @Provides @Singleton
-    fun provideMlKitClient(mm: ModelManager): MlKitClient = MlKitClient(mm)
+    fun provideMlKitClient(@ApplicationContext context: Context, mm: ModelManager): MlKitClient = MlKitClient(context, mm)
 
     @Provides
     fun provideParser(mm: ModelManager, ml: MlKitClient): TransactionParser = TransactionParser(mm, ml)

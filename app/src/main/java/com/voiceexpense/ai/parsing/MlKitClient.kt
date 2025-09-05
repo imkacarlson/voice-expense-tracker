@@ -1,8 +1,13 @@
 package com.voiceexpense.ai.parsing
 
+import android.content.Context
+import com.google.mlkit.genai.rewriting.Rewriting
+import com.google.mlkit.genai.rewriting.RewriterOptions
+import com.google.mlkit.genai.rewriting.RewritingRequest
 import com.voiceexpense.ai.model.ModelManager
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.tasks.await
 
 /**
  * Thin wrapper around ML Kit GenAI Rewriting API.
@@ -13,6 +18,7 @@ import kotlinx.coroutines.sync.withLock
  * - Safe no-op/failure behavior when the feature is unavailable.
  */
 class MlKitClient(
+    private val context: Context,
     private val modelManager: ModelManager = ModelManager()
 ) {
     private val mutex = Mutex()
@@ -57,20 +63,32 @@ class MlKitClient(
 
     /**
      * Rewrite input text using on-device GenAI.
-     *
-     * Currently a placeholder that validates readiness and returns a controlled failure until
-     * the ML Kit dependency is wired. This prevents silent fall-through into unexpected behavior.
      */
     suspend fun rewrite(input: String, systemPrompt: String? = null): Result<String> {
         if (!initialized || !modelManager.isModelReady()) {
             return Result.failure(IllegalStateException("GenAI model not ready"))
         }
 
-        // TODO: Integrate with ML Kit GenAI Rewriting API when available, e.g.:
-        // val client = GenAiRewritingClient.create(...)
-        // val output = client.rewrite(input, options)
-        // return Result.success(output)
-        return Result.failure(UnsupportedOperationException("ML Kit GenAI rewriting not wired yet"))
+        return try {
+            val rewriterOptions = RewriterOptions.builder(context)
+                .setOutputType(RewriterOptions.OutputType.REPHRASE)
+                .setLanguage(RewriterOptions.Language.ENGLISH)
+                .build()
+            
+            val rewriter = Rewriting.getClient(rewriterOptions)
+            val request = RewritingRequest.builder(input).build()
+            
+            val results = rewriter.runInference(request).await().results
+            rewriter.close()
+            
+            if (results.isNotEmpty()) {
+                Result.success(results.first())
+            } else {
+                Result.failure(Exception("No rewrite results returned"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
     }
 
     /** Release resources and unload model. */
