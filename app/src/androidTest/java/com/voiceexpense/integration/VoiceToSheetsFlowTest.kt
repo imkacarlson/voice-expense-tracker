@@ -4,6 +4,7 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionParser
+import io.mockk.mockk
 import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.model.SheetReference
 import com.voiceexpense.data.model.Transaction
@@ -45,7 +46,7 @@ class VoiceToSheetsFlowTest {
 
     @Test
     fun parse_and_map_to_sheet_row() = runBlocking {
-        val parser = TransactionParser()
+        val parser = TransactionParser(mlKit = mockk(relaxed = true))
         val parsed = parser.parse("I spent 23 at Starbucks for coffee", ParsingContext(defaultDate = LocalDate.parse("2025-07-02")))
         val txn = Transaction(
             userLocalDate = parsed.userLocalDate,
@@ -71,4 +72,3 @@ class VoiceToSheetsFlowTest {
         assertThat(row[4]).isEqualTo("Expense")
     }
 }
-

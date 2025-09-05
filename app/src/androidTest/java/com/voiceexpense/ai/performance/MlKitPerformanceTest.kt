@@ -3,6 +3,7 @@ package com.voiceexpense.ai.performance
 import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.ai.parsing.TransactionParser
+import io.mockk.mockk
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -11,7 +12,7 @@ import org.junit.runner.RunWith
 class MlKitPerformanceTest {
     @Test
     fun parsing_completes_under_three_seconds_baseline() = runBlocking {
-        val parser = TransactionParser()
+        val parser = TransactionParser(mlKit = mockk(relaxed = true))
         val start = System.currentTimeMillis()
         val res = parser.parse("I spent 23 at Starbucks for coffee")
         val elapsed = System.currentTimeMillis() - start
@@ -20,4 +21,3 @@ class MlKitPerformanceTest {
         assertThat(res.type).isNotEmpty()
     }
 }
-

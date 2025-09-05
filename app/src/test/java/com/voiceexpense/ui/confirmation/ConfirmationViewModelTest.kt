@@ -2,6 +2,8 @@ package com.voiceexpense.ui.confirmation
 
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.ai.parsing.TransactionParser
+import com.voiceexpense.ai.parsing.MlKitClient
+import io.mockk.mockk
 import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
@@ -33,7 +35,7 @@ class ConfirmationViewModelTest {
             renderer = PromptRenderer(),
             scope = CoroutineScope(mainRule.testDispatcher)
         )
-        val vm = ConfirmationViewModel(repo, TransactionParser(), controller)
+        val vm = ConfirmationViewModel(repo, TransactionParser(mlKit = mockk(relaxed = true)), controller)
         val t = Transaction(
             userLocalDate = LocalDate.now(),
             amountUsd = BigDecimal("1.00"),
@@ -68,7 +70,7 @@ class ConfirmationViewModelTest {
             renderer = PromptRenderer(),
             scope = CoroutineScope(mainRule.testDispatcher)
         )
-        val vm = ConfirmationViewModel(repo, TransactionParser(), controller)
+        val vm = ConfirmationViewModel(repo, TransactionParser(mlKit = mockk(relaxed = true)), controller)
         val t = Transaction(
             userLocalDate = LocalDate.now(),
             amountUsd = BigDecimal("5.00"),

@@ -34,7 +34,9 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             parser = CorrectionIntentParser(),
             renderer = PromptRenderer()
         )
-        viewModel = ConfirmationViewModel(repo, TransactionParser(), controller)
+        // Use applicationContext to construct MlKitClient for the parser
+        val parser = TransactionParser(mlKit = com.voiceexpense.ai.parsing.MlKitClient(applicationContext, com.voiceexpense.ai.model.ModelManager()))
+        viewModel = ConfirmationViewModel(repo, parser, controller)
         // Enable debug logs if developer toggle is set
         val prefs = getSharedPreferences(com.voiceexpense.ui.common.SettingsKeys.PREFS, android.content.Context.MODE_PRIVATE)
         controller.setDebug(prefs.getBoolean(com.voiceexpense.ui.common.SettingsKeys.DEBUG_LOGS, false))

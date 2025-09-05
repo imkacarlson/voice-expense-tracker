@@ -6,7 +6,7 @@ import java.math.BigDecimal
 
 class TransactionParser(
     private val modelManager: ModelManager = ModelManager(),
-    private val mlKit: MlKitClient = MlKitClient()
+    private val mlKit: MlKitClient
 ) {
     // Placeholder for ML Kit GenAI (Gemini Nano) integration. Structured for easy swap-in.
     suspend fun parse(text: String, context: ParsingContext = ParsingContext()): ParsedResult {

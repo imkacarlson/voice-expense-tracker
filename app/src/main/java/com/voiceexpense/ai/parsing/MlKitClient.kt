@@ -74,17 +74,18 @@ class MlKitClient(
                 .setOutputType(RewriterOptions.OutputType.REPHRASE)
                 .setLanguage(RewriterOptions.Language.ENGLISH)
                 .build()
-            
+
             val rewriter = Rewriting.getClient(rewriterOptions)
-            val request = RewritingRequest.builder(input).build()
-            
-            val results = rewriter.runInference(request).await().results
-            rewriter.close()
-            
-            if (results.isNotEmpty()) {
-                Result.success(results.first())
-            } else {
-                Result.failure(Exception("No rewrite results returned"))
+            try {
+                val request = RewritingRequest.builder(input).build()
+                val results = rewriter.runInference(request).await().results
+                if (results.isNotEmpty()) {
+                    Result.success(results.first())
+                } else {
+                    Result.failure(Exception("No rewrite results returned"))
+                }
+            } finally {
+                try { rewriter.close() } catch (_: Throwable) {}
             }
         } catch (e: Exception) {
             Result.failure(e)
@@ -97,4 +98,3 @@ class MlKitClient(
         modelManager.unload()
     }
 }
-

@@ -9,7 +9,8 @@ import org.junit.Test
 import java.time.LocalDate
 
 class TransactionParserTest {
-    private val parser = TransactionParser()
+    private val ml: MlKitClient = mockk(relaxed = true)
+    private val parser = TransactionParser(mlKit = ml)
 
     @Test
     fun parsesIncomeKeyword() = runBlocking {
