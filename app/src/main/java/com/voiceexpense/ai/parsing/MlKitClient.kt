@@ -77,13 +77,8 @@ class MlKitClient(
             val rewriter = Rewriting.getClient(rewriterOptions)
             try {
                 val request = RewritingRequest.builder(input).build()
-                val out = rewriter.runInference(request)
-                val best: String? = when (out) {
-                    is List<*> -> out.firstOrNull() as? String
-                    is Array<*> -> out.firstOrNull() as? String
-                    is CharSequence -> out.toString()
-                    else -> out?.toString()
-                }
+                val results: List<String> = rewriter.runInference(request)
+                val best = results.firstOrNull()
                 if (!best.isNullOrBlank()) Result.success(best) else Result.failure(Exception("No rewrite results returned"))
             } finally {
                 try { rewriter.close() } catch (_: Throwable) {}
@@ -111,14 +106,8 @@ class MlKitClient(
             val rewriter = Rewriting.getClient(rewriterOptions)
             try {
                 val request = RewritingRequest.builder(prompt).build()
-                val out = rewriter.runInference(request)
-                val raw: String? = when (out) {
-                    is List<*> -> out.firstOrNull() as? String
-                    is Array<*> -> out.firstOrNull() as? String
-                    is CharSequence -> out.toString()
-                    else -> out?.toString()
-                }
-                val rawText = raw ?: return Result.failure(Exception("No results"))
+                val results: List<String> = rewriter.runInference(request)
+                val rawText = results.firstOrNull() ?: return Result.failure(Exception("No results"))
                 val normalized = StructuredOutputValidator.normalizeMlKitJson(rawText)
                 val vr = StructuredOutputValidator.validateTransactionJson(normalized)
                 if (vr.valid) Result.success(normalized) else Result.failure(Exception(vr.error ?: "invalid json"))
