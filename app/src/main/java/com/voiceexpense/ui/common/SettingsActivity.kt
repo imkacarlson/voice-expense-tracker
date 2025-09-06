@@ -19,6 +19,9 @@ import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
 import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContracts
+import android.app.Activity
+import android.util.Log
+import com.google.android.gms.common.api.ApiException
 import com.voiceexpense.ai.model.ModelManager
 import com.google.android.material.appbar.MaterialToolbar
 
@@ -110,19 +113,31 @@ class SettingsActivity : AppCompatActivity() {
         updateAuthStatus(existing)
 
         val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            val task = GoogleSignIn.getSignedInAccountFromIntent(result.data)
-            val account = task.result
-            updateAuthStatus(account)
-            // Persist account and optionally warm token in background
-            lifecycleScope.launch {
-                authRepository.setAccount(accountName = account?.displayName, email = account?.email)
-                account?.email?.let { email ->
-                    // Warm token for Sheets scope (provider handles actual fetching/caching)
-                    runCatching {
-                        tokenProvider.getAccessToken(email, "https://www.googleapis.com/auth/spreadsheets")
+            if (result.resultCode != Activity.RESULT_OK) {
+                android.widget.Toast.makeText(this, "Sign-in canceled", android.widget.Toast.LENGTH_SHORT).show()
+                return@registerForActivityResult
+            }
+            try {
+                val account = GoogleSignIn.getSignedInAccountFromIntent(result.data)
+                    .getResult(ApiException::class.java)
+                updateAuthStatus(account)
+                // Persist account and optionally warm token in background
+                lifecycleScope.launch {
+                    authRepository.setAccount(accountName = account?.displayName, email = account?.email)
+                    account?.email?.let { email ->
+                        runCatching { tokenProvider.getAccessToken(email, "https://www.googleapis.com/auth/spreadsheets") }
                     }
+                    updateGatingMessage()
                 }
-                updateGatingMessage()
+            } catch (e: ApiException) {
+                val code = e.statusCode
+                Log.w("SettingsActivity", "Google sign-in failed: code=$code", e)
+                val msg = if (code == 10) {
+                    "Sign-in configuration error (code 10). See setup tips."
+                } else {
+                    "Sign-in failed: ${e.statusCode}"
+                }
+                android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_LONG).show()
             }
         }
 
