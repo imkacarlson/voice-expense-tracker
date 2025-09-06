@@ -23,7 +23,7 @@ class App : Application(), Configuration.Provider {
         super.onCreate()
 
         // Enable StrictMode in debug to surface disk/network on main thread
-        if (BuildConfig.DEBUG) {
+        if (isAppDebuggable()) {
             StrictMode.setThreadPolicy(
                 StrictMode.ThreadPolicy.Builder()
                     .detectAll()
@@ -67,5 +67,9 @@ class App : Application(), Configuration.Provider {
                 }
             }
         }, "anr-watchdog").apply { isDaemon = true }.start()
+    }
+
+    private fun isAppDebuggable(): Boolean {
+        return (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0
     }
 }
