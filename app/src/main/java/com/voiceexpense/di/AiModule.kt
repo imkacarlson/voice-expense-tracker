@@ -1,9 +1,9 @@
 package com.voiceexpense.di
 
 import android.content.Context
+import com.voiceexpense.ai.mediapipe.MediaPipeGenAiClient
 import com.voiceexpense.ai.model.ModelManager
 import com.voiceexpense.ai.parsing.TransactionParser
-import com.voiceexpense.ai.parsing.MlKitClient
 import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
 import com.voiceexpense.ai.parsing.hybrid.PromptBuilder
 import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
@@ -29,20 +29,20 @@ object AiModule {
     fun provideAsr(@ApplicationContext ctx: Context): SpeechRecognitionService = SpeechRecognitionService(ctx)
 
     @Provides @Singleton
-    fun provideMlKitClient(@ApplicationContext context: Context, mm: ModelManager): MlKitClient = MlKitClient(context, mm)
+    fun provideMediaPipeClient(@ApplicationContext context: Context): MediaPipeGenAiClient = MediaPipeGenAiClient(context)
 
     @Provides @Singleton
     fun providePromptBuilder(): PromptBuilder = PromptBuilder()
 
     @Provides
-    fun provideGenAiGateway(ml: MlKitClient): GenAiGateway = object : GenAiGateway {
-        override fun isAvailable(): Boolean = ml.isAvailable()
-        override suspend fun structured(prompt: String) = ml.structured(prompt)
+    fun provideGenAiGateway(mp: MediaPipeGenAiClient): GenAiGateway = object : GenAiGateway {
+        override fun isAvailable(): Boolean = mp.isAvailable()
+        override suspend fun structured(prompt: String) = mp.structured(prompt)
     }
 
     @Provides
     fun provideHybridParser(gateway: GenAiGateway, pb: PromptBuilder): HybridTransactionParser = HybridTransactionParser(gateway, pb)
 
     @Provides
-    fun provideParser(mm: ModelManager, ml: MlKitClient): TransactionParser = TransactionParser(mm, ml)
+    fun provideParser(mm: ModelManager, hybrid: HybridTransactionParser): TransactionParser = TransactionParser(mm, hybrid)
 }

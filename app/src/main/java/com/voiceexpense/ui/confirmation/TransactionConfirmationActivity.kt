@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 class TransactionConfirmationActivity : AppCompatActivity() {
     @Inject lateinit var repo: TransactionRepository
     private lateinit var viewModel: ConfirmationViewModel
+    @Inject lateinit var parser: TransactionParser
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -39,8 +40,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             parser = CorrectionIntentParser(),
             renderer = PromptRenderer()
         )
-        // Use applicationContext to construct MlKitClient for the parser
-        val parser = TransactionParser(mlKit = com.voiceexpense.ai.parsing.MlKitClient(applicationContext, com.voiceexpense.ai.model.ModelManager()))
         viewModel = ConfirmationViewModel(repo, parser, controller)
         // Enable debug logs if developer toggle is set
         val prefs = getSharedPreferences(com.voiceexpense.ui.common.SettingsKeys.PREFS, android.content.Context.MODE_PRIVATE)

@@ -1,6 +1,9 @@
 package com.voiceexpense.ai.parsing
 
 import com.google.common.truth.Truth.assertThat
+import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
+import com.voiceexpense.ai.parsing.hybrid.PromptBuilder
+import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
 import kotlinx.coroutines.runBlocking
 import io.mockk.coEvery
 import io.mockk.every
@@ -9,8 +12,15 @@ import org.junit.Test
 import java.time.LocalDate
 
 class TransactionParserTest {
-    private val ml: MlKitClient = mockk(relaxed = true)
-    private val parser = TransactionParser(mlKit = ml)
+    private val mmDisabled = mockk<com.voiceexpense.ai.model.ModelManager>().apply {
+        every { isModelReady() } returns false
+    }
+    private val dummyGateway = object : GenAiGateway {
+        override fun isAvailable(): Boolean = false
+        override suspend fun structured(prompt: String) = Result.failure(Exception("unavailable"))
+    }
+    private val hybrid = HybridTransactionParser(dummyGateway, PromptBuilder())
+    private val parser = TransactionParser(mmDisabled, hybrid)
 
     @Test
     fun parsesIncomeKeyword() = runBlocking {
@@ -94,14 +104,15 @@ class TransactionParserGenAiTest {
         val mm = mockk<com.voiceexpense.ai.model.ModelManager>()
         every { mm.isModelReady() } returns true
 
-        val ml = mockk<MlKitClient>()
-        every { ml.isAvailable() } returns true
+        val gateway = object : GenAiGateway {
+            override fun isAvailable(): Boolean = true
+            override suspend fun structured(prompt: String): Result<String> = Result.success(json)
+        }
+        val hybrid = HybridTransactionParser(gateway, PromptBuilder())
+        val parser = TransactionParser(mm, hybrid)
         val json = """
             {"amountUsd": 10.0, "merchant":"Cafe", "description":"latte", "type":"Expense", "expenseCategory":"Dining", "tags":["coffee"], "confidence":0.9}
         """.trimIndent()
-        coEvery { ml.structured(any()) } returns Result.success(json)
-
-        val parser = TransactionParser(mm, ml)
         val res = parser.parse("spent 10 at cafe")
         assertThat(res.type).isEqualTo("Expense")
         assertThat(res.merchant).isEqualTo("Cafe")
@@ -113,11 +124,12 @@ class TransactionParserGenAiTest {
         val mm = mockk<com.voiceexpense.ai.model.ModelManager>()
         every { mm.isModelReady() } returns true
 
-        val ml = mockk<MlKitClient>()
-        every { ml.isAvailable() } returns true
-        coEvery { ml.structured(any()) } returns Result.failure(IllegalStateException("bad output"))
-
-        val parser = TransactionParser(mm, ml)
+        val gateway = object : GenAiGateway {
+            override fun isAvailable(): Boolean = true
+            override suspend fun structured(prompt: String): Result<String> = Result.failure(IllegalStateException("bad output"))
+        }
+        val hybrid = HybridTransactionParser(gateway, PromptBuilder())
+        val parser = TransactionParser(mm, hybrid)
         val res = parser.parse("Income paycheck two thousand")
         assertThat(res.type).isEqualTo("Income")
         // income heuristic chooses Salary category by default

@@ -148,9 +148,8 @@ class SettingsActivity : AppCompatActivity() {
 
         // Probe AI status lazily
         lifecycleScope.launch {
-            when (val s = modelManager.ensureModelAvailable()) {
+            when (val s = modelManager.ensureModelAvailable(applicationContext)) {
                 is ModelManager.ModelStatus.Ready -> aiStatus.text = getString(R.string.setup_guide_status_ready)
-                is ModelManager.ModelStatus.Downloading -> aiStatus.text = getString(R.string.setup_guide_status_downloading)
                 is ModelManager.ModelStatus.Unavailable -> aiStatus.text = getString(R.string.setup_guide_status_unavailable, s.reason)
                 is ModelManager.ModelStatus.Error -> aiStatus.text = getString(R.string.setup_guide_status_error, s.throwable.message ?: "unknown")
             }

@@ -3,25 +3,25 @@ Voice Expense Tracker (Android)
 Overview
 - Voice-first Android app to log expenses/income/transfers to a Google Sheet.
 - On-device only for ASR and parsing; network used only for Sheets sync.
- - Optional: ML Kit GenAI (Rewriting API) for structured parsing on-device.
+ - On-device LLM via MediaPipe Tasks (LlmInference) for structured parsing.
 
 Getting Started
 - Requirements: Android Studio (AGP 8.5+), JDK 17, Android SDK (API 34).
 - Clone this repo and open `voice-expense-tracker` in Android Studio.
 - First build: use Gradle sync to download dependencies.
 
-ML Kit GenAI Setup (Optional)
-- Device requirements: AICore/Gemini Nano-capable device and up-to-date Google Play services.
-- Enable dependency:
-  - In `gradle.properties`, set `ML_KIT_GENAI_COORDINATE=com.google.mlkit:genai-rewriting:1.0.0-beta1`.
-  - Gradle picks this up via conditional `implementation` in `app/build.gradle.kts`.
-- App setup on device:
-  - Open Settings → AI Setup Guide, then tap “Test AI setup” to prepare/verify the on-device model.
-  - If unavailable or downloading, the guide shows a status message with suggestions.
-- Troubleshooting:
-  - Ensure Wi‑Fi is enabled for initial model preparation.
-  - Reboot device if AICore services were recently updated.
-  - Clear Play services cache if model download appears stuck.
+On-device LLM (MediaPipe) Setup
+- Dependency: `com.google.mediapipe:tasks-genai:0.10.27` (already configured).
+- Model file: a `.task` model (e.g., Gemma3 1B 4-bit) must be placed at app-private path: `filesDir/llm/model.task`.
+- Option A (no adb): In-app import
+  - Open Settings → On-device LLM Setup (MediaPipe) → “Import model (.task)” and choose the `.task` file. The app copies it into its sandbox.
+  - Tap “Test AI setup” to verify readiness.
+- Option B (adb): Push/copy into sandbox
+  1. Create target dir inside app sandbox: `adb shell run-as com.voiceexpense mkdir -p files/llm`
+  2. Push to temp: `adb push gemma3-1b-it-q4.task /data/local/tmp/model.task`
+  3. Copy into app files: `adb shell run-as com.voiceexpense cp /data/local/tmp/model.task files/llm/model.task`
+  4. Verify: `adb shell run-as com.voiceexpense ls -la files/llm/`
+- Initialize: Open Settings → On-device LLM Setup → “Test AI setup” to validate the model presence.
 
 Run & Build
 - Debug build via Android Studio or CLI:
@@ -49,12 +49,12 @@ Testing
 - Unit tests: `./gradlew testDebugUnitTest`
 - Instrumented tests: `./gradlew connectedAndroidTest`
 - Key test areas: repository mapping, DAO operations, worker posting, parser validation.
- - Added tests:
-   - `MlKitClientTest`, `TransactionParserTest` (GenAI path and fallback),
-   - `TransactionPromptsTest`, setup guide UI test, and a baseline performance test.
+- Tests:
+  - `TransactionParserTest` (MediaPipe path and fallback),
+  - `TransactionPromptsTest`, setup guide UI test, and a baseline performance test.
 
 Notes
-- ASR uses Android SpeechRecognizer. GenAI rewriting is wired behind `MlKitClient` and currently mocked in tests until ML Kit API is enabled.
+- ASR uses Android SpeechRecognizer. LLM parsing uses MediaPipe `LlmInference` with a local `.task` model.
 - Sync requires a valid Google access token and spreadsheet configuration. If unsigned or token invalid, transactions remain queued and WorkManager retries after sign-in.
 
 Sign-In & Sync Checklist

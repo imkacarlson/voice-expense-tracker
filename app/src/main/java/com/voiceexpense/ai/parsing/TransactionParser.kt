@@ -1,22 +1,15 @@
 package com.voiceexpense.ai.parsing
 
 import com.voiceexpense.ai.model.ModelManager
+import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
 import org.json.JSONObject
 import java.math.BigDecimal
 
 class TransactionParser(
     private val modelManager: ModelManager = ModelManager(),
-    private val mlKit: MlKitClient
+    private val hybrid: HybridTransactionParser
 ) {
-    private val hybrid by lazy {
-        com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser(
-            object : com.voiceexpense.ai.parsing.hybrid.GenAiGateway {
-                override fun isAvailable(): Boolean = mlKit.isAvailable()
-                override suspend fun structured(prompt: String): Result<String> = mlKit.structured(prompt)
-            }
-        )
-    }
-    // Placeholder for ML Kit GenAI (Gemini Nano) integration. Structured for easy swap-in.
+    // MediaPipe LLM is used via HybridTransactionParser; falls back to heuristics when needed.
     suspend fun parse(text: String, context: ParsingContext = ParsingContext()): ParsedResult {
         // Attempt hybrid GenAI path when model is ready
         if (modelManager.isModelReady()) {

@@ -4,7 +4,7 @@ import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionPrompts
 
 /**
- * Builds structured prompts for ML Kit on-device GenAI rewriting, combining:
+ * Builds structured prompts for on-device LLM inference (MediaPipe), combining:
  * - A strict system instruction and schema constraints
  * - Targeted few-shot examples selected by heuristics
  * - Lightweight context hints (recent merchants/accounts)
@@ -92,4 +92,3 @@ class PromptBuilder(
         return chosen.take(12)
     }
 }
-

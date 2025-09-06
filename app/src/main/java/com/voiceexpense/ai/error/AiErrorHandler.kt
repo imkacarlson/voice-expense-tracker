@@ -39,11 +39,6 @@ object AiErrorHandler {
 
     fun fromModelStatus(status: ModelManager.ModelStatus): RecoveryAction = when (status) {
         is ModelManager.ModelStatus.Ready -> RecoveryAction("Model ready", canRetry = false)
-        is ModelManager.ModelStatus.Downloading -> RecoveryAction(
-            message = "Downloading on-device model…",
-            canRetry = true,
-            retryDelayMs = 1_000L
-        )
         is ModelManager.ModelStatus.Unavailable -> RecoveryAction(
             message = "Model unavailable: ${status.reason}",
             canRetry = true,
