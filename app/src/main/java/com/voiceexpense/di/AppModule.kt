@@ -8,6 +8,7 @@ import com.voiceexpense.auth.EncryptedPrefsStore
 import com.voiceexpense.auth.InMemoryStore
 import com.voiceexpense.auth.TokenProvider
 import com.voiceexpense.auth.GoogleIdentityTokenProvider
+import com.voiceexpense.auth.LazyEncryptedPrefsStore
 import com.voiceexpense.data.local.AppDatabase
 import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.remote.SheetsClient
