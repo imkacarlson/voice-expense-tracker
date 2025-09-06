@@ -7,7 +7,6 @@ import com.google.mlkit.genai.rewriting.RewritingRequest
 import com.voiceexpense.ai.model.ModelManager
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
-import kotlinx.coroutines.tasks.await
 
 /**
  * Thin wrapper around ML Kit GenAI Rewriting API.
@@ -78,12 +77,14 @@ class MlKitClient(
             val rewriter = Rewriting.getClient(rewriterOptions)
             try {
                 val request = RewritingRequest.builder(input).build()
-                val results = rewriter.runInference(request).await().results
-                if (results.isNotEmpty()) {
-                    Result.success(results.first())
-                } else {
-                    Result.failure(Exception("No rewrite results returned"))
+                val out = rewriter.runInference(request)
+                val best: String? = when (out) {
+                    is List<*> -> out.firstOrNull() as? String
+                    is Array<*> -> out.firstOrNull() as? String
+                    is CharSequence -> out.toString()
+                    else -> out?.toString()
                 }
+                if (!best.isNullOrBlank()) Result.success(best) else Result.failure(Exception("No rewrite results returned"))
             } finally {
                 try { rewriter.close() } catch (_: Throwable) {}
             }
@@ -110,10 +111,15 @@ class MlKitClient(
             val rewriter = Rewriting.getClient(rewriterOptions)
             try {
                 val request = RewritingRequest.builder(prompt).build()
-                val raw = rewriter.runInference(request).await().results.firstOrNull()
-                    ?: return Result.failure(Exception("No results"))
-
-                val normalized = StructuredOutputValidator.normalizeMlKitJson(raw)
+                val out = rewriter.runInference(request)
+                val raw: String? = when (out) {
+                    is List<*> -> out.firstOrNull() as? String
+                    is Array<*> -> out.firstOrNull() as? String
+                    is CharSequence -> out.toString()
+                    else -> out?.toString()
+                }
+                val rawText = raw ?: return Result.failure(Exception("No results"))
+                val normalized = StructuredOutputValidator.normalizeMlKitJson(rawText)
                 val vr = StructuredOutputValidator.validateTransactionJson(normalized)
                 if (vr.valid) Result.success(normalized) else Result.failure(Exception(vr.error ?: "invalid json"))
             } finally {
