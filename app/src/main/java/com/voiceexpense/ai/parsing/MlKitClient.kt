@@ -7,6 +7,7 @@ import com.google.mlkit.genai.rewriting.RewritingRequest
 import com.voiceexpense.ai.model.ModelManager
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.guava.await
 
 /**
  * Thin wrapper around ML Kit GenAI Rewriting API.
@@ -77,8 +78,8 @@ class MlKitClient(
             val rewriter = Rewriting.getClient(rewriterOptions)
             try {
                 val request = RewritingRequest.builder(input).build()
-                val results: List<String> = rewriter.runInference(request)
-                val best = results.firstOrNull()
+                val res = rewriter.runInference(request).await()
+                val best = firstTextFromResult(res)
                 if (!best.isNullOrBlank()) Result.success(best) else Result.failure(Exception("No rewrite results returned"))
             } finally {
                 try { rewriter.close() } catch (_: Throwable) {}
@@ -106,17 +107,45 @@ class MlKitClient(
             val rewriter = Rewriting.getClient(rewriterOptions)
             try {
                 val request = RewritingRequest.builder(prompt).build()
-                val results: List<String> = rewriter.runInference(request)
-                val rawText = results.firstOrNull() ?: return Result.failure(Exception("No results"))
+                val res = rewriter.runInference(request).await()
+                val rawText = firstTextFromResult(res) ?: return Result.failure(Exception("No results"))
                 val normalized = StructuredOutputValidator.normalizeMlKitJson(rawText)
                 val vr = StructuredOutputValidator.validateTransactionJson(normalized)
                 if (vr.valid) Result.success(normalized) else Result.failure(Exception(vr.error ?: "invalid json"))
             } finally {
                 try { rewriter.close() } catch (_: Throwable) {}
             }
+
         } catch (e: Exception) {
             Result.failure(e)
         }
+    }
+
+    // Attempt to extract first text from various possible RewritingResult shapes
+    private fun firstTextFromResult(result: Any): String? {
+        fun listFrom(method: String): List<*>? = try {
+            val m = result.javaClass.getMethod(method)
+            (m.invoke(result) as? List<*>)
+        } catch (_: Throwable) { null }
+
+        val candidates: List<*>? = listFrom("getResults")
+            ?: listFrom("getCandidates")
+            ?: listFrom("getRewrites")
+            ?: listFrom("getTexts")
+            ?: listFrom("getOutputs")
+
+        val first = candidates?.firstOrNull() ?: return null
+        if (first is CharSequence) return first.toString()
+
+        val accessors = listOf("getText", "text", "getOutputText", "getContent", "getRewrite", "getResult")
+        for (name in accessors) {
+            try {
+                val m = first.javaClass.getMethod(name)
+                val v = m.invoke(first)
+                if (v is CharSequence) return v.toString()
+            } catch (_: Throwable) { /* try next */ }
+        }
+        return first.toString()
     }
 
     /** Release resources and unload model. */
