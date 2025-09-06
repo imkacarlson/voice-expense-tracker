@@ -5,6 +5,7 @@ import android.widget.Button
 import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.appbar.MaterialToolbar
 import com.voiceexpense.R
 import com.voiceexpense.ai.model.ModelManager
 import kotlinx.coroutines.CoroutineScope
@@ -18,6 +19,10 @@ class SetupGuidePage : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup_guide)
+        // Back/up navigation on toolbar
+        findViewById<MaterialToolbar>(R.id.toolbar)?.setNavigationOnClickListener {
+            onBackPressedDispatcher.onBackPressed()
+        }
 
         findViewById<TextView>(R.id.text_setup_title).text = getString(R.string.setup_guide_title)
         findViewById<TextView>(R.id.text_setup_steps).text = getString(R.string.setup_guide_steps)
@@ -36,4 +41,3 @@ class SetupGuidePage : AppCompatActivity() {
         }
     }
 }
-

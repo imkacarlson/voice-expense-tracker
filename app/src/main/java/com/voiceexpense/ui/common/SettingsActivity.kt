@@ -20,6 +20,7 @@ import com.google.android.gms.common.api.Scope
 import android.content.Intent
 import androidx.activity.result.contract.ActivityResultContracts
 import com.voiceexpense.ai.model.ModelManager
+import com.google.android.material.appbar.MaterialToolbar
 
 object SettingsKeys {
     const val PREFS = "settings"
@@ -36,6 +37,10 @@ class SettingsActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
+        // Back/up navigation on toolbar
+        findViewById<MaterialToolbar>(R.id.toolbar)?.setNavigationOnClickListener {
+            onBackPressedDispatcher.onBackPressed()
+        }
 
         val prefs = getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
         val spreadsheet: EditText = findViewById(R.id.input_spreadsheet)

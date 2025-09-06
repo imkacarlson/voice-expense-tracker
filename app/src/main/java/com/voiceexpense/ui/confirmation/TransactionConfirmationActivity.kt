@@ -5,6 +5,7 @@ import android.widget.Toast
 import android.widget.Button
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.appbar.MaterialToolbar
 import androidx.lifecycle.lifecycleScope
 import com.voiceexpense.R
 import com.voiceexpense.ai.parsing.TransactionParser
@@ -27,6 +28,10 @@ class TransactionConfirmationActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_transaction_confirmation)
+        // Back/up navigation on toolbar
+        findViewById<MaterialToolbar>(R.id.toolbar)?.setNavigationOnClickListener {
+            onBackPressedDispatcher.onBackPressed()
+        }
 
         // Basic wiring without DI; replaced by Hilt later
         val controller = VoiceCorrectionController(
