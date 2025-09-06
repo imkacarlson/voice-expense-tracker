@@ -43,10 +43,6 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
             }
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
-                .setMaxTokens(512)
-                .setTopK(40)
-                .setTemperature(0.7f)
-                .setRandomSeed(101)
                 .build()
             llm = LlmInference.createFromOptions(context, options)
             return true
@@ -63,4 +59,3 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
         llm = null
     }
 }
-
