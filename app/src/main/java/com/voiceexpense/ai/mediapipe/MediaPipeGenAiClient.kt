@@ -23,12 +23,15 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
     override fun isAvailable(): Boolean = tryInitSync()
 
     override suspend fun structured(prompt: String): Result<String> = withContext(Dispatchers.IO) {
-        if (!tryInitSync()) return@withContext Result.failure(IllegalStateException("Model not initialized"))
-        return@withContext try {
-            val out = llm!!.generateResponse(prompt)
-            if (out.isNullOrBlank()) Result.failure(IllegalStateException("Empty response")) else Result.success(out)
-        } catch (t: Throwable) {
-            Result.failure(t)
+        if (!tryInitSync()) {
+            Result.failure(IllegalStateException("Model not initialized"))
+        } else {
+            try {
+                val out = llm!!.generateResponse(prompt)
+                if (out.isNullOrBlank()) Result.failure(IllegalStateException("Empty response")) else Result.success(out)
+            } catch (t: Throwable) {
+                Result.failure(t)
+            }
         }
     }
 
