@@ -54,7 +54,8 @@ object AppModule {
 
     @Provides @Singleton
     fun provideAuth(@ApplicationContext ctx: Context): AuthRepository = try {
-        AuthRepository(EncryptedPrefsStore(ctx))
+        // Lazy store defers heavy Android Keystore + disk work until first use.
+        AuthRepository(LazyEncryptedPrefsStore(ctx.applicationContext))
     } catch (t: Throwable) {
         // Robolectric/host unit tests don't have AndroidKeyStore; fall back to in-memory store
         AuthRepository(InMemoryStore())
