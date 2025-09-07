@@ -44,6 +44,10 @@ class SettingsActivity : AppCompatActivity() {
     companion object {
         private const val RC_SHEETS = 1002
     }
+    private lateinit var prefs: android.content.SharedPreferences
+    private lateinit var gatingView: android.widget.TextView
+    private fun prefsOrInit(): android.content.SharedPreferences =
+        if (::prefs.isInitialized) prefs else getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE).also { prefs = it }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
@@ -52,8 +56,7 @@ class SettingsActivity : AppCompatActivity() {
             onBackPressedDispatcher.onBackPressed()
         }
 
-        // Lazy so we can pre-warm on a background thread before main-thread access
-        val prefs by lazy { getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE) }
+        // Views
         val spreadsheet: EditText = findViewById(R.id.input_spreadsheet)
         val sheet: EditText = findViewById(R.id.input_sheet)
         val accounts: EditText = findViewById(R.id.input_accounts)
@@ -62,7 +65,7 @@ class SettingsActivity : AppCompatActivity() {
         val signOut: Button = findViewById(R.id.btn_sign_out)
         val grantSheets: Button = findViewById(R.id.btn_grant_sheets)
         val authStatus: android.widget.TextView = findViewById(R.id.text_auth_status)
-        val gating: android.widget.TextView = findViewById(R.id.text_sync_gating)
+        gatingView = findViewById(R.id.text_sync_gating)
         val aiStatus: android.widget.TextView = findViewById(R.id.text_ai_status)
         val openSetup: Button = findViewById(R.id.btn_open_setup_guide)
         val modelManager = ModelManager()
@@ -78,9 +81,10 @@ class SettingsActivity : AppCompatActivity() {
         // Preload prefs and account off main thread, then update UI
         lifecycleScope.launch(Dispatchers.IO) {
             // Touch prefs on IO thread to avoid StrictMode disk read on main
-            val ss = prefs.getString(SettingsKeys.SPREADSHEET_ID, "")
-            val sh = prefs.getString(SettingsKeys.SHEET_NAME, "Sheet1")
-            val ka = prefs.getString(SettingsKeys.KNOWN_ACCOUNTS, "")
+            val p = prefsOrInit()
+            val ss = p.getString(SettingsKeys.SPREADSHEET_ID, "")
+            val sh = p.getString(SettingsKeys.SHEET_NAME, "Sheet1")
+            val ka = p.getString(SettingsKeys.KNOWN_ACCOUNTS, "")
             val existing = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
             val hasSheetConfig = !ss.isNullOrBlank() && !sh.isNullOrBlank()
             withContext(Dispatchers.Main) {
@@ -88,26 +92,11 @@ class SettingsActivity : AppCompatActivity() {
                 sheet.setText(sh)
                 accounts.setText(ka)
                 updateAuthStatus(existing)
-                gating.text = when {
+                gatingView.text = when {
                     !hasSheetConfig -> getString(R.string.sync_gating_message_default)
                     existing == null -> getString(R.string.sync_gating_message_need_sign_in)
                     else -> getString(R.string.sync_gating_message_ready, sh ?: "")
                 }
-            }
-        }
-
-        fun updateGatingMessage() {
-            // Compute gating message off main to avoid disk/account reads on UI thread
-            lifecycleScope.launch(Dispatchers.IO) {
-                val hasSheetConfig = !prefs.getString(SettingsKeys.SPREADSHEET_ID, "").isNullOrBlank() &&
-                        !prefs.getString(SettingsKeys.SHEET_NAME, "").isNullOrBlank()
-                val acct = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
-                val text = when {
-                    !hasSheetConfig -> getString(R.string.sync_gating_message_default)
-                    acct == null -> getString(R.string.sync_gating_message_need_sign_in)
-                    else -> getString(R.string.sync_gating_message_ready, prefs.getString(SettingsKeys.SHEET_NAME, "") ?: "")
-                }
-                withContext(Dispatchers.Main) { gating.text = text }
             }
         }
 
@@ -118,7 +107,7 @@ class SettingsActivity : AppCompatActivity() {
                 android.widget.Toast.makeText(this, R.string.error_missing_sheet_config, android.widget.Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            prefs.edit()
+            prefsOrInit().edit()
                 .putString(SettingsKeys.SPREADSHEET_ID, ss)
                 .putString(SettingsKeys.SHEET_NAME, sh)
                 .putString(SettingsKeys.KNOWN_ACCOUNTS, accounts.text.toString())
@@ -215,6 +204,22 @@ class SettingsActivity : AppCompatActivity() {
                 is ModelManager.ModelStatus.Unavailable -> aiStatus.text = getString(R.string.setup_guide_status_unavailable, s.reason)
                 is ModelManager.ModelStatus.Error -> aiStatus.text = getString(R.string.setup_guide_status_error, s.throwable.message ?: "unknown")
             }
+        }
+    }
+
+    private fun updateGatingMessage() {
+        // Compute gating message off main to avoid disk/account reads on UI thread
+        lifecycleScope.launch(Dispatchers.IO) {
+            val p = prefsOrInit()
+            val hasSheetConfig = !p.getString(SettingsKeys.SPREADSHEET_ID, "").isNullOrBlank() &&
+                    !p.getString(SettingsKeys.SHEET_NAME, "").isNullOrBlank()
+            val acct = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
+            val text = when {
+                !hasSheetConfig -> getString(R.string.sync_gating_message_default)
+                acct == null -> getString(R.string.sync_gating_message_need_sign_in)
+                else -> getString(R.string.sync_gating_message_ready, p.getString(SettingsKeys.SHEET_NAME, "") ?: "")
+            }
+            withContext(Dispatchers.Main) { gatingView.text = text }
         }
     }
 
