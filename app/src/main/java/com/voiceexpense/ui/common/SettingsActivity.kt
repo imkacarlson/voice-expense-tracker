@@ -8,7 +8,9 @@ import androidx.appcompat.app.AppCompatActivity
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import androidx.lifecycle.lifecycleScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.TokenProvider
 import com.voiceexpense.R
@@ -45,7 +47,8 @@ class SettingsActivity : AppCompatActivity() {
             onBackPressedDispatcher.onBackPressed()
         }
 
-        val prefs = getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
+        // Lazy so we can pre-warm on a background thread before main-thread access
+        val prefs by lazy { getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE) }
         val spreadsheet: EditText = findViewById(R.id.input_spreadsheet)
         val sheet: EditText = findViewById(R.id.input_sheet)
         val accounts: EditText = findViewById(R.id.input_accounts)
@@ -58,18 +61,39 @@ class SettingsActivity : AppCompatActivity() {
         val openSetup: Button = findViewById(R.id.btn_open_setup_guide)
         val modelManager = ModelManager()
 
-        spreadsheet.setText(prefs.getString(SettingsKeys.SPREADSHEET_ID, ""))
-        sheet.setText(prefs.getString(SettingsKeys.SHEET_NAME, "Sheet1"))
-        accounts.setText(prefs.getString(SettingsKeys.KNOWN_ACCOUNTS, ""))
+        // Preload prefs and account off main thread, then update UI
+        lifecycleScope.launch(Dispatchers.IO) {
+            // Touch prefs on IO thread to avoid StrictMode disk read on main
+            val ss = prefs.getString(SettingsKeys.SPREADSHEET_ID, "")
+            val sh = prefs.getString(SettingsKeys.SHEET_NAME, "Sheet1")
+            val ka = prefs.getString(SettingsKeys.KNOWN_ACCOUNTS, "")
+            val existing = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
+            val hasSheetConfig = !ss.isNullOrBlank() && !sh.isNullOrBlank()
+            withContext(Dispatchers.Main) {
+                spreadsheet.setText(ss)
+                sheet.setText(sh)
+                accounts.setText(ka)
+                updateAuthStatus(existing)
+                gating.text = when {
+                    !hasSheetConfig -> getString(R.string.sync_gating_message_default)
+                    existing == null -> getString(R.string.sync_gating_message_need_sign_in)
+                    else -> getString(R.string.sync_gating_message_ready, sh ?: "")
+                }
+            }
+        }
 
         fun updateGatingMessage() {
-            val hasSheetConfig = !prefs.getString(SettingsKeys.SPREADSHEET_ID, "").isNullOrBlank() &&
-                    !prefs.getString(SettingsKeys.SHEET_NAME, "").isNullOrBlank()
-            val acct = GoogleSignIn.getLastSignedInAccount(this)
-            gating.text = when {
-                !hasSheetConfig -> getString(R.string.sync_gating_message_default)
-                acct == null -> getString(R.string.sync_gating_message_need_sign_in)
-                else -> getString(R.string.sync_gating_message_ready, prefs.getString(SettingsKeys.SHEET_NAME, "") ?: "")
+            // Compute gating message off main to avoid disk/account reads on UI thread
+            lifecycleScope.launch(Dispatchers.IO) {
+                val hasSheetConfig = !prefs.getString(SettingsKeys.SPREADSHEET_ID, "").isNullOrBlank() &&
+                        !prefs.getString(SettingsKeys.SHEET_NAME, "").isNullOrBlank()
+                val acct = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
+                val text = when {
+                    !hasSheetConfig -> getString(R.string.sync_gating_message_default)
+                    acct == null -> getString(R.string.sync_gating_message_need_sign_in)
+                    else -> getString(R.string.sync_gating_message_ready, prefs.getString(SettingsKeys.SHEET_NAME, "") ?: "")
+                }
+                withContext(Dispatchers.Main) { gating.text = text }
             }
         }
 
@@ -109,8 +133,7 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
-        val existing = GoogleSignIn.getLastSignedInAccount(this)
-        updateAuthStatus(existing)
+        // Auth status is set in the pre-warm block above
 
         val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != Activity.RESULT_OK) {
@@ -146,23 +169,26 @@ class SettingsActivity : AppCompatActivity() {
         }
         signOut.setOnClickListener {
             signInClient.signOut().addOnCompleteListener {
-                lifecycleScope.launch {
+                lifecycleScope.launch(Dispatchers.IO) {
                     // Clear stored credentials and invalidate any cached token
                     authRepository.signOut()
-                    existing?.email?.let { email ->
+                    val last = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
+                    last?.email?.let { email ->
                         runCatching { tokenProvider.invalidateToken(email, "https://www.googleapis.com/auth/spreadsheets") }
                     }
-                    updateAuthStatus(null)
-                    android.widget.Toast.makeText(this@SettingsActivity, R.string.info_sign_in_required, android.widget.Toast.LENGTH_SHORT).show()
-                    updateGatingMessage()
+                    withContext(Dispatchers.Main) {
+                        updateAuthStatus(null)
+                        android.widget.Toast.makeText(this@SettingsActivity, R.string.info_sign_in_required, android.widget.Toast.LENGTH_SHORT).show()
+                        updateGatingMessage()
+                    }
                 }
             }
         }
 
         updateGatingMessage()
 
-        // Probe AI status lazily
-        lifecycleScope.launch {
+        // Probe AI status lazily (ensureModelAvailable does IO internally, but keep off main)
+        lifecycleScope.launch(Dispatchers.Main) {
             when (val s = modelManager.ensureModelAvailable(applicationContext)) {
                 is ModelManager.ModelStatus.Ready -> aiStatus.text = getString(R.string.setup_guide_status_ready)
                 is ModelManager.ModelStatus.Unavailable -> aiStatus.text = getString(R.string.setup_guide_status_unavailable, s.reason)
