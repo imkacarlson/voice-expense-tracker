@@ -1,7 +1,7 @@
 package com.voiceexpense.auth
 
 /**
- * Abstraction to fetch/refresh OAuth access tokens for Google APIs (Sheets scope).
+ * Abstraction to fetch/refresh OAuth access tokens for Google APIs.
  * Production implementation will use Google Play Services / Identity APIs.
  */
 interface TokenProvider {
@@ -18,4 +18,3 @@ class StaticTokenProvider(private var token: String = "") : TokenProvider {
     override suspend fun invalidateToken(accountEmail: String, scope: String) { /* no-op */ }
     fun setToken(value: String) { token = value }
 }
-

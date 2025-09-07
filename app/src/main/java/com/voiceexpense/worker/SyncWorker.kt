@@ -19,11 +19,11 @@ class SyncWorker @AssistedInject constructor(
     override suspend fun doWork(): Result {
         return runCatching {
             val prefs = applicationContext.getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
-            val spreadsheetId = prefs.getString(SettingsKeys.SPREADSHEET_ID, "") ?: ""
-            val sheetName = prefs.getString(SettingsKeys.SHEET_NAME, "") ?: ""
+            val webUrl = prefs.getString(SettingsKeys.WEB_APP_URL, "") ?: ""
+            val backupToken = prefs.getString(SettingsKeys.BACKUP_AUTH_TOKEN, null)
 
-            repo.spreadsheetId = spreadsheetId
-            repo.sheetName = sheetName
+            repo.webAppUrl = webUrl
+            repo.backupAuthToken = backupToken
 
             val result = repo.syncPending()
             result

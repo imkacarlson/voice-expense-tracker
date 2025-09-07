@@ -11,7 +11,7 @@ import com.voiceexpense.auth.GoogleIdentityTokenProvider
 import com.voiceexpense.auth.LazyEncryptedPrefsStore
 import com.voiceexpense.data.local.AppDatabase
 import com.voiceexpense.data.local.TransactionDao
-import com.voiceexpense.data.remote.SheetsClient
+import com.voiceexpense.data.remote.AppsScriptClient
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.ui.confirmation.voice.CorrectionIntentParser
 import com.voiceexpense.ui.confirmation.voice.PromptRenderer
@@ -38,10 +38,10 @@ object AppModule {
     @Provides @Singleton
     fun provideRepo(
         dao: TransactionDao,
-        sheets: SheetsClient,
+        apps: AppsScriptClient,
         auth: AuthRepository,
         tokenProvider: com.voiceexpense.auth.TokenProvider
-    ): TransactionRepository = TransactionRepository(dao, sheets, auth, tokenProvider)
+    ): TransactionRepository = TransactionRepository(dao, apps, auth, tokenProvider)
 
     @Provides @Singleton fun provideMoshi(): Moshi = Moshi.Builder().build()
 
@@ -51,7 +51,7 @@ object AppModule {
         .build()
 
     @Provides @Singleton
-    fun provideSheets(client: OkHttpClient, moshi: Moshi): SheetsClient = SheetsClient(client = client, moshi = moshi)
+    fun provideAppsScript(client: OkHttpClient, moshi: Moshi): AppsScriptClient = AppsScriptClient(client = client, moshi = moshi)
 
     @Provides @Singleton
     fun provideAuth(@ApplicationContext ctx: Context): AuthRepository = try {

@@ -8,8 +8,10 @@ import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
-import com.voiceexpense.data.remote.AppendResponse
-import com.voiceexpense.data.remote.SheetsClient
+import com.voiceexpense.data.remote.AppsScriptClient
+import com.voiceexpense.data.remote.AppsScriptRequest
+import com.voiceexpense.data.remote.AppsScriptResponse
+import com.voiceexpense.data.remote.AppsScriptResponseData
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 import java.math.BigDecimal
@@ -26,27 +28,22 @@ class FakeTokenProvider(var token: String) : TokenProvider {
 class RepositoryAuthTests {
     @Test
     fun sync_401ThenSuccess_invalidatesAndRetries() = runBlocking {
-        // Sheets client that fails first with 401, then succeeds
-        class Sheets401 : SheetsClient() {
+        // Apps Script client that fails first with 401, then succeeds
+        class Apps401 : AppsScriptClient(okhttp3.OkHttpClient(), com.squareup.moshi.Moshi.Builder().build()) {
             var calls = 0
-            override suspend fun appendRow(
-                accessToken: String,
-                spreadsheetId: String,
-                sheetName: String,
-                values: List<String>
-            ): Result<AppendResponse> {
+            override suspend fun postExpense(url: String, request: AppsScriptRequest): Result<AppsScriptResponse> {
                 calls++
-                return if (calls == 1) Result.failure(IllegalStateException("Sheets append failed: HTTP 401 Unauthorized"))
-                else Result.success(AppendResponse(spreadsheetId, null, AppendResponse.Updates("$sheetName!A2:M2", 1, 13, 13)))
+                return if (calls == 1) Result.failure(IllegalStateException("AppsScript post failed: HTTP 401 Unauthorized"))
+                else Result.success(AppsScriptResponse("success", null, null, AppsScriptResponseData(null, null, null, 2)))
             }
         }
 
         val dao = com.voiceexpense.worker.FakeDao()
         val auth = AuthRepository(InMemoryStore()).apply { setAccount("user", "user@example.com") }
         val tokenProvider = FakeTokenProvider("t1")
-        val sheets = Sheets401()
-        val repo = TransactionRepository(dao, sheets, auth, tokenProvider).apply {
-            spreadsheetId = "id"; sheetName = "Sheet1"
+        val apps = Apps401()
+        val repo = TransactionRepository(dao, apps, auth, tokenProvider).apply {
+            webAppUrl = "https://script.example/exec"
         }
 
         val txn = Transaction(
@@ -77,16 +74,12 @@ class RepositoryAuthTests {
         val auth = AuthRepository(InMemoryStore()) // no account set
         val tokenProvider = FakeTokenProvider("t")
         // Avoid real HTTP in unit tests; force a deterministic failure
-        val sheets = object : SheetsClient() {
-            override suspend fun appendRow(
-                accessToken: String,
-                spreadsheetId: String,
-                sheetName: String,
-                values: List<String>
-            ) = Result.failure<AppendResponse>(IllegalStateException("no account configured"))
+        val apps = object : AppsScriptClient(okhttp3.OkHttpClient(), com.squareup.moshi.Moshi.Builder().build()) {
+            override suspend fun postExpense(url: String, request: AppsScriptRequest): Result<AppsScriptResponse> =
+                Result.failure(IllegalStateException("no account configured"))
         }
-        val repo = TransactionRepository(dao, sheets, auth, tokenProvider).apply {
-            spreadsheetId = "id"; sheetName = "Sheet1"
+        val repo = TransactionRepository(dao, apps, auth, tokenProvider).apply {
+            webAppUrl = "https://script.example/exec"
         }
 
         val txn = Transaction(
@@ -112,4 +105,3 @@ class RepositoryAuthTests {
         assertThat(res.failed).isEqualTo(1)
     }
 }
-

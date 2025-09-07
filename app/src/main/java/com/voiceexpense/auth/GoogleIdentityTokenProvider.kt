@@ -10,7 +10,7 @@ import kotlinx.coroutines.withContext
  * Google Identity-backed TokenProvider.
  *
  * Uses GoogleAuthUtil to acquire an OAuth2 access token for the requested scope
- * (expects full scope string, e.g., "https://www.googleapis.com/auth/spreadsheets").
+ * (expects full scope string, e.g., "https://www.googleapis.com/auth/userinfo.email").
  * Stores/clears the token in AuthRepository for local caching.
  */
 class GoogleIdentityTokenProvider(

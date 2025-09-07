@@ -14,19 +14,19 @@ Android mobile application with voice-first interface and on-device AI processin
 - **ML Kit GenAI**: On-device Gemini Nano for natural language understanding and structured parsing
 - **ML Kit Speech Recognition**: On-device speech-to-text conversion
 - **Google Play Services Auth**: OAuth 2.0 authentication for Google account integration
-- **Google Sheets API**: For posting structured transaction data to user's spreadsheet
+- **Google Apps Script Web App**: For appending structured transaction data to the user's spreadsheet
 - **WorkManager**: Background task scheduling for offline queue processing and sync
 - **Room Database**: Local SQLite database for transaction persistence and offline queue
 - **EncryptedSharedPreferences**: Secure storage for OAuth tokens and sensitive data
 - **Android Widget Framework**: Home screen widget implementation
-- **Retrofit/OkHttp**: HTTP client for Google Sheets API communication
+- **OkHttp/Moshi**: HTTP client for Apps Script Web App communication
 
 ### Application Architecture
 Event-driven architecture with MVVM pattern:
 - **Widget-triggered capture**: Home screen widget initiates voice recording
 - **Service-based processing**: Foreground service handles ASR and AI processing
 - **Activity-based confirmation**: Single-screen confirmation UI with voice correction loop
-- **Background sync**: WorkManager handles offline queue and Google Sheets posting
+- **Background sync**: WorkManager handles offline queue and Apps Script posting
 
 ### Data Storage (if applicable)
 - **Primary storage**: Room Database (SQLite) for local transaction persistence
@@ -35,9 +35,9 @@ Event-driven architecture with MVVM pattern:
 - **Secure storage**: EncryptedSharedPreferences for OAuth tokens, Hardware-backed Keystore for sensitive data
 
 ### External Integrations (if applicable)
-- **APIs**: Google Sheets API v4 for transaction posting
-- **Protocols**: HTTPS/REST for Google API communication
-- **Authentication**: OAuth 2.0 with Google Sign-In, minimal scopes (Google Sheets access only)
+- **APIs**: Google Apps Script HTTPS endpoint for transaction posting
+- **Protocols**: HTTPS/REST
+- **Authentication**: OAuth 2.0 with Google Sign-In (userinfo.email access token) validated server-side by Apps Script
 
 ### Monitoring & Dashboard Technologies (if applicable)
 - **Dashboard Framework**: Native Android UI (Activities/Fragments)
@@ -103,7 +103,7 @@ Event-driven architecture with MVVM pattern:
 - **Security Requirements**: 
   - On-device AI processing only (no cloud AI calls)
   - Secure OAuth token storage with hardware-backed encryption
-  - Minimal permissions (microphone, internet for Sheets sync only)
+  - Minimal permissions (microphone, internet for sync only)
   - No sensitive data in logs or crash reports
 - **Privacy Model**: User owns all data, no telemetry or analytics collection
 - **Threat Model**: Protect OAuth tokens, prevent data leakage, secure local storage
@@ -128,5 +128,5 @@ Event-driven architecture with MVVM pattern:
 - **Device Compatibility**: Limited to Google Pixel devices with Gemini Nano support
 - **Currency Support**: USD-only for initial version, no multi-currency handling
 - **Language Support**: English-only speech recognition and parsing
-- **Network Dependency**: Requires internet connection for Google Sheets sync (offline queue mitigates UX impact)
+- **Network Dependency**: Requires internet connection for Apps Script sync (offline queue mitigates UX impact)
 - **Account Limitations**: Single Google account per app instance initially

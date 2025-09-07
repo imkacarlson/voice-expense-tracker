@@ -11,8 +11,10 @@ import com.voiceexpense.auth.TokenProvider
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
-import com.voiceexpense.data.remote.AppendResponse
-import com.voiceexpense.data.remote.SheetsClient
+import com.voiceexpense.data.remote.AppsScriptClient
+import com.voiceexpense.data.remote.AppsScriptRequest
+import com.voiceexpense.data.remote.AppsScriptResponse
+import com.voiceexpense.data.remote.AppsScriptResponseData
 import com.voiceexpense.data.repository.TransactionRepository
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -25,13 +27,9 @@ class FakeTokenProvider2(private val token: String) : TokenProvider {
     override suspend fun invalidateToken(accountEmail: String, scope: String) { /* no-op */ }
 }
 
-class SheetsSuccess : SheetsClient() {
-    override suspend fun appendRow(
-        accessToken: String,
-        spreadsheetId: String,
-        sheetName: String,
-        values: List<String>
-    ) = Result.success(AppendResponse(spreadsheetId, null, null))
+class AppsSuccess : AppsScriptClient(okhttp3.OkHttpClient(), com.squareup.moshi.Moshi.Builder().build()) {
+    override suspend fun postExpense(url: String, request: AppsScriptRequest): Result<AppsScriptResponse> =
+        Result.success(AppsScriptResponse("success", null, null, AppsScriptResponseData(null, null, null, 1)))
 }
 
 @RunWith(RobolectricTestRunner::class)
@@ -46,8 +44,8 @@ class SyncWorkerAuthTest {
             auth.setAccount("user", "user@example.com")
             auth.setAccessToken("t")
         }
-        val repo = TransactionRepository(dao, SheetsSuccess(), auth, FakeTokenProvider2("t")).apply {
-            spreadsheetId = "id"; sheetName = "Sheet1"
+        val repo = TransactionRepository(dao, AppsSuccess(), auth, FakeTokenProvider2("t")).apply {
+            webAppUrl = "https://script.example/exec"
         }
 
         val txn = Transaction(
@@ -68,8 +66,7 @@ class SyncWorkerAuthTest {
         runBlockingUnit { dao.upsert(txn) }
 
         val prefs = context.getSharedPreferences(com.voiceexpense.ui.common.SettingsKeys.PREFS, android.content.Context.MODE_PRIVATE)
-        prefs.edit().putString(com.voiceexpense.ui.common.SettingsKeys.SPREADSHEET_ID, "id")
-            .putString(com.voiceexpense.ui.common.SettingsKeys.SHEET_NAME, "Sheet1").apply()
+        prefs.edit().putString(com.voiceexpense.ui.common.SettingsKeys.WEB_APP_URL, "https://script.example/exec").apply()
 
         val worker = TestListenableWorkerBuilder<SyncWorker>(context)
             .setWorkerFactory(object : WorkerFactory() {

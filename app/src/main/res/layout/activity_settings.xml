@@ -49,27 +49,21 @@
                 android:text="@string/sign_out" />
         </LinearLayout>
 
-        <Button
-            android:id="@+id/btn_grant_sheets"
+        <EditText
+            android:id="@+id/input_web_url"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:minHeight="48dp"
-            android:text="@string/grant_sheets_access" />
+            android:hint="@string/web_app_url"
+            android:contentDescription="@string/web_app_url"
+            android:inputType="textUri" />
 
         <EditText
-            android:id="@+id/input_spreadsheet"
+            android:id="@+id/input_backup_token"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:hint="@string/spreadsheet_id"
-            android:contentDescription="@string/spreadsheet_id" />
-
-        <EditText
-            android:id="@+id/input_sheet"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="Sheet1"
-            android:hint="@string/sheet_name"
-            android:contentDescription="@string/sheet_name" />
+            android:hint="@string/backup_auth_token"
+            android:contentDescription="@string/backup_auth_token"
+            android:inputType="textPassword" />
 
         <EditText
             android:id="@+id/input_accounts"

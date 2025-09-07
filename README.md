@@ -2,7 +2,7 @@ Voice Expense Tracker (Android)
 
 Overview
 - Voice-first Android app to log expenses/income/transfers to a Google Sheet.
-- On-device only for ASR and parsing; network used only for Sheets sync.
+- On-device only for ASR and parsing; network used only to sync via a Google Apps Script Web App.
  - On-device LLM via MediaPipe Tasks (LlmInference) for structured parsing.
 
 Getting Started
@@ -35,14 +35,14 @@ App Structure
   - `ui/` (widget, confirmation, common)
   - `service/` (voice recording)
   - `ai/` (speech, parsing, model management)
-  - `data/` (local Room DB, remote Sheets API, repository)
+  - `data/` (local Room DB, remote Apps Script API, repository)
   - `auth/` (encrypted token storage)
   - `worker/` (WorkManager sync)
   - `di/` (Hilt modules)
 
 Configuration
-- Settings screen: set Spreadsheet ID, Sheet Name, and Known Accounts.
-- Google Sign-In: Required for posting to Google Sheets (scope: `https://www.googleapis.com/auth/spreadsheets`). Open Settings and tap Sign in.
+- Settings screen: enter the Apps Script Web App URL, optional Backup Auth Token, and Known Accounts.
+- Google Sign-In: Required for posting (uses `userinfo.email` access token). Open Settings and tap Sign in.
 - OAuth storage: Access tokens and account info stored in EncryptedSharedPreferences.
 
 Testing
@@ -55,10 +55,10 @@ Testing
 
 Notes
 - ASR uses Android SpeechRecognizer. LLM parsing uses MediaPipe `LlmInference` with a local `.task` model.
-- Sync requires a valid Google access token and spreadsheet configuration. If unsigned or token invalid, transactions remain queued and WorkManager retries after sign-in.
+- Sync posts to your Google Apps Script Web App. If unsigned or token invalid, transactions remain queued and WorkManager retries after sign-in.
 
 Sign-In & Sync Checklist
-- Spreadsheet: Enter Spreadsheet ID and Sheet Name in Settings.
+- Web App URL: Paste your Apps Script deployment URL into Settings.
 - Sign-In: Tap Sign in and choose your Google account. Status updates to the signed-in email.
-- Permissions: App requests only the Google Sheets scope for posting.
-- Ready State: Settings shows “Sync ready” when both sheet config and sign-in are complete.
+- Permissions: App uses only the `userinfo.email` scope for token; Apps Script validates the email server-side.
+- Ready State: Settings shows “Sync ready via Apps Script” when URL is set and you’re signed in.

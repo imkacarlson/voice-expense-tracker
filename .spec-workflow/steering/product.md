@@ -14,7 +14,7 @@ Build an Android app that lets a user verbally log financial transactions into a
 4. App shows a compact confirmation UI (widget or activity) with parsed fields.
 5. User provides verbal corrections (e.g., "actually twenty-five", "tags: Auto-Paid, Subscription", or "overall charged one twenty on my card"); the loop updates the draft transaction.
 6. Loop continues until user says "yes" or "looks good".
-7. App posts transaction to Google Sheets via the Sheets API. If offline, it queues and syncs automatically when online.
+7. App posts transaction to Google Sheets via a Google Apps Script Web App. If offline, it queues and syncs automatically when online.
 
 ## Technical Constraints
 - Device: Google Pixel 7a (Android 14+ recommended).
@@ -68,8 +68,8 @@ Field mapping rules:
 5. "Transfer fifty from checking to savings" → { type: "Transfer", amountUsd: null, expenseCategory: null, incomeCategory: null, tags: [], note: "transfer 50 checking→savings" }
 
 ## Google Sheets Integration
-- Auth: OAuth 2.0 with the Sheets scope, using Android Account/Google Sign-In. Store tokens securely (EncryptedSharedPreferences/Hardware-backed Keystore). Request minimal scopes and allow account switch.
-- Posting: WorkManager job posts confirmed transactions; retries with exponential backoff; handles token refresh; conflict-safe append (valueInputOption=USER_ENTERED) to a configured tab following the column order above.
+- Auth: OAuth 2.0 with `userinfo.email` scope using Google Sign-In. Apps Script validates token/email server-side. Store tokens securely (EncryptedSharedPreferences/Hardware-backed Keystore).
+- Posting: WorkManager job posts confirmed transactions to the Apps Script Web App; retries with exponential backoff; handles token refresh; server appends to the configured sheet.
 - Offline: Queue entries locally; when connectivity returns, batch post.
 
 ## Confirmation UI and Voice Feedback Loop
@@ -93,12 +93,12 @@ Field mapping rules:
 1. Test scenarios per user story with acceptance criteria (happy paths, edge cases, failure modes).
 2. API contract tests:
    - ASR text → structured JSON parsing using the 5 fixtures above plus minimal variants (tags, split amounts, account parsing).
-   - Sheets posting (success, auth errors, network failures, retries) with the exact column mapping.
+   - Apps Script posting (success, auth errors, network failures, retries) with the exact column mapping.
    - Widget → Activity/Service intents and parameters.
 3. Performance benchmarks with automated timing assertions (<3s parsing).
 4. Mock strategies:
    - Replace Gemini Nano parser with deterministic mock returning fixtures.
-   - Stub Sheets API with local fake server or in-memory adapter.
+   - Stub Apps Script client with local fake server or in-memory adapter.
    - Simulate SpeechRecognizer outputs for CI.
 5. Integration tests:
    - Widget lifecycle + foreground service + confirmation UI.
@@ -122,7 +122,7 @@ Field mapping rules:
 
 ## Implementation Phases
 - Phase 1: Prototype widget, ASR, structured parsing mock, basic confirmation UI.
-- Phase 2: Sheets OAuth + posting with offline queue; Room persistence; exact column mapping.
+- Phase 2: Apps Script posting with offline queue; Room persistence; exact column mapping.
 - Phase 3: Voice correction loop (tags, account, split overall charged), ambiguity handling, metrics & logging.
 - Phase 4: Polish, battery/perf tuning, accessibility and internationalization pass.
 

@@ -17,7 +17,7 @@ voice-expense-tracker/
 │   │   │   │   │   └── sync/     # Background sync services
 │   │   │   │   ├── data/         # Data layer
 │   │   │   │   │   ├── local/    # Room database, DAOs
-│   │   │   │   │   ├── remote/   # Google Sheets API integration
+│   │   │   │   │   ├── remote/   # Google Apps Script Web App integration
 │   │   │   │   │   ├── repository/ # Repository pattern implementations
 │   │   │   │   │   └── model/    # Data models and entities
 │   │   │   │   ├── ai/           # On-device AI processing
@@ -71,7 +71,7 @@ voice-expense-tracker/
 - **Tests**: `PascalCase` with suffix (e.g., `TransactionRepositoryTest`, `ParsingServiceTest`)
 
 ### Code
-- **Classes/Data Classes**: `PascalCase` (e.g., `Transaction`, `VoiceProcessor`, `SheetsClient`)
+- **Classes/Data Classes**: `PascalCase` (e.g., `Transaction`, `VoiceProcessor`, `AppsScriptClient`)
 - **Functions/Methods**: `camelCase` (e.g., `parseTransaction`, `saveToDatabase`, `authenticateUser`)
 - **Constants**: `UPPER_SNAKE_CASE` (e.g., `MAX_RETRIES`, `DEFAULT_TIMEOUT_MS`, `SHEETS_SCOPE`)
 - **Variables/Properties**: `camelCase` (e.g., `transactionAmount`, `userAccount`, `isOffline`)
@@ -137,7 +137,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
 ```kotlin
 class TransactionRepository @Inject constructor(
     private val localDataSource: TransactionDao,
-    private val remoteDataSource: SheetsApiClient
+    private val remoteDataSource: AppsScriptClient
 ) {
     // 1. Public API methods
     suspend fun saveTransaction(transaction: Transaction): Result<Unit>
@@ -147,8 +147,8 @@ class TransactionRepository @Inject constructor(
     suspend fun syncPendingTransactions(): SyncResult
     
     // 3. Private helper methods
-    private suspend fun uploadToSheets(transaction: Transaction): Boolean
-    private fun mapToSheetRow(transaction: Transaction): List<String>
+    private suspend fun uploadViaAppsScript(transaction: Transaction): Boolean
+    private fun mapToAppsRequest(transaction: Transaction): AppsScriptRequest
 }
 ```
 
@@ -195,7 +195,7 @@ data class Transaction(
 
 ### Feature Boundaries
 - **Voice Capture**: Widget → Service → AI Processing pipeline (isolated from UI)
-- **Transaction Management**: Repository pattern with Room + Sheets API integration
+- **Transaction Management**: Repository pattern with Room + Apps Script integration
 - **Authentication**: OAuth flow isolated with secure token storage
 - **Background Sync**: WorkManager tasks independent from main app lifecycle
 
@@ -286,7 +286,7 @@ app/src/test/java/com/voiceexpense/
 
 ### Testing Principles
 - Use fixture data for consistent AI parsing tests
-- Mock external dependencies (Sheets API, ML Kit)
+- Mock external dependencies (Apps Script client, ML Kit)
 - Integration tests for critical paths (widget → service → confirmation)
 - Performance tests for parsing latency requirements (<3s)
 - Error scenario testing for offline/auth failures

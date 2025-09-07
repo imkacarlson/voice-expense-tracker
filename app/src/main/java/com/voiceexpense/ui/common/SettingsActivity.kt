@@ -29,8 +29,8 @@ import com.google.android.material.appbar.MaterialToolbar
 
 object SettingsKeys {
     const val PREFS = "settings"
-    const val SPREADSHEET_ID = "spreadsheet_id"
-    const val SHEET_NAME = "sheet_name"
+    const val WEB_APP_URL = "web_app_url"
+    const val BACKUP_AUTH_TOKEN = "backup_auth_token"
     const val KNOWN_ACCOUNTS = "known_accounts" // comma-separated labels
     const val DEBUG_LOGS = "debug_logs" // developer toggle for verbose local logs
 }
@@ -39,12 +39,9 @@ object SettingsKeys {
 class SettingsActivity : AppCompatActivity() {
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var tokenProvider: TokenProvider
-    private val sheetsScope = Scope("https://www.googleapis.com/auth/spreadsheets")
-    private val driveFileScope = Scope("https://www.googleapis.com/auth/drive.file")
+    private val emailScope = Scope("https://www.googleapis.com/auth/userinfo.email")
 
-    companion object {
-        private const val RC_SHEETS = 1002
-    }
+    // No special request codes required; Google Sign-In handled via ActivityResult API.
     private lateinit var prefs: android.content.SharedPreferences
     private lateinit var gatingView: android.widget.TextView
     private fun prefsOrInit(): android.content.SharedPreferences =
@@ -58,13 +55,12 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         // Views
-        val spreadsheet: EditText = findViewById(R.id.input_spreadsheet)
-        val sheet: EditText = findViewById(R.id.input_sheet)
+        val webUrl: EditText = findViewById(R.id.input_web_url)
+        val backup: EditText = findViewById(R.id.input_backup_token)
         val accounts: EditText = findViewById(R.id.input_accounts)
         val save: Button = findViewById(R.id.btn_save)
         val signIn: Button = findViewById(R.id.btn_sign_in)
         val signOut: Button = findViewById(R.id.btn_sign_out)
-        val grantSheets: Button = findViewById(R.id.btn_grant_sheets)
         val authStatus: android.widget.TextView = findViewById(R.id.text_auth_status)
         gatingView = findViewById(R.id.text_sync_gating)
         val aiStatus: android.widget.TextView = findViewById(R.id.text_ai_status)
@@ -83,34 +79,41 @@ class SettingsActivity : AppCompatActivity() {
         lifecycleScope.launch(Dispatchers.IO) {
             // Touch prefs on IO thread to avoid StrictMode disk read on main
             val p = prefsOrInit()
-            val ss = p.getString(SettingsKeys.SPREADSHEET_ID, "")
-            val sh = p.getString(SettingsKeys.SHEET_NAME, "Sheet1")
+            var url = p.getString(SettingsKeys.WEB_APP_URL, "")
+            if (url.isNullOrBlank()) {
+                // Pre-fill default Web App URL for convenience
+                val def = getString(R.string.default_web_app_url)
+                if (def.isNotBlank()) {
+                    p.edit().putString(SettingsKeys.WEB_APP_URL, def).apply()
+                    url = def
+                }
+            }
+            val bt = p.getString(SettingsKeys.BACKUP_AUTH_TOKEN, "")
             val ka = p.getString(SettingsKeys.KNOWN_ACCOUNTS, "")
             val existing = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
-            val hasSheetConfig = !ss.isNullOrBlank() && !sh.isNullOrBlank()
+            val hasConfig = !url.isNullOrBlank()
             withContext(Dispatchers.Main) {
-                spreadsheet.setText(ss)
-                sheet.setText(sh)
+                webUrl.setText(url)
+                backup.setText(bt)
                 accounts.setText(ka)
                 updateAuthStatus(existing)
                 gatingView.text = when {
-                    !hasSheetConfig -> getString(R.string.sync_gating_message_default)
+                    !hasConfig -> getString(R.string.sync_gating_message_default)
                     existing == null -> getString(R.string.sync_gating_message_need_sign_in)
-                    else -> getString(R.string.sync_gating_message_ready, sh ?: "")
+                    else -> getString(R.string.sync_gating_message_ready_web)
                 }
             }
         }
 
         save.setOnClickListener {
-            val ss = spreadsheet.text.toString().trim()
-            val sh = sheet.text.toString().trim()
-            if (ss.isEmpty() || sh.isEmpty()) {
-                android.widget.Toast.makeText(this, R.string.error_missing_sheet_config, android.widget.Toast.LENGTH_SHORT).show()
+            val url = webUrl.text.toString().trim()
+            if (url.isEmpty()) {
+                android.widget.Toast.makeText(this, R.string.error_missing_web_url, android.widget.Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             prefsOrInit().edit()
-                .putString(SettingsKeys.SPREADSHEET_ID, ss)
-                .putString(SettingsKeys.SHEET_NAME, sh)
+                .putString(SettingsKeys.WEB_APP_URL, url)
+                .putString(SettingsKeys.BACKUP_AUTH_TOKEN, backup.text.toString())
                 .putString(SettingsKeys.KNOWN_ACCOUNTS, accounts.text.toString())
                 .apply()
             android.widget.Toast.makeText(this, R.string.info_settings_saved, android.widget.Toast.LENGTH_SHORT).show()
@@ -121,8 +124,7 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, com.voiceexpense.ui.setup.SetupGuidePage::class.java))
         }
 
-        // Configure Google Sign-In (email only). Request Sheets scope later if needed to
-        // avoid RESULT_CANCELED when consent screen cannot be shown due to OAuth config.
+        // Configure Google Sign-In (email only). We use userinfo.email access tokens for Apps Script auth.
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .build()
@@ -143,10 +145,9 @@ class SettingsActivity : AppCompatActivity() {
                 // Persist account and optionally warm token in background
                 lifecycleScope.launch {
                     authRepository.setAccount(accountName = account?.displayName, email = account?.email)
-                    // Attempt to warm a token (optional). If OAuth consent is not set up for
-                    // this scope, this may fail silently here and will be retried when needed.
+                    // Attempt to warm a token for userinfo.email
                     account?.email?.let { email ->
-                        runCatching { tokenProvider.getAccessToken(email, sheetsScope.scopeUri) }
+                        runCatching { tokenProvider.getAccessToken(email, emailScope.scopeUri) }
                     }
                     updateGatingMessage()
                 }
@@ -172,7 +173,7 @@ class SettingsActivity : AppCompatActivity() {
                     authRepository.signOut()
                     val last = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
                     last?.email?.let { email ->
-                        runCatching { tokenProvider.invalidateToken(email, "https://www.googleapis.com/auth/spreadsheets") }
+                        runCatching { tokenProvider.invalidateToken(email, "https://www.googleapis.com/auth/userinfo.email") }
                     }
                     withContext(Dispatchers.Main) {
                         updateAuthStatus(null)
@@ -180,21 +181,6 @@ class SettingsActivity : AppCompatActivity() {
                         updateGatingMessage()
                     }
                 }
-            }
-        }
-
-        grantSheets.setOnClickListener {
-            val acct = GoogleSignIn.getLastSignedInAccount(this)
-            if (acct == null) {
-                android.widget.Toast.makeText(this, getString(R.string.info_sign_in_first), android.widget.Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
-            if (GoogleSignIn.hasPermissions(acct, sheetsScope)) {
-                android.widget.Toast.makeText(this, getString(R.string.info_sheets_access_already), android.widget.Toast.LENGTH_SHORT).show()
-            } else {
-                // Request both Sheets and Drive File scopes so Drive access is limited
-                // to files the user explicitly selects/creates with the app.
-                GoogleSignIn.requestPermissions(this, RC_SHEETS, acct, sheetsScope, driveFileScope)
             }
         }
 
@@ -214,36 +200,15 @@ class SettingsActivity : AppCompatActivity() {
         // Compute gating message off main to avoid disk/account reads on UI thread
         lifecycleScope.launch(Dispatchers.IO) {
             val p = prefsOrInit()
-            val hasSheetConfig = !p.getString(SettingsKeys.SPREADSHEET_ID, "").isNullOrBlank() &&
-                    !p.getString(SettingsKeys.SHEET_NAME, "").isNullOrBlank()
+            val hasConfig = !p.getString(SettingsKeys.WEB_APP_URL, "").isNullOrBlank()
             val acct = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
             val text = when {
-                !hasSheetConfig -> getString(R.string.sync_gating_message_default)
+                !hasConfig -> getString(R.string.sync_gating_message_default)
                 acct == null -> getString(R.string.sync_gating_message_need_sign_in)
-                else -> getString(R.string.sync_gating_message_ready, p.getString(SettingsKeys.SHEET_NAME, "") ?: "")
+                else -> getString(R.string.sync_gating_message_ready_web)
             }
             withContext(Dispatchers.Main) { gatingView.text = text }
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        if (requestCode == RC_SHEETS) {
-            val acct = GoogleSignIn.getLastSignedInAccount(this)
-            if (resultCode == Activity.RESULT_OK && acct != null && GoogleSignIn.hasPermissions(acct, sheetsScope)) {
-                // Optionally warm token
-                lifecycleScope.launch(Dispatchers.IO) {
-                    acct.email?.let { email ->
-                        runCatching { tokenProvider.getAccessToken(email, sheetsScope.scopeUri) }
-                        runCatching { tokenProvider.getAccessToken(email, driveFileScope.scopeUri) }
-                    }
-                }
-                android.widget.Toast.makeText(this, getString(R.string.info_sheets_access_granted), android.widget.Toast.LENGTH_SHORT).show()
-            } else {
-                android.widget.Toast.makeText(this, getString(R.string.info_sheets_permission_canceled), android.widget.Toast.LENGTH_SHORT).show()
-            }
-            // Update gating text in case you want to reflect permission status later
-            updateGatingMessage()
-        }
-    }
 }

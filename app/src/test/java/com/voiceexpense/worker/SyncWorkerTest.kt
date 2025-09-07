@@ -12,8 +12,10 @@ import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
-import com.voiceexpense.data.remote.AppendResponse
-import com.voiceexpense.data.remote.SheetsClient
+import com.voiceexpense.data.remote.AppsScriptClient
+import com.voiceexpense.data.remote.AppsScriptRequest
+import com.voiceexpense.data.remote.AppsScriptResponse
+import com.voiceexpense.data.remote.AppsScriptResponseData
 import com.voiceexpense.data.repository.TransactionRepository
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
@@ -36,14 +38,10 @@ class FakeDao : TransactionDao {
     override suspend fun setPosted(id: String, ref: com.voiceexpense.data.model.SheetReference, newStatus: TransactionStatus) = updateStatus(id, newStatus)
 }
 
-class FakeSheetsClient(var succeed: Boolean = true) : SheetsClient() {
-    override suspend fun appendRow(
-        accessToken: String,
-        spreadsheetId: String,
-        sheetName: String,
-        values: List<String>
-    ): Result<AppendResponse> {
-        return if (succeed) Result.success(AppendResponse(spreadsheetId, null, null)) else Result.failure(IllegalStateException("fail"))
+class FakeAppsClient(var succeed: Boolean = true) : AppsScriptClient(okhttp3.OkHttpClient(), com.squareup.moshi.Moshi.Builder().build()) {
+    override suspend fun postExpense(url: String, request: AppsScriptRequest): Result<AppsScriptResponse> {
+        return if (succeed) Result.success(AppsScriptResponse("success", null, null, AppsScriptResponseData(null, null, null, 1)))
+        else Result.failure(IllegalStateException("fail"))
     }
 }
 
@@ -54,11 +52,10 @@ class SyncWorkerTest {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
 
         val dao = FakeDao()
-        val sheets = FakeSheetsClient(succeed = true)
+        val sheets = FakeAppsClient(succeed = true)
         val auth = AuthRepository(InMemoryStore()).apply { setAccessToken("t") }
         val repo = TransactionRepository(dao, sheets, auth, com.voiceexpense.auth.StaticTokenProvider("t")).apply {
-            spreadsheetId = "id"
-            sheetName = "Sheet1"
+            webAppUrl = "https://script.example/exec"
         }
 
         val txn = Transaction(
@@ -82,8 +79,7 @@ class SyncWorkerTest {
         // Pre-populate SharedPreferences used by worker
         val prefs = context.getSharedPreferences(com.voiceexpense.ui.common.SettingsKeys.PREFS, android.content.Context.MODE_PRIVATE)
         prefs.edit()
-            .putString(com.voiceexpense.ui.common.SettingsKeys.SPREADSHEET_ID, "id")
-            .putString(com.voiceexpense.ui.common.SettingsKeys.SHEET_NAME, "Sheet1")
+            .putString(com.voiceexpense.ui.common.SettingsKeys.WEB_APP_URL, "https://script.example/exec")
             .apply()
 
         val worker = TestListenableWorkerBuilder<SyncWorker>(context)

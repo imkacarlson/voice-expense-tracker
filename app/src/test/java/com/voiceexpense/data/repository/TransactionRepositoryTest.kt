@@ -8,8 +8,10 @@ import com.voiceexpense.data.model.TransactionType
 import kotlinx.coroutines.runBlocking
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.InMemoryStore
-import com.voiceexpense.data.remote.AppendResponse
-import com.voiceexpense.data.remote.SheetsClient
+import com.voiceexpense.data.remote.AppsScriptClient
+import com.voiceexpense.data.remote.AppsScriptRequest
+import com.voiceexpense.data.remote.AppsScriptResponse
+import com.voiceexpense.data.remote.AppsScriptResponseData
 import org.junit.Test
 import java.math.BigDecimal
 import java.time.Instant
@@ -37,7 +39,7 @@ class TransactionRepositoryTest {
     private val repo = TransactionRepository(dao)
 
     @Test
-    fun mapToSheetRow_expense_hasAmountAndExpenseCategory() {
+    fun mapToAppsRequest_expense_hasAmountAndExpenseCategory() {
         val t = base().copy(
             type = TransactionType.Expense,
             amountUsd = BigDecimal("12.34"),
@@ -46,67 +48,52 @@ class TransactionRepositoryTest {
             account = "Bilt Card (5217)",
             tags = listOf("Subscription", "Auto-Paid")
         )
-        val row = repo.mapToSheetRow(t)
-        assertThat(row[2]).isEqualTo("12.34")
-        assertThat(row[5]).isEqualTo("Dining")
-        assertThat(row[6]).isEqualTo("Subscription, Auto-Paid")
-        assertThat(row[7]).isEqualTo("") // Income Category blank
+        val req = repo.mapToAppsScriptRequest(t, token = "tok")
+        assertThat(req.amount).isEqualTo("12.34")
+        assertThat(req.expenseCategory).isEqualTo("Dining")
+        assertThat(req.tags).isEqualTo("Subscription, Auto-Paid")
+        assertThat(req.incomeCategory).isNull()
     }
 
     @Test
-    fun mapToSheetRow_income_hasIncomeCategoryAndAmount() {
+    fun mapToAppsRequest_income_hasIncomeCategoryAndAmount() {
         val t = base().copy(
             type = TransactionType.Income,
             amountUsd = BigDecimal("2000.00"),
             expenseCategory = null,
             incomeCategory = "Salary"
         )
-        val row = repo.mapToSheetRow(t)
-        assertThat(row[2]).isEqualTo("2000.00")
-        assertThat(row[5]).isEqualTo("")
-        assertThat(row[7]).isEqualTo("Salary")
+        val req = repo.mapToAppsScriptRequest(t, token = "tok")
+        assertThat(req.amount).isEqualTo("2000.00")
+        assertThat(req.expenseCategory).isNull()
+        assertThat(req.incomeCategory).isEqualTo("Salary")
     }
 
     @Test
-    fun mapToSheetRow_transfer_blanksAmount() {
+    fun mapToAppsRequest_transfer_blanksAmount() {
         val t = base().copy(
             type = TransactionType.Transfer,
             amountUsd = null
         )
-        val row = repo.mapToSheetRow(t)
-        assertThat(row[2]).isEqualTo("")
+        val req = repo.mapToAppsScriptRequest(t, token = "tok")
+        assertThat(req.amount).isNull()
     }
 
     @Test
-    fun syncPending_401ThenSuccess_postsAndSetsSheetRef() = runBlocking {
-        class FakeSheets : SheetsClient() {
+    fun syncPending_401ThenSuccess_posts() = runBlocking {
+        class FakeApps : AppsScriptClient(okhttp3.OkHttpClient(), com.squareup.moshi.Moshi.Builder().build()) {
             var calls = 0
-            override suspend fun appendRow(
-                accessToken: String,
-                spreadsheetId: String,
-                sheetName: String,
-                values: List<String>
-            ): Result<AppendResponse> {
+            override suspend fun postExpense(url: String, request: AppsScriptRequest): Result<AppsScriptResponse> {
                 calls++
-                return if (calls == 1) {
-                    Result.failure(IllegalStateException("Sheets append failed: HTTP 401 Unauthorized"))
-                } else {
-                    Result.success(
-                        AppendResponse(
-                            spreadsheetId = spreadsheetId,
-                            tableRange = null,
-                            updates = AppendResponse.Updates("$sheetName!A5:M5", 1, 13, 13)
-                        )
-                    )
-                }
+                return if (calls == 1) Result.failure(IllegalStateException("AppsScript post failed: HTTP 401 Unauthorized"))
+                else Result.success(AppsScriptResponse("success", null, null, AppsScriptResponseData(null, null, null, 5)))
             }
         }
 
-        val sheets = FakeSheets()
+        val apps = FakeApps()
         val auth = AuthRepository(InMemoryStore()).apply { setAccessToken("token"); setAccount("user","user@example.com") }
-        val repo2 = TransactionRepository(dao, sheets, auth, com.voiceexpense.auth.StaticTokenProvider("token")).apply {
-            spreadsheetId = "sheetId"
-            sheetName = "Sheet1"
+        val repo2 = TransactionRepository(dao, apps, auth, com.voiceexpense.auth.StaticTokenProvider("token")).apply {
+            webAppUrl = "https://script.example/exec"
         }
 
         val txn = base().copy(

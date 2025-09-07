@@ -45,7 +45,7 @@ class VoiceToSheetsFlowTest {
     }
 
     @Test
-    fun parse_and_map_to_sheet_row() = runBlocking {
+    fun parse_and_map_to_apps_request() = runBlocking {
         val parser = TransactionParser(mlKit = mockk(relaxed = true))
         val parsed = parser.parse("I spent 23 at Starbucks for coffee", ParsingContext(defaultDate = LocalDate.parse("2025-07-02")))
         val txn = Transaction(
@@ -64,11 +64,11 @@ class VoiceToSheetsFlowTest {
         )
 
         val repo = TransactionRepository(dao = InMemoryDao())
-        val row = repo.mapToSheetRow(txn)
-        // Columns: Timestamp | Date | Amount | Description | Type | Expense Category | Tags | Income Category | ... | Account | OverallCharged | ...
-        assertThat(row[1]).isEqualTo("2025-07-02")
-        assertThat(row[2]).isEqualTo("23.00")
-        assertThat(row[3]).contains("Starbucks")
-        assertThat(row[4]).isEqualTo("Expense")
+        val req = repo.mapToAppsScriptRequest(txn, token = "tok")
+        // Fields: date, amount, description, type, expenseCategory, account, tags
+        assertThat(req.date).isEqualTo("07/02/2025")
+        assertThat(req.amount).isEqualTo("23.00")
+        assertThat(req.description).contains("Starbucks")
+        assertThat(req.type).isEqualTo("Expense")
     }
 }
