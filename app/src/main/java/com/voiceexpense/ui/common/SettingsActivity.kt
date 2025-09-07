@@ -40,6 +40,7 @@ class SettingsActivity : AppCompatActivity() {
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var tokenProvider: TokenProvider
     private val sheetsScope = Scope("https://www.googleapis.com/auth/spreadsheets")
+    private val driveFileScope = Scope("https://www.googleapis.com/auth/drive.file")
 
     companion object {
         private const val RC_SHEETS = 1002
@@ -191,7 +192,9 @@ class SettingsActivity : AppCompatActivity() {
             if (GoogleSignIn.hasPermissions(acct, sheetsScope)) {
                 android.widget.Toast.makeText(this, getString(R.string.info_sheets_access_already), android.widget.Toast.LENGTH_SHORT).show()
             } else {
-                GoogleSignIn.requestPermissions(this, RC_SHEETS, acct, sheetsScope)
+                // Request both Sheets and Drive File scopes so Drive access is limited
+                // to files the user explicitly selects/creates with the app.
+                GoogleSignIn.requestPermissions(this, RC_SHEETS, acct, sheetsScope, driveFileScope)
             }
         }
 
@@ -232,6 +235,7 @@ class SettingsActivity : AppCompatActivity() {
                 lifecycleScope.launch(Dispatchers.IO) {
                     acct.email?.let { email ->
                         runCatching { tokenProvider.getAccessToken(email, sheetsScope.scopeUri) }
+                        runCatching { tokenProvider.getAccessToken(email, driveFileScope.scopeUri) }
                     }
                 }
                 android.widget.Toast.makeText(this, getString(R.string.info_sheets_access_granted), android.widget.Toast.LENGTH_SHORT).show()
