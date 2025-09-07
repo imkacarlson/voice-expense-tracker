@@ -39,6 +39,11 @@ object SettingsKeys {
 class SettingsActivity : AppCompatActivity() {
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var tokenProvider: TokenProvider
+    private val sheetsScope = Scope("https://www.googleapis.com/auth/spreadsheets")
+
+    companion object {
+        private const val RC_SHEETS = 1002
+    }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
@@ -55,6 +60,7 @@ class SettingsActivity : AppCompatActivity() {
         val save: Button = findViewById(R.id.btn_save)
         val signIn: Button = findViewById(R.id.btn_sign_in)
         val signOut: Button = findViewById(R.id.btn_sign_out)
+        val grantSheets: Button = findViewById(R.id.btn_grant_sheets)
         val authStatus: android.widget.TextView = findViewById(R.id.text_auth_status)
         val gating: android.widget.TextView = findViewById(R.id.text_sync_gating)
         val aiStatus: android.widget.TextView = findViewById(R.id.text_ai_status)
@@ -127,7 +133,6 @@ class SettingsActivity : AppCompatActivity() {
 
         // Configure Google Sign-In (email only). Request Sheets scope later if needed to
         // avoid RESULT_CANCELED when consent screen cannot be shown due to OAuth config.
-        val sheetsScope = Scope("https://www.googleapis.com/auth/spreadsheets")
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
             .build()
@@ -188,6 +193,19 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        grantSheets.setOnClickListener {
+            val acct = GoogleSignIn.getLastSignedInAccount(this)
+            if (acct == null) {
+                android.widget.Toast.makeText(this, getString(R.string.info_sign_in_first), android.widget.Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            if (GoogleSignIn.hasPermissions(acct, sheetsScope)) {
+                android.widget.Toast.makeText(this, getString(R.string.info_sheets_access_already), android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                GoogleSignIn.requestPermissions(this, RC_SHEETS, acct, sheetsScope)
+            }
+        }
+
         updateGatingMessage()
 
         // Probe AI status lazily (ensureModelAvailable does IO internally, but keep off main)
@@ -197,6 +215,26 @@ class SettingsActivity : AppCompatActivity() {
                 is ModelManager.ModelStatus.Unavailable -> aiStatus.text = getString(R.string.setup_guide_status_unavailable, s.reason)
                 is ModelManager.ModelStatus.Error -> aiStatus.text = getString(R.string.setup_guide_status_error, s.throwable.message ?: "unknown")
             }
+        }
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == RC_SHEETS) {
+            val acct = GoogleSignIn.getLastSignedInAccount(this)
+            if (resultCode == Activity.RESULT_OK && acct != null && GoogleSignIn.hasPermissions(acct, sheetsScope)) {
+                // Optionally warm token
+                lifecycleScope.launch(Dispatchers.IO) {
+                    acct.email?.let { email ->
+                        runCatching { tokenProvider.getAccessToken(email, sheetsScope.scopeUri) }
+                    }
+                }
+                android.widget.Toast.makeText(this, getString(R.string.info_sheets_access_granted), android.widget.Toast.LENGTH_SHORT).show()
+            } else {
+                android.widget.Toast.makeText(this, getString(R.string.info_sheets_permission_canceled), android.widget.Toast.LENGTH_SHORT).show()
+            }
+            // Update gating text in case you want to reflect permission status later
+            updateGatingMessage()
         }
     }
 }

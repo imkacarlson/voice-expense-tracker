@@ -12,6 +12,7 @@
     <string name="save">Save</string>
     <string name="sign_in">Sign in</string>
     <string name="sign_out">Sign out</string>
+    <string name="grant_sheets_access">Grant Sheets Access</string>
     <string name="auth_status_signed_out">Not signed in</string>
     <string name="auth_status_signed_in">Signed in as %1$s</string>
     <string name="sync_gating_message_default">Sign in and configure spreadsheet to enable sync.</string>
@@ -22,6 +23,10 @@
     <string name="error_missing_sheet_config">Enter Spreadsheet ID and Sheet name to enable sync.</string>
     <string name="info_sign_in_required">Sign in required to post transactions.</string>
     <string name="info_settings_saved">Settings saved.</string>
+    <string name="info_sign_in_first">Sign in first</string>
+    <string name="info_sheets_access_granted">Sheets access granted</string>
+    <string name="info_sheets_access_already">Sheets access already granted</string>
+    <string name="info_sheets_permission_canceled">Sheets permission canceled</string>
     <string name="error_sign_in_required">Sign in required to post to Google Sheets.</string>
     <string name="error_token_fetch_failed">Could not get sign-in token. Try again later.</string>
     <string name="error_open_draft_failed">Could not open draft. Please try again.</string>

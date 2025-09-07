@@ -49,6 +49,13 @@
                 android:text="@string/sign_out" />
         </LinearLayout>
 
+        <Button
+            android:id="@+id/btn_grant_sheets"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:minHeight="48dp"
+            android:text="@string/grant_sheets_access" />
+
         <EditText
             android:id="@+id/input_spreadsheet"
             android:layout_width="match_parent"
