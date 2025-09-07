@@ -61,6 +61,14 @@ class SettingsActivity : AppCompatActivity() {
         val openSetup: Button = findViewById(R.id.btn_open_setup_guide)
         val modelManager = ModelManager()
 
+        fun updateAuthStatus(account: GoogleSignInAccount?) {
+            if (account != null) {
+                authStatus.text = getString(R.string.auth_status_signed_in, account.email ?: account.displayName ?: "")
+            } else {
+                authStatus.text = getString(R.string.auth_status_signed_out)
+            }
+        }
+
         // Preload prefs and account off main thread, then update UI
         lifecycleScope.launch(Dispatchers.IO) {
             // Touch prefs on IO thread to avoid StrictMode disk read on main
@@ -124,14 +132,6 @@ class SettingsActivity : AppCompatActivity() {
             .requestScopes(sheetsScope)
             .build()
         val signInClient: GoogleSignInClient = GoogleSignIn.getClient(this, gso)
-
-        fun updateAuthStatus(account: GoogleSignInAccount?) {
-            if (account != null) {
-                authStatus.text = getString(R.string.auth_status_signed_in, account.email ?: account.displayName ?: "")
-            } else {
-                authStatus.text = getString(R.string.auth_status_signed_out)
-            }
-        }
 
         // Auth status is set in the pre-warm block above
 
