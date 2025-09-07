@@ -125,11 +125,11 @@ class SettingsActivity : AppCompatActivity() {
             startActivity(android.content.Intent(this, com.voiceexpense.ui.setup.SetupGuidePage::class.java))
         }
 
-        // Configure Google Sign-In for Sheets scope (consent UI only; token handling added later)
+        // Configure Google Sign-In (email only). Request Sheets scope later if needed to
+        // avoid RESULT_CANCELED when consent screen cannot be shown due to OAuth config.
         val sheetsScope = Scope("https://www.googleapis.com/auth/spreadsheets")
         val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
             .requestEmail()
-            .requestScopes(sheetsScope)
             .build()
         val signInClient: GoogleSignInClient = GoogleSignIn.getClient(this, gso)
 
@@ -137,6 +137,7 @@ class SettingsActivity : AppCompatActivity() {
 
         val signInLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
             if (result.resultCode != Activity.RESULT_OK) {
+                Log.w("SettingsActivity", "Google sign-in result canceled: code=${result.resultCode}")
                 android.widget.Toast.makeText(this, "Sign-in canceled", android.widget.Toast.LENGTH_SHORT).show()
                 return@registerForActivityResult
             }
@@ -147,8 +148,10 @@ class SettingsActivity : AppCompatActivity() {
                 // Persist account and optionally warm token in background
                 lifecycleScope.launch {
                     authRepository.setAccount(accountName = account?.displayName, email = account?.email)
+                    // Attempt to warm a token (optional). If OAuth consent is not set up for
+                    // this scope, this may fail silently here and will be retried when needed.
                     account?.email?.let { email ->
-                        runCatching { tokenProvider.getAccessToken(email, "https://www.googleapis.com/auth/spreadsheets") }
+                        runCatching { tokenProvider.getAccessToken(email, sheetsScope.scopeUri) }
                     }
                     updateGatingMessage()
                 }
