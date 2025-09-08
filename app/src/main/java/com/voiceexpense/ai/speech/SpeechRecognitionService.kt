@@ -3,6 +3,8 @@ package com.voiceexpense.ai.speech
 import android.content.Context
 import android.content.Intent
 import android.os.Bundle
+import android.os.Handler
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
@@ -15,6 +17,7 @@ import kotlinx.coroutines.delay
 class SpeechRecognitionService(private val context: Context) {
 
     private var recognizer: SpeechRecognizer? = null
+    private val mainHandler = Handler(Looper.getMainLooper())
 
     suspend fun isAvailable(): Boolean = SpeechRecognizer.isRecognitionAvailable(context)
 
@@ -25,62 +28,61 @@ class SpeechRecognitionService(private val context: Context) {
             return@callbackFlow
         }
 
-        recognizer = SpeechRecognizer.createSpeechRecognizer(context).also { sr ->
-            sr.setRecognitionListener(object : RecognitionListener {
-                override fun onReadyForSpeech(params: Bundle?) {
-                    trySend(RecognitionResult.Listening)
-                }
-
-                override fun onBeginningOfSpeech() {}
-                override fun onRmsChanged(rmsdB: Float) {}
-                override fun onBufferReceived(buffer: ByteArray?) {}
-                override fun onEndOfSpeech() {}
-
-                override fun onError(error: Int) {
-                    val mapped = when (error) {
-                        SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> RecognitionError.NoPermission
-                        SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> RecognitionError.Timeout
-                        else -> RecognitionError.Api(error, "ASR error $error")
+        // Create and start SpeechRecognizer on the main thread as required by the platform
+        mainHandler.post {
+            recognizer = SpeechRecognizer.createSpeechRecognizer(context).also { sr ->
+                sr.setRecognitionListener(object : RecognitionListener {
+                    override fun onReadyForSpeech(params: Bundle?) {
+                        trySend(RecognitionResult.Listening)
                     }
-                    trySend(RecognitionResult.Error(mapped))
-                }
 
-                override fun onResults(results: Bundle) {
-                    val texts = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                    val confidences = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
-                    if (texts.isNotEmpty()) {
-                        val text = texts.first()
-                        val conf = confidences?.firstOrNull() ?: 0f
-                        if (conf >= config.confidenceThreshold) {
-                            trySend(RecognitionResult.Success(text, conf))
-                        } else {
+                    override fun onBeginningOfSpeech() {}
+                    override fun onRmsChanged(rmsdB: Float) {}
+                    override fun onBufferReceived(buffer: ByteArray?) {}
+                    override fun onEndOfSpeech() {}
+
+                    override fun onError(error: Int) {
+                        val mapped = when (error) {
+                            SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> RecognitionError.NoPermission
+                            SpeechRecognizer.ERROR_NETWORK_TIMEOUT, SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> RecognitionError.Timeout
+                            else -> RecognitionError.Api(error, "ASR error $error")
+                        }
+                        trySend(RecognitionResult.Error(mapped))
+                        trySend(RecognitionResult.Complete)
+                    }
+
+                    override fun onResults(results: Bundle) {
+                        val texts = results.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+                        val confidences = results.getFloatArray(SpeechRecognizer.CONFIDENCE_SCORES)
+                        if (texts.isNotEmpty()) {
+                            val text = texts.first()
+                            val conf = confidences?.firstOrNull() ?: 0f
                             trySend(RecognitionResult.Success(text, conf))
                         }
+                        trySend(RecognitionResult.Complete)
                     }
-                    trySend(RecognitionResult.Complete)
-                }
 
-                override fun onPartialResults(partialResults: Bundle) {
-                    if (config.partialResults) {
-                        val texts = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
-                        if (texts.isNotEmpty()) trySend(RecognitionResult.Partial(texts.first()))
+                    override fun onPartialResults(partialResults: Bundle) {
+                        if (config.partialResults) {
+                            val texts = partialResults.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION).orEmpty()
+                            if (texts.isNotEmpty()) trySend(RecognitionResult.Partial(texts.first()))
+                        }
                     }
+
+                    override fun onEvent(eventType: Int, params: Bundle?) {}
+                })
+
+                val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE, config.languageCode)
+                    putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, config.maxResults)
+                    putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, config.partialResults)
+                    // Prefer offline if available
+                    putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, config.offlineMode)
                 }
-
-                override fun onEvent(eventType: Int, params: Bundle?) {}
-            })
+                sr.startListening(intent)
+            }
         }
-
-        val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
-            putExtra(RecognizerIntent.EXTRA_LANGUAGE, config.languageCode)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, config.maxResults)
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, config.partialResults)
-            // Prefer offline if available
-            putExtra(RecognizerIntent.EXTRA_PREFER_OFFLINE, config.offlineMode)
-        }
-
-        recognizer?.startListening(intent)
 
         awaitClose {
             stopListening()
@@ -98,14 +100,18 @@ class SpeechRecognitionService(private val context: Context) {
     }
 
     fun stopListening() {
-        recognizer?.apply {
-            try {
-                stopListening()
-                cancel()
-            } finally {
-                destroy()
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            recognizer?.apply {
+                try {
+                    stopListening()
+                    cancel()
+                } finally {
+                    destroy()
+                }
             }
+            recognizer = null
+        } else {
+            mainHandler.post { stopListening() }
         }
-        recognizer = null
     }
 }
