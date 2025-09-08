@@ -39,6 +39,7 @@ class VoiceRecordingService : Service() {
         const val ACTION_LISTENING_COMPLETE = "com.voiceexpense.action.LISTENING_COMPLETE"
         const val ACTION_LISTENING_STARTED = "com.voiceexpense.action.LISTENING_STARTED"
         const val EXTRA_TRANSACTION_ID = "transaction_id"
+        const val EXTRA_ERROR_MESSAGE = "error_message"
     }
 
     private val scope = CoroutineScope(Dispatchers.Default)
@@ -69,8 +70,8 @@ class VoiceRecordingService : Service() {
 
     private fun startCapture() {
         startForeground(NOTIF_ID, notification("Listening…"))
-        // Notify UI that listening has started
-        sendBroadcast(Intent(ACTION_LISTENING_STARTED))
+        // Notify UI that listening has started (explicit to our package)
+        sendBroadcast(Intent(ACTION_LISTENING_STARTED).setPackage(packageName))
         job?.cancel()
         job = scope.launch {
             // Safety timeout to avoid battery drain
@@ -83,6 +84,7 @@ class VoiceRecordingService : Service() {
                 languageCode = "en-US",
                 maxResults = 1,
                 partialResults = false,
+                // Steering docs: prefer on-device (offline) ASR only
                 offlineMode = true,
                 confidenceThreshold = 0.5f
             )
@@ -93,7 +95,21 @@ class VoiceRecordingService : Service() {
                         stopCapture()
                     }
                     is RecognitionResult.Error -> {
-                        // TODO: route user-friendly feedback based on error type
+                        // Surface a user-friendly message via broadcast before stopping
+                        val msg = when (result.error) {
+                            is com.voiceexpense.ai.speech.RecognitionError.Unavailable ->
+                                "On-device speech recognition unavailable. Install 'Speech Services by Google' and download offline English."
+                            is com.voiceexpense.ai.speech.RecognitionError.NoPermission ->
+                                "Microphone permission not granted"
+                            is com.voiceexpense.ai.speech.RecognitionError.Timeout ->
+                                "Didn't catch that — please try again"
+                            else -> "Speech recognition error"
+                        }
+                        sendBroadcast(
+                            Intent(ACTION_LISTENING_COMPLETE)
+                                .setPackage(packageName)
+                                .putExtra(EXTRA_ERROR_MESSAGE, msg)
+                        )
                         stopCapture()
                     }
                     RecognitionResult.Complete -> stopCapture()
@@ -127,7 +143,11 @@ class VoiceRecordingService : Service() {
         )
         repo.saveDraft(txn)
         // Notify listeners (optional)
-        sendBroadcast(Intent(ACTION_DRAFT_READY).putExtra(EXTRA_TRANSACTION_ID, txn.id))
+        sendBroadcast(
+            Intent(ACTION_DRAFT_READY)
+                .setPackage(packageName)
+                .putExtra(EXTRA_TRANSACTION_ID, txn.id)
+        )
         // Debounce duplicate launches for the same id
         val now = System.currentTimeMillis()
         val shouldLaunch = lastLaunchedId != txn.id || (now - lastLaunchAt) > 2000
@@ -144,7 +164,7 @@ class VoiceRecordingService : Service() {
     private fun stopCapture() {
         job?.cancel()
         // Inform UI to dismiss any overlay
-        sendBroadcast(Intent(ACTION_LISTENING_COMPLETE))
+        sendBroadcast(Intent(ACTION_LISTENING_COMPLETE).setPackage(packageName))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }

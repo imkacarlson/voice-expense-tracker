@@ -8,6 +8,7 @@ import android.os.Bundle
 import android.view.WindowManager
 import android.widget.Button
 import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import com.voiceexpense.R
@@ -21,7 +22,14 @@ class ListeningActivity : AppCompatActivity() {
         override fun onReceive(context: Context?, intent: Intent?) {
             when (intent?.action) {
                 VoiceRecordingService.ACTION_LISTENING_COMPLETE,
-                VoiceRecordingService.ACTION_DRAFT_READY -> finish()
+                VoiceRecordingService.ACTION_DRAFT_READY -> {
+                    // If an error message is provided, show it briefly before closing
+                    val msg = intent.getStringExtra(VoiceRecordingService.EXTRA_ERROR_MESSAGE)
+                    if (!msg.isNullOrBlank()) {
+                        Toast.makeText(this@ListeningActivity, msg, Toast.LENGTH_SHORT).show()
+                    }
+                    finish()
+                }
             }
         }
     }
@@ -57,4 +65,3 @@ class ListeningActivity : AppCompatActivity() {
         runCatching { unregisterReceiver(finishReceiver) }
     }
 }
-
