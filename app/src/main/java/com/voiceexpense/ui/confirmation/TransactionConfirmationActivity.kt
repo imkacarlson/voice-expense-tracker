@@ -62,6 +62,9 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val noteView: EditText = findViewById(R.id.field_note)
 
         title.text = getString(R.string.app_name)
+        // Disable actions until draft loads
+        confirm.isEnabled = false
+        speak.isEnabled = false
 
         // Load draft by id if provided
         val id = intent?.getStringExtra(com.voiceexpense.service.voice.VoiceRecordingService.EXTRA_TRANSACTION_ID)
@@ -87,6 +90,9 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 viewModel.transaction.collect { t ->
                     if (t == null) return@collect
+                    // Enable actions once draft is available
+                    confirm.isEnabled = true
+                    speak.isEnabled = true
                     amountView.setText(t.amountUsd?.toPlainString() ?: "")
                     overallView.setText(t.splitOverallChargedUsd?.toPlainString() ?: "")
                     merchantView.setText(t.merchant)
@@ -118,11 +124,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
 
         confirm.setOnClickListener {
             // Gather manual edits from inputs and persist before confirming
-            val current = viewModel.transaction.value
-            if (current == null) {
-                Toast.makeText(this, R.string.error_open_draft_failed, Toast.LENGTH_SHORT).show()
-                return@setOnClickListener
-            }
+            val current = viewModel.transaction.value ?: return@setOnClickListener
             // Parse and validate inputs
             fun parseAmount(text: String): java.math.BigDecimal? =
                 text.trim().takeIf { it.isNotEmpty() }?.let { runCatching { java.math.BigDecimal(it) }.getOrNull() }
