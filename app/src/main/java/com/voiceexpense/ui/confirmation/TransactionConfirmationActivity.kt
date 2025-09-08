@@ -2,6 +2,7 @@ package com.voiceexpense.ui.confirmation
 
 import android.os.Bundle
 import android.widget.Toast
+import android.content.Intent
 import android.widget.Button
 import android.widget.TextView
 import android.widget.EditText
@@ -17,6 +18,7 @@ import com.voiceexpense.ui.confirmation.voice.TtsEngine
 import com.voiceexpense.ui.confirmation.voice.VoiceCorrectionController
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.worker.enqueueSyncNow
+import com.voiceexpense.ui.common.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -176,8 +178,13 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             viewModel.applyManualEdits(updated)
             viewModel.confirm()
             enqueueSyncNow(this)
+            Toast.makeText(this, "Saved. Syncing in background.", Toast.LENGTH_SHORT).show()
+            navigateHome()
         }
-        cancel.setOnClickListener { viewModel.cancel(); finish() }
+        cancel.setOnClickListener {
+            viewModel.cancel()
+            navigateHome()
+        }
 
         // Placeholder voice correction using ASR debug
         val asr = SpeechRecognitionService(this)
@@ -194,5 +201,13 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         }
 
         // Removed typed correction row per UX change
+    }
+
+    private fun navigateHome() {
+        // Bring MainActivity to front if it exists, otherwise create it
+        val intent = Intent(this, MainActivity::class.java)
+            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        startActivity(intent)
+        finish()
     }
 }
