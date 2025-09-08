@@ -20,6 +20,8 @@ import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.data.repository.TransactionRepository
 import dagger.hilt.android.AndroidEntryPoint
+import android.content.pm.ApplicationInfo
+import com.voiceexpense.ui.common.SettingsKeys
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -79,7 +81,7 @@ class VoiceRecordingService : Service() {
             // Safety timeout to avoid battery drain
             val timeoutJob = launch { kotlinx.coroutines.delay(20_000); stopCapture() }
 
-            // Attempt offline first; in debug, fall back to online if language unavailable (12/13)
+            // Attempt offline first; optional dev toggle can fall back to online if language unavailable (12/13)
             var attempt = 0
             var completed = false
             while (attempt < 2 && !completed) {
@@ -104,7 +106,9 @@ class VoiceRecordingService : Service() {
                             Log.w("VoiceService", "ASR error: ${result.error}")
                             val e = result.error
                             val isLangError = (e is com.voiceexpense.ai.speech.RecognitionError.Api) && (e.code == 12 || e.code == 13)
-                            if (useOffline && isLangError && com.voiceexpense.BuildConfig.DEBUG) {
+                            val allowOnlineFallback = getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
+                                .getBoolean(SettingsKeys.ASR_ONLINE_FALLBACK, isDebuggable())
+                            if (useOffline && isLangError && allowOnlineFallback) {
                                 // Retry online in debug builds to keep development unblocked
                                 retryOnline = true
                             } else {
@@ -153,6 +157,8 @@ class VoiceRecordingService : Service() {
             timeoutJob.cancel()
         }
     }
+
+    private fun isDebuggable(): Boolean = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     private suspend fun handleTranscript(text: String) {
         val parsed = parser.parse(text, ParsingContext(defaultDate = LocalDate.now()))

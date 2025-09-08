@@ -33,6 +33,7 @@ object SettingsKeys {
     const val BACKUP_AUTH_TOKEN = "backup_auth_token"
     const val KNOWN_ACCOUNTS = "known_accounts" // comma-separated labels
     const val DEBUG_LOGS = "debug_logs" // developer toggle for verbose local logs
+    const val ASR_ONLINE_FALLBACK = "asr_online_fallback" // allow online ASR when offline model missing (dev aid)
 }
 
 @AndroidEntryPoint
@@ -66,6 +67,7 @@ class SettingsActivity : AppCompatActivity() {
         val aiStatus: android.widget.TextView = findViewById(R.id.text_ai_status)
         val openSetup: Button = findViewById(R.id.btn_open_setup_guide)
         val modelManager = ModelManager()
+        val asrFallback: androidx.appcompat.widget.SwitchCompat = findViewById(R.id.switch_asr_online_fallback)
 
         fun updateAuthStatus(account: GoogleSignInAccount?) {
             if (account != null) {
@@ -90,12 +92,14 @@ class SettingsActivity : AppCompatActivity() {
             }
             val bt = p.getString(SettingsKeys.BACKUP_AUTH_TOKEN, "")
             val ka = p.getString(SettingsKeys.KNOWN_ACCOUNTS, "")
+            val asrOnline = p.getBoolean(SettingsKeys.ASR_ONLINE_FALLBACK, (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0)
             val existing = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
             val hasConfig = !url.isNullOrBlank()
             withContext(Dispatchers.Main) {
                 webUrl.setText(url)
                 backup.setText(bt)
                 accounts.setText(ka)
+                asrFallback.isChecked = asrOnline
                 updateAuthStatus(existing)
                 gatingView.text = when {
                     !hasConfig -> getString(R.string.sync_gating_message_default)
@@ -185,6 +189,13 @@ class SettingsActivity : AppCompatActivity() {
         }
 
         updateGatingMessage()
+
+        // Persist ASR fallback toggle
+        asrFallback.setOnCheckedChangeListener { _, isChecked ->
+            prefsOrInit().edit().putBoolean(SettingsKeys.ASR_ONLINE_FALLBACK, isChecked).apply()
+            val msg = if (isChecked) R.string.asr_fallback_enabled else R.string.asr_fallback_disabled
+            android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
+        }
 
         // Probe AI status lazily (ensureModelAvailable does IO internally, but keep off main)
         lifecycleScope.launch(Dispatchers.Main) {

@@ -39,4 +39,9 @@
     <string name="setup_guide_import_success">Model imported successfully.</string>
     <string name="setup_guide_import_failure">Failed to import model: %1$s</string>
     <string name="listening_now">Listening…</string>
+    
+    <!-- Developer options -->
+    <string name="asr_online_fallback_label">Allow online ASR fallback (dev)</string>
+    <string name="asr_fallback_enabled">Online ASR fallback enabled</string>
+    <string name="asr_fallback_disabled">Online ASR fallback disabled</string>
 </resources>
