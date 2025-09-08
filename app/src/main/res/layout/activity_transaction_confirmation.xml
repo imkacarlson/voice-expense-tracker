@@ -41,76 +41,85 @@
                 android:orientation="vertical"
                 android:layout_marginBottom="16dp">
 
-                <TextView
+                <EditText
                     android:id="@+id/field_amount"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="16sp"
-                    android:text="Amount: —"
-                    android:textStyle="bold" />
+                    android:hint="@string/hint_amount"
+                    android:inputType="numberDecimal"
+                    android:textSize="16sp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/field_overall"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:text="Overall charged: —" />
+                    android:hint="@string/hint_overall"
+                    android:inputType="numberDecimal"
+                    android:textSize="14sp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/field_merchant"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:text="Merchant: —" />
+                    android:hint="@string/hint_merchant"
+                    android:inputType="textCapWords"
+                    android:textSize="14sp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/field_description"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:text="Description: —" />
+                    android:hint="@string/hint_description"
+                    android:inputType="textCapSentences"
+                    android:textSize="14sp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/field_type"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:text="Type: —" />
+                    android:hint="@string/hint_type"
+                    android:inputType="textCapWords"
+                    android:textSize="14sp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/field_category"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:text="Category: —" />
+                    android:hint="@string/hint_category"
+                    android:inputType="textCapWords"
+                    android:textSize="14sp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/field_tags"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:text="Tags: —" />
+                    android:hint="@string/hint_tags"
+                    android:inputType="textCapWords"
+                    android:textSize="14sp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/field_account"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:text="Account: —" />
+                    android:hint="@string/hint_account"
+                    android:inputType="textCapWords"
+                    android:textSize="14sp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/field_date"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:text="Date: —" />
+                    android:hint="@string/hint_date"
+                    android:inputType="date"
+                    android:textSize="14sp" />
 
-                <TextView
+                <EditText
                     android:id="@+id/field_note"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:textSize="14sp"
-                    android:text="Note: —" />
+                    android:hint="@string/hint_note"
+                    android:inputType="textCapSentences"
+                    android:textSize="14sp" />
             </LinearLayout>
 
             <!-- Voice correction actions -->
@@ -121,35 +130,7 @@
                 android:minHeight="48dp"
                 android:text="@string/speak_correction" />
 
-            <!-- Typed corrections for emulator/testing -->
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:layout_marginTop="8dp"
-                android:layout_marginBottom="16dp">
-
-                <EditText
-                    android:id="@+id/input_correction"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:hint="@string/type_correction_hint"
-                    android:imeOptions="actionDone"
-                    android:singleLine="true" />
-
-                <View
-                    android:layout_width="8dp"
-                    android:layout_height="match_parent" />
-
-                <Button
-                    android:id="@+id/btn_apply_correction"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="80dp"
-                    android:minHeight="48dp"
-                    android:text="@string/apply_correction" />
-            </LinearLayout>
+            <!-- Removed freeform typed correction row as per UX change -->
         </LinearLayout>
     </ScrollView>
 

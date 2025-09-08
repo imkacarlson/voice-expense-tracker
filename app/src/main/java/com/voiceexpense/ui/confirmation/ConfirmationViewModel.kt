@@ -15,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
+import java.time.LocalDate
 
 class ConfirmationViewModel(
     private val repo: TransactionRepository,
@@ -68,6 +69,12 @@ class ConfirmationViewModel(
 
     fun cancel() {
         _transaction.value = null
+    }
+
+    // Apply manual edits from UI and persist as draft before confirmation
+    fun applyManualEdits(updated: Transaction) {
+        _transaction.value = updated
+        viewModelScope.launch { repo.saveDraft(updated) }
     }
 
     // Voice loop state/effects

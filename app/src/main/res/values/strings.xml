@@ -48,6 +48,18 @@
     <string name="error_empty_input">Please enter some text</string>
     <string name="creating_draft">Creating draft…</string>
     
+    <!-- Confirmation editable field hints -->
+    <string name="hint_amount">Amount (USD)</string>
+    <string name="hint_overall">Overall charged (Splitwise total)</string>
+    <string name="hint_merchant">Merchant</string>
+    <string name="hint_description">Description (optional)</string>
+    <string name="hint_type">Type (Expense | Income | Transfer)</string>
+    <string name="hint_category">Category</string>
+    <string name="hint_tags">Tags (comma-separated)</string>
+    <string name="hint_account">Account / Card</string>
+    <string name="hint_date">Date (YYYY-MM-DD)</string>
+    <string name="hint_note">Note (optional)</string>
+    
     <!-- Developer options -->
     <string name="asr_online_fallback_label">Allow online ASR fallback (dev)</string>
     <string name="asr_fallback_enabled">Online ASR fallback enabled</string>

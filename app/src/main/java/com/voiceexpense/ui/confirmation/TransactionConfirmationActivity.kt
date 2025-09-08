@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.widget.Toast
 import android.widget.Button
 import android.widget.TextView
+import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
 import androidx.lifecycle.lifecycleScope
@@ -49,18 +50,16 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val confirm: Button = findViewById(R.id.btn_confirm)
         val cancel: Button = findViewById(R.id.btn_cancel)
         val speak: Button = findViewById(R.id.btn_speak)
-        val inputCorrection: android.widget.EditText = findViewById(R.id.input_correction)
-        val applyCorrection: Button = findViewById(R.id.btn_apply_correction)
-        val amountView: TextView = findViewById(R.id.field_amount)
-        val overallView: TextView = findViewById(R.id.field_overall)
-        val merchantView: TextView = findViewById(R.id.field_merchant)
-        val descView: TextView = findViewById(R.id.field_description)
-        val typeView: TextView = findViewById(R.id.field_type)
-        val categoryView: TextView = findViewById(R.id.field_category)
-        val tagsView: TextView = findViewById(R.id.field_tags)
-        val accountView: TextView = findViewById(R.id.field_account)
-        val dateView: TextView = findViewById(R.id.field_date)
-        val noteView: TextView = findViewById(R.id.field_note)
+        val amountView: EditText = findViewById(R.id.field_amount)
+        val overallView: EditText = findViewById(R.id.field_overall)
+        val merchantView: EditText = findViewById(R.id.field_merchant)
+        val descView: EditText = findViewById(R.id.field_description)
+        val typeView: EditText = findViewById(R.id.field_type)
+        val categoryView: EditText = findViewById(R.id.field_category)
+        val tagsView: EditText = findViewById(R.id.field_tags)
+        val accountView: EditText = findViewById(R.id.field_account)
+        val dateView: EditText = findViewById(R.id.field_date)
+        val noteView: EditText = findViewById(R.id.field_note)
 
         title.text = getString(R.string.app_name)
 
@@ -88,21 +87,21 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             lifecycleScope.launch {
                 viewModel.transaction.collect { t ->
                     if (t == null) return@collect
-                    amountView.text = "Amount: ${t.amountUsd?.toPlainString() ?: "—"}"
-                    overallView.text = "Overall charged: ${t.splitOverallChargedUsd?.toPlainString() ?: "—"}"
-                    merchantView.text = "Merchant: ${t.merchant}"
-                    descView.text = "Description: ${t.description ?: "—"}"
-                    typeView.text = "Type: ${t.type}"
+                    amountView.setText(t.amountUsd?.toPlainString() ?: "")
+                    overallView.setText(t.splitOverallChargedUsd?.toPlainString() ?: "")
+                    merchantView.setText(t.merchant)
+                    descView.setText(t.description ?: "")
+                    typeView.setText(t.type.name)
                     val category = when (t.type) {
                         com.voiceexpense.data.model.TransactionType.Expense -> t.expenseCategory
                         com.voiceexpense.data.model.TransactionType.Income -> t.incomeCategory
                         com.voiceexpense.data.model.TransactionType.Transfer -> null
                     }
-                    categoryView.text = "Category: ${category ?: "—"}"
-                    tagsView.text = "Tags: ${if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else "—"}"
-                    accountView.text = "Account: ${t.account ?: "—"}"
-                    dateView.text = "Date: ${t.userLocalDate}"
-                    noteView.text = "Note: ${t.note ?: "—"}"
+                    categoryView.setText(category ?: "")
+                    tagsView.setText(if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else "")
+                    accountView.setText(t.account ?: "")
+                    dateView.setText(t.userLocalDate.toString())
+                    noteView.setText(t.note ?: "")
 
                     // Simple highlighting for missing key fields
                     fun TextView.markMissing(missing: Boolean) {
@@ -118,6 +117,61 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         }
 
         confirm.setOnClickListener {
+            // Gather manual edits from inputs and persist before confirming
+            val current = viewModel.transaction.value
+            if (current == null) {
+                Toast.makeText(this, R.string.error_open_draft_failed, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            // Parse and validate inputs
+            fun parseAmount(text: String): java.math.BigDecimal? =
+                text.trim().takeIf { it.isNotEmpty() }?.let { runCatching { java.math.BigDecimal(it) }.getOrNull() }
+
+            val newAmount = parseAmount(amountView.text?.toString() ?: "")
+            val newOverall = parseAmount(overallView.text?.toString() ?: "")
+            val newMerchant = (merchantView.text?.toString() ?: "").trim()
+            if (newMerchant.isBlank()) {
+                Toast.makeText(this, "Merchant is required", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val newDescription = (descView.text?.toString() ?: "").trim().ifEmpty { null }
+            val newTypeStr = (typeView.text?.toString() ?: "").trim()
+            val newType = when {
+                newTypeStr.equals("expense", true) -> com.voiceexpense.data.model.TransactionType.Expense
+                newTypeStr.equals("income", true) -> com.voiceexpense.data.model.TransactionType.Income
+                newTypeStr.equals("transfer", true) -> com.voiceexpense.data.model.TransactionType.Transfer
+                newTypeStr.isBlank() -> current.type
+                else -> {
+                    Toast.makeText(this, "Type must be Expense, Income, or Transfer", Toast.LENGTH_SHORT).show()
+                    return@setOnClickListener
+                }
+            }
+            val categoryText = (categoryView.text?.toString() ?: "").trim().ifEmpty { null }
+            val newExpenseCategory = if (newType == com.voiceexpense.data.model.TransactionType.Expense) categoryText else null
+            val newIncomeCategory = if (newType == com.voiceexpense.data.model.TransactionType.Income) categoryText else null
+            val newTags = (tagsView.text?.toString() ?: "").split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            val newAccount = (accountView.text?.toString() ?: "").trim().ifEmpty { null }
+            val newDateStr = (dateView.text?.toString() ?: "").trim()
+            val newDate = runCatching { java.time.LocalDate.parse(newDateStr.ifEmpty { current.userLocalDate.toString() }) }.getOrElse {
+                Toast.makeText(this, "Date must be YYYY-MM-DD", Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val newNote = (noteView.text?.toString() ?: "").trim().ifEmpty { null }
+
+            val updated = current.copy(
+                amountUsd = newAmount,
+                splitOverallChargedUsd = newOverall,
+                merchant = newMerchant,
+                description = newDescription,
+                type = newType,
+                expenseCategory = newExpenseCategory,
+                incomeCategory = newIncomeCategory,
+                tags = newTags,
+                account = newAccount,
+                userLocalDate = newDate,
+                note = newNote
+            )
+            viewModel.applyManualEdits(updated)
             viewModel.confirm()
             enqueueSyncNow(this)
         }
@@ -137,18 +191,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             }
         }
 
-        // Typed corrections
-        fun submitCorrection() {
-            val text = inputCorrection.text?.toString()?.trim().orEmpty()
-            if (text.isBlank()) {
-                Toast.makeText(this, R.string.error_empty_input, Toast.LENGTH_SHORT).show()
-                return
-            }
-            viewModel.interruptTts()
-            viewModel.applyCorrection(text)
-            inputCorrection.text?.clear()
-        }
-        applyCorrection.setOnClickListener { submitCorrection() }
-        inputCorrection.setOnEditorActionListener { _, _, _ -> submitCorrection(); true }
+        // Removed typed correction row per UX change
     }
 }
