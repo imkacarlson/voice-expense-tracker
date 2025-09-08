@@ -14,14 +14,146 @@
         app:title="@string/draft_transaction"
         app:navigationIcon="?attr/homeAsUpIndicator" />
 
-    <TextView
-        android:id="@+id/txn_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/draft_transaction"
-        android:textSize="18sp"
-        android:layout_marginBottom="16dp" />
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/txn_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/draft_transaction"
+                android:textSize="18sp"
+                android:layout_marginBottom="12dp" />
+
+            <!-- Draft fields moved above actions and made always-visible area -->
+            <LinearLayout
+                android:id="@+id/container_fields"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:layout_marginBottom="16dp">
+
+                <TextView
+                    android:id="@+id/field_amount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="16sp"
+                    android:text="Amount: —"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/field_overall"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="Overall charged: —" />
+
+                <TextView
+                    android:id="@+id/field_merchant"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="Merchant: —" />
+
+                <TextView
+                    android:id="@+id/field_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="Description: —" />
+
+                <TextView
+                    android:id="@+id/field_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="Type: —" />
+
+                <TextView
+                    android:id="@+id/field_category"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="Category: —" />
+
+                <TextView
+                    android:id="@+id/field_tags"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="Tags: —" />
+
+                <TextView
+                    android:id="@+id/field_account"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="Account: —" />
+
+                <TextView
+                    android:id="@+id/field_date"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="Date: —" />
+
+                <TextView
+                    android:id="@+id/field_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="14sp"
+                    android:text="Note: —" />
+            </LinearLayout>
+
+            <!-- Voice correction actions -->
+            <Button
+                android:id="@+id/btn_speak"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:text="@string/speak_correction" />
+
+            <!-- Typed corrections for emulator/testing -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="16dp">
+
+                <EditText
+                    android:id="@+id/input_correction"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:hint="@string/type_correction_hint"
+                    android:imeOptions="actionDone"
+                    android:singleLine="true" />
+
+                <View
+                    android:layout_width="8dp"
+                    android:layout_height="match_parent" />
+
+                <Button
+                    android:id="@+id/btn_apply_correction"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:minWidth="80dp"
+                    android:minHeight="48dp"
+                    android:text="@string/apply_correction" />
+            </LinearLayout>
+        </LinearLayout>
+    </ScrollView>
+
+    <!-- Primary confirm/cancel actions anchored at bottom -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -42,112 +174,6 @@
             android:layout_weight="1"
             android:minHeight="48dp"
             android:text="@string/cancel" />
-    </LinearLayout>
-
-    <Button
-        android:id="@+id/btn_speak"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:minHeight="48dp"
-        android:text="@string/speak_correction" />
-
-    <!-- Draft fields -->
-    <LinearLayout
-        android:id="@+id/container_fields"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="vertical"
-        android:layout_marginTop="12dp">
-
-        <TextView
-            android:id="@+id/field_amount"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="16sp"
-            android:textStyle="bold" />
-
-        <TextView
-            android:id="@+id/field_overall"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/field_merchant"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/field_description"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/field_type"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/field_category"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/field_tags"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/field_account"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/field_date"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-
-        <TextView
-            android:id="@+id/field_note"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:textSize="14sp" />
-    </LinearLayout>
-
-    <!-- Typed corrections for emulator/testing -->
-    <LinearLayout
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:layout_marginTop="8dp">
-
-        <EditText
-            android:id="@+id/input_correction"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="@string/type_correction_hint"
-            android:imeOptions="actionDone"
-            android:singleLine="true" />
-
-        <View
-            android:layout_width="8dp"
-            android:layout_height="match_parent" />
-
-        <Button
-            android:id="@+id/btn_apply_correction"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:minWidth="80dp"
-            android:minHeight="48dp"
-            android:text="@string/apply_correction" />
     </LinearLayout>
 
 </LinearLayout>
