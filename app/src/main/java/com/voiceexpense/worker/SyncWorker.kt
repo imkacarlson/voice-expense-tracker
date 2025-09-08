@@ -1,22 +1,36 @@
 package com.voiceexpense.worker
 
 import android.content.Context
-import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.voiceexpense.ui.common.SettingsKeys
 import com.voiceexpense.data.repository.TransactionRepository
-import dagger.assisted.Assisted
-import dagger.assisted.AssistedInject
+import dagger.hilt.EntryPoint
+import dagger.hilt.InstallIn
+import dagger.hilt.android.EntryPointAccessors
+import dagger.hilt.components.SingletonComponent
 
-@HiltWorker
-class SyncWorker @AssistedInject constructor(
-    @Assisted appContext: Context,
-    @Assisted params: WorkerParameters,
-    private val repo: TransactionRepository,
+class SyncWorker(
+    appContext: Context,
+    params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
 
+    @EntryPoint
+    @InstallIn(SingletonComponent::class)
+    interface WorkerEntryPoint {
+        fun transactionRepository(): TransactionRepository
+    }
+
+    private fun repo(): TransactionRepository {
+        val entryPoint = EntryPointAccessors.fromApplication(
+            applicationContext,
+            WorkerEntryPoint::class.java
+        )
+        return entryPoint.transactionRepository()
+    }
+
     override suspend fun doWork(): Result {
+        val repo = repo()
         return runCatching {
             val prefs = applicationContext.getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
             val webUrl = prefs.getString(SettingsKeys.WEB_APP_URL, "") ?: ""
@@ -25,8 +39,7 @@ class SyncWorker @AssistedInject constructor(
             repo.webAppUrl = webUrl
             repo.backupAuthToken = backupToken
 
-            val result = repo.syncPending()
-            result
+            repo.syncPending()
         }.fold(
             onSuccess = { Result.success() },
             onFailure = { Result.retry() }
