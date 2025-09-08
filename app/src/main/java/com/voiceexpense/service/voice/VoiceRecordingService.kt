@@ -79,54 +79,75 @@ class VoiceRecordingService : Service() {
             // Safety timeout to avoid battery drain
             val timeoutJob = launch { kotlinx.coroutines.delay(20_000); stopCapture() }
 
-            // Do not start a parallel AudioRecord while SpeechRecognizer is active
-
-            val config = RecognitionConfig(
-                languageCode = "en-US",
-                maxResults = 1,
-                partialResults = false,
-                // Steering docs: prefer on-device (offline) ASR only
-                offlineMode = true,
-                confidenceThreshold = 0.5f
-            )
-            asr.startListening(config).collectLatest { result ->
-                when (result) {
-                    is RecognitionResult.Success -> {
-                        Log.d("VoiceService", "ASR success: '${result.text}' conf=${result.confidence}")
-                        handleTranscript(result.text)
-                        stopCapture()
-                    }
-                    is RecognitionResult.Error -> {
-                        Log.w("VoiceService", "ASR error: ${result.error}")
-                        // Surface a user-friendly message via broadcast before stopping
-                        val msg = when (val e = result.error) {
-                            is com.voiceexpense.ai.speech.RecognitionError.Unavailable ->
-                                "On-device speech recognition unavailable. Install 'Speech Services by Google' and download offline English."
-                            is com.voiceexpense.ai.speech.RecognitionError.NoPermission ->
-                                "Microphone permission not granted"
-                            is com.voiceexpense.ai.speech.RecognitionError.Timeout ->
-                                "Didn't catch that — please try again"
-                            is com.voiceexpense.ai.speech.RecognitionError.Api -> when (e.code) {
-                                // LANGUAGE_NOT_SUPPORTED (12) or LANGUAGE_UNAVAILABLE (13)
-                                12, 13 -> "Offline English (US) model not installed. Open Google app > Settings > Voice > Offline speech recognition and download English (US)."
-                                8 -> "Speech recognizer busy — please try again"
-                                3 -> "Audio error from recognizer — please try again"
-                                else -> "Speech recognition error (${e.code})"
-                            }
-                            else -> "Speech recognition error"
+            // Attempt offline first; in debug, fall back to online if language unavailable (12/13)
+            var attempt = 0
+            var completed = false
+            while (attempt < 2 && !completed) {
+                val useOffline = attempt == 0
+                val config = RecognitionConfig(
+                    languageCode = "en-US",
+                    maxResults = 1,
+                    partialResults = false,
+                    offlineMode = useOffline,
+                    confidenceThreshold = 0.5f
+                )
+                var retryOnline = false
+                asr.startListening(config).collectLatest { result ->
+                    when (result) {
+                        is RecognitionResult.Success -> {
+                            Log.d("VoiceService", "ASR success: '${result.text}' conf=${result.confidence}")
+                            handleTranscript(result.text)
+                            completed = true
+                            stopCapture()
                         }
-                        sendBroadcast(
-                            Intent(ACTION_LISTENING_COMPLETE)
-                                .setPackage(packageName)
-                                .putExtra(EXTRA_ERROR_MESSAGE, msg)
-                        )
-                        stopCapture()
+                        is RecognitionResult.Error -> {
+                            Log.w("VoiceService", "ASR error: ${result.error}")
+                            val e = result.error
+                            val isLangError = (e is com.voiceexpense.ai.speech.RecognitionError.Api) && (e.code == 12 || e.code == 13)
+                            if (useOffline && isLangError && com.voiceexpense.BuildConfig.DEBUG) {
+                                // Retry online in debug builds to keep development unblocked
+                                retryOnline = true
+                            } else {
+                                val msg = when (e) {
+                                    is com.voiceexpense.ai.speech.RecognitionError.Unavailable ->
+                                        "On-device speech recognition unavailable. Install 'Speech Services by Google' and download offline English."
+                                    is com.voiceexpense.ai.speech.RecognitionError.NoPermission ->
+                                        "Microphone permission not granted"
+                                    is com.voiceexpense.ai.speech.RecognitionError.Timeout ->
+                                        "Didn't catch that — please try again"
+                                    is com.voiceexpense.ai.speech.RecognitionError.Api -> when (e.code) {
+                                        12, 13 -> "Offline English (US) model not installed. Open Google app > Settings > Voice > Offline speech recognition and download English (US)."
+                                        8 -> "Speech recognizer busy — please try again"
+                                        3 -> "Audio error from recognizer — please try again"
+                                        else -> "Speech recognition error (${e.code})"
+                                    }
+                                    else -> "Speech recognition error"
+                                }
+                                sendBroadcast(
+                                    Intent(ACTION_LISTENING_COMPLETE)
+                                        .setPackage(packageName)
+                                        .putExtra(EXTRA_ERROR_MESSAGE, msg)
+                                )
+                                completed = true
+                                stopCapture()
+                            }
+                        }
+                        RecognitionResult.Complete -> {
+                            Log.d("VoiceService", "ASR complete")
+                            if (!retryOnline) {
+                                completed = true
+                                stopCapture()
+                            }
+                        }
+                        else -> { /* Listening/Partial ignored here */ }
                     }
-                    RecognitionResult.Complete -> {
-                        Log.d("VoiceService", "ASR complete")
-                        stopCapture()
-                    }
-                    else -> { /* Listening/Partial ignored here */ }
+                }
+                if (retryOnline) {
+                    Log.i("VoiceService", "Retrying ASR online (debug fallback)")
+                    attempt++
+                    continue
+                } else {
+                    break
                 }
             }
             timeoutJob.cancel()
