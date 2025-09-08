@@ -7,6 +7,7 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.os.IBinder
+import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionParser
@@ -72,13 +73,13 @@ class VoiceRecordingService : Service() {
         startForeground(NOTIF_ID, notification("Listening…"))
         // Notify UI that listening has started (explicit to our package)
         sendBroadcast(Intent(ACTION_LISTENING_STARTED).setPackage(packageName))
+        Log.d("VoiceService", "startCapture: starting ASR with offlineMode=true")
         job?.cancel()
         job = scope.launch {
             // Safety timeout to avoid battery drain
             val timeoutJob = launch { kotlinx.coroutines.delay(20_000); stopCapture() }
 
-            // Optionally warm up audio path (no bytes consumed by SpeechRecognizer)
-            launch { audio.events().collect { /* no-op; ensures mic lifecycle */ } }
+            // Do not start a parallel AudioRecord while SpeechRecognizer is active
 
             val config = RecognitionConfig(
                 languageCode = "en-US",
@@ -91,10 +92,12 @@ class VoiceRecordingService : Service() {
             asr.startListening(config).collectLatest { result ->
                 when (result) {
                     is RecognitionResult.Success -> {
+                        Log.d("VoiceService", "ASR success: '${result.text}' conf=${result.confidence}")
                         handleTranscript(result.text)
                         stopCapture()
                     }
                     is RecognitionResult.Error -> {
+                        Log.w("VoiceService", "ASR error: ${result.error}")
                         // Surface a user-friendly message via broadcast before stopping
                         val msg = when (result.error) {
                             is com.voiceexpense.ai.speech.RecognitionError.Unavailable ->
@@ -112,7 +115,10 @@ class VoiceRecordingService : Service() {
                         )
                         stopCapture()
                     }
-                    RecognitionResult.Complete -> stopCapture()
+                    RecognitionResult.Complete -> {
+                        Log.d("VoiceService", "ASR complete")
+                        stopCapture()
+                    }
                     else -> { /* Listening/Partial ignored here */ }
                 }
             }
@@ -163,6 +169,7 @@ class VoiceRecordingService : Service() {
 
     private fun stopCapture() {
         job?.cancel()
+        Log.d("VoiceService", "stopCapture: stopping service and notifying UI")
         // Inform UI to dismiss any overlay
         sendBroadcast(Intent(ACTION_LISTENING_COMPLETE).setPackage(packageName))
         stopForeground(STOP_FOREGROUND_REMOVE)
