@@ -99,13 +99,20 @@ class VoiceRecordingService : Service() {
                     is RecognitionResult.Error -> {
                         Log.w("VoiceService", "ASR error: ${result.error}")
                         // Surface a user-friendly message via broadcast before stopping
-                        val msg = when (result.error) {
+                        val msg = when (val e = result.error) {
                             is com.voiceexpense.ai.speech.RecognitionError.Unavailable ->
                                 "On-device speech recognition unavailable. Install 'Speech Services by Google' and download offline English."
                             is com.voiceexpense.ai.speech.RecognitionError.NoPermission ->
                                 "Microphone permission not granted"
                             is com.voiceexpense.ai.speech.RecognitionError.Timeout ->
                                 "Didn't catch that — please try again"
+                            is com.voiceexpense.ai.speech.RecognitionError.Api -> when (e.code) {
+                                // LANGUAGE_NOT_SUPPORTED (12) or LANGUAGE_UNAVAILABLE (13)
+                                12, 13 -> "Offline English (US) model not installed. Open Google app > Settings > Voice > Offline speech recognition and download English (US)."
+                                8 -> "Speech recognizer busy — please try again"
+                                3 -> "Audio error from recognizer — please try again"
+                                else -> "Speech recognition error (${e.code})"
+                            }
                             else -> "Speech recognition error"
                         }
                         sendBroadcast(

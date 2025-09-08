@@ -26,7 +26,7 @@ class ListeningActivity : AppCompatActivity() {
                     // If an error message is provided, show it briefly before closing
                     val msg = intent.getStringExtra(VoiceRecordingService.EXTRA_ERROR_MESSAGE)
                     if (!msg.isNullOrBlank()) {
-                        Toast.makeText(this@ListeningActivity, msg, Toast.LENGTH_SHORT).show()
+                        Toast.makeText(this@ListeningActivity, msg, Toast.LENGTH_LONG).show()
                     }
                     finish()
                 }
