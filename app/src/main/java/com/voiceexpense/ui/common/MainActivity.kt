@@ -54,7 +54,7 @@ class MainActivity : AppCompatActivity() {
                     .putExtra(VoiceRecordingService.EXTRA_TRANSACTION_ID, t.id)
                 startActivity(intent)
             }
-            TransactionStatus.CONFIRMED, TransactionStatus.POSTED, TransactionStatus.QUEUED -> {
+            TransactionStatus.CONFIRMED, TransactionStatus.POSTED, TransactionStatus.QUEUED, TransactionStatus.FAILED -> {
                 val intent = Intent(this, TransactionDetailsActivity::class.java)
                     .putExtra(TransactionDetailsActivity.EXTRA_ID, t.id)
                 startActivity(intent)

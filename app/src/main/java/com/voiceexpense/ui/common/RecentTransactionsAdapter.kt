@@ -51,6 +51,7 @@ class RecentTransactionsAdapter(
                 TransactionStatus.QUEUED -> Triple("Queued", R.drawable.bg_chip_amber, android.R.color.black)
                 TransactionStatus.CONFIRMED -> Triple("Confirmed", R.drawable.bg_chip_blue, android.R.color.white)
                 TransactionStatus.POSTED -> Triple("Posted", R.drawable.bg_chip_green, android.R.color.white)
+                TransactionStatus.FAILED -> Triple("Failed", R.drawable.bg_chip_gray, android.R.color.black)
             }
             status.text = label
             status.background = ContextCompat.getDrawable(itemView.context, bg)
@@ -60,4 +61,3 @@ class RecentTransactionsAdapter(
         }
     }
 }
-
