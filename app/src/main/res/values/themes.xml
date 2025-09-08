@@ -3,5 +3,11 @@
         <!-- Customize your theme here. -->
         <item name="android:statusBarColor" tools:targetApi="l">@android:color/transparent</item>
     </style>
-</resources>
 
+    <!-- Transparent, no-UI theme for trampoline activities -->
+    <style name="Theme.VoiceExpense.Transparent" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:colorBackgroundCacheHint">@null</item>
+    </style>
+</resources>
