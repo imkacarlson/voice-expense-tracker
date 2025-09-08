@@ -86,10 +86,11 @@ class VoiceRecordingService : Service() {
             var completed = false
             while (attempt < 2 && !completed) {
                 val useOffline = attempt == 0
+                Log.i("VoiceService", "ASR attempt ${attempt + 1} using ${if (useOffline) "offline" else "online"} mode")
                 val config = RecognitionConfig(
                     languageCode = "en-US",
                     maxResults = 1,
-                    partialResults = false,
+                    partialResults = !useOffline,
                     offlineMode = useOffline,
                     confidenceThreshold = 0.5f
                 )

@@ -60,6 +60,9 @@ class SpeechRecognitionService(private val context: Context) {
                             val text = texts.first()
                             val conf = confidences?.firstOrNull() ?: 0f
                             trySend(RecognitionResult.Success(text, conf))
+                        } else {
+                            // No recognized text — treat like a timeout so UI can inform the user
+                            trySend(RecognitionResult.Error(RecognitionError.Timeout))
                         }
                         trySend(RecognitionResult.Complete)
                         close()
