@@ -51,6 +51,16 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val speak: Button = findViewById(R.id.btn_speak)
         val inputCorrection: android.widget.EditText = findViewById(R.id.input_correction)
         val applyCorrection: Button = findViewById(R.id.btn_apply_correction)
+        val amountView: TextView = findViewById(R.id.field_amount)
+        val overallView: TextView = findViewById(R.id.field_overall)
+        val merchantView: TextView = findViewById(R.id.field_merchant)
+        val descView: TextView = findViewById(R.id.field_description)
+        val typeView: TextView = findViewById(R.id.field_type)
+        val categoryView: TextView = findViewById(R.id.field_category)
+        val tagsView: TextView = findViewById(R.id.field_tags)
+        val accountView: TextView = findViewById(R.id.field_account)
+        val dateView: TextView = findViewById(R.id.field_date)
+        val noteView: TextView = findViewById(R.id.field_note)
 
         title.text = getString(R.string.app_name)
 
@@ -73,6 +83,37 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             if (draft.confidence < 0.7f) {
                 title.text = getString(R.string.app_name) + "  •  Verify highlighted fields"
                 Toast.makeText(this@TransactionConfirmationActivity, "Low confidence — please verify fields.", Toast.LENGTH_LONG).show()
+            }
+            // Observe transaction updates and render fields
+            lifecycleScope.launch {
+                viewModel.transaction.collect { t ->
+                    if (t == null) return@collect
+                    amountView.text = "Amount: ${t.amountUsd?.toPlainString() ?: "—"}"
+                    overallView.text = "Overall charged: ${t.splitOverallChargedUsd?.toPlainString() ?: "—"}"
+                    merchantView.text = "Merchant: ${t.merchant}"
+                    descView.text = "Description: ${t.description ?: "—"}"
+                    typeView.text = "Type: ${t.type}"
+                    val category = when (t.type) {
+                        com.voiceexpense.data.model.TransactionType.Expense -> t.expenseCategory
+                        com.voiceexpense.data.model.TransactionType.Income -> t.incomeCategory
+                        com.voiceexpense.data.model.TransactionType.Transfer -> null
+                    }
+                    categoryView.text = "Category: ${category ?: "—"}"
+                    tagsView.text = "Tags: ${if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else "—"}"
+                    accountView.text = "Account: ${t.account ?: "—"}"
+                    dateView.text = "Date: ${t.userLocalDate}"
+                    noteView.text = "Note: ${t.note ?: "—"}"
+
+                    // Simple highlighting for missing key fields
+                    fun TextView.markMissing(missing: Boolean) {
+                        setTextColor(if (missing) android.graphics.Color.parseColor("#E65100") else android.graphics.Color.BLACK)
+                    }
+                    amountView.markMissing(t.amountUsd == null)
+                    merchantView.markMissing(t.merchant.isBlank())
+                    if (t.type == com.voiceexpense.data.model.TransactionType.Expense) {
+                        categoryView.markMissing(t.expenseCategory.isNullOrBlank())
+                    }
+                }
             }
         }
 
