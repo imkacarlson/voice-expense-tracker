@@ -36,6 +36,8 @@ class VoiceRecordingService : Service() {
         const val ACTION_START = "com.voiceexpense.action.START"
         const val ACTION_STOP = "com.voiceexpense.action.STOP"
         const val ACTION_DRAFT_READY = "com.voiceexpense.action.DRAFT_READY"
+        const val ACTION_LISTENING_COMPLETE = "com.voiceexpense.action.LISTENING_COMPLETE"
+        const val ACTION_LISTENING_STARTED = "com.voiceexpense.action.LISTENING_STARTED"
         const val EXTRA_TRANSACTION_ID = "transaction_id"
     }
 
@@ -67,6 +69,8 @@ class VoiceRecordingService : Service() {
 
     private fun startCapture() {
         startForeground(NOTIF_ID, notification("Listening…"))
+        // Notify UI that listening has started
+        sendBroadcast(Intent(ACTION_LISTENING_STARTED))
         job?.cancel()
         job = scope.launch {
             // Safety timeout to avoid battery drain
@@ -139,6 +143,8 @@ class VoiceRecordingService : Service() {
 
     private fun stopCapture() {
         job?.cancel()
+        // Inform UI to dismiss any overlay
+        sendBroadcast(Intent(ACTION_LISTENING_COMPLETE))
         stopForeground(STOP_FOREGROUND_REMOVE)
         stopSelf()
     }
@@ -149,10 +155,17 @@ class VoiceRecordingService : Service() {
         mgr.createNotificationChannel(channel)
     }
 
-    private fun notification(text: String): Notification = NotificationCompat.Builder(this, CHANNEL_ID)
-        .setContentTitle("Voice Expense")
-        .setContentText(text)
-        .setSmallIcon(android.R.drawable.ic_btn_speak_now)
-        .setOngoing(true)
-        .build()
+    private fun notification(text: String): Notification {
+        val stopIntent = Intent(this, VoiceRecordingService::class.java).apply { action = ACTION_STOP }
+        val stopPending = android.app.PendingIntent.getService(
+            this, 0, stopIntent, android.app.PendingIntent.FLAG_IMMUTABLE
+        )
+        return NotificationCompat.Builder(this, CHANNEL_ID)
+            .setContentTitle("Voice Expense")
+            .setContentText(text)
+            .setSmallIcon(android.R.drawable.ic_btn_speak_now)
+            .setOngoing(true)
+            .addAction(0, "Stop", stopPending)
+            .build()
+    }
 }

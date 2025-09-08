@@ -38,4 +38,5 @@
     <string name="setup_guide_status_error">LLM setup error: %1$s</string>
     <string name="setup_guide_import_success">Model imported successfully.</string>
     <string name="setup_guide_import_failure">Failed to import model: %1$s</string>
+    <string name="listening_now">Listening…</string>
 </resources>

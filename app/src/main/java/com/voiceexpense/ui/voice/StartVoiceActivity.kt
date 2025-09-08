@@ -35,7 +35,8 @@ class StartVoiceActivity : AppCompatActivity() {
             action = VoiceRecordingService.ACTION_START
         }
         ContextCompat.startForegroundService(this, intent)
+        // Show overlay while listening so user can stop
+        startActivity(Intent(this, ListeningActivity::class.java))
         finish()
     }
 }
-

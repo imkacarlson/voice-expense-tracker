@@ -29,6 +29,9 @@
             android:name=".ui.voice.StartVoiceActivity"
             android:exported="false"
             android:theme="@style/Theme.VoiceExpense.Transparent" />
+        <activity
+            android:name=".ui.voice.ListeningActivity"
+            android:exported="false" />
         <activity android:name=".ui.setup.SetupGuidePage" />
         <activity android:name=".ui.common.SettingsActivity" />
 
