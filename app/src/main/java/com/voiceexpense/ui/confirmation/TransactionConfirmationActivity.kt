@@ -49,6 +49,8 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val confirm: Button = findViewById(R.id.btn_confirm)
         val cancel: Button = findViewById(R.id.btn_cancel)
         val speak: Button = findViewById(R.id.btn_speak)
+        val inputCorrection: android.widget.EditText = findViewById(R.id.input_correction)
+        val applyCorrection: Button = findViewById(R.id.btn_apply_correction)
 
         title.text = getString(R.string.app_name)
 
@@ -93,5 +95,19 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 }
             }
         }
+
+        // Typed corrections
+        fun submitCorrection() {
+            val text = inputCorrection.text?.toString()?.trim().orEmpty()
+            if (text.isBlank()) {
+                Toast.makeText(this, R.string.error_empty_input, Toast.LENGTH_SHORT).show()
+                return
+            }
+            viewModel.interruptTts()
+            viewModel.applyCorrection(text)
+            inputCorrection.text?.clear()
+        }
+        applyCorrection.setOnClickListener { submitCorrection() }
+        inputCorrection.setOnEditorActionListener { _, _, _ -> submitCorrection(); true }
     }
 }

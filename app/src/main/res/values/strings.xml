@@ -40,6 +40,14 @@
     <string name="setup_guide_import_failure">Failed to import model: %1$s</string>
     <string name="listening_now">Listening…</string>
     
+    <!-- Typed input helpers -->
+    <string name="type_utterance_hint">Type expense (e.g., "I spent $6 at Starbucks")</string>
+    <string name="create_draft">Create draft</string>
+    <string name="type_correction_hint">Type a correction (e.g., "actually 7.50" or "tags: Subscription")</string>
+    <string name="apply_correction">Apply</string>
+    <string name="error_empty_input">Please enter some text</string>
+    <string name="creating_draft">Creating draft…</string>
+    
     <!-- Developer options -->
     <string name="asr_online_fallback_label">Allow online ASR fallback (dev)</string>
     <string name="asr_fallback_enabled">Online ASR fallback enabled</string>
