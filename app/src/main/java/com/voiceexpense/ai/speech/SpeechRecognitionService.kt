@@ -49,6 +49,8 @@ class SpeechRecognitionService(private val context: Context) {
                         }
                         trySend(RecognitionResult.Error(mapped))
                         trySend(RecognitionResult.Complete)
+                        // Close the flow so collectors can proceed (e.g., to retry online)
+                        close()
                     }
 
                     override fun onResults(results: Bundle) {
@@ -60,6 +62,7 @@ class SpeechRecognitionService(private val context: Context) {
                             trySend(RecognitionResult.Success(text, conf))
                         }
                         trySend(RecognitionResult.Complete)
+                        close()
                     }
 
                     override fun onPartialResults(partialResults: Bundle) {

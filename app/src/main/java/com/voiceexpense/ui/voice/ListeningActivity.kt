@@ -27,8 +27,11 @@ class ListeningActivity : AppCompatActivity() {
                     val msg = intent.getStringExtra(VoiceRecordingService.EXTRA_ERROR_MESSAGE)
                     if (!msg.isNullOrBlank()) {
                         Toast.makeText(this@ListeningActivity, msg, Toast.LENGTH_LONG).show()
+                        // Keep overlay briefly so the Toast can be read
+                        window.decorView.postDelayed({ finish() }, 1500)
+                    } else {
+                        finish()
                     }
-                    finish()
                 }
             }
         }
