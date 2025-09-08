@@ -26,6 +26,9 @@
             android:exported="false"
             android:launchMode="singleTop" />
         <activity
+            android:name=".ui.common.TransactionDetailsActivity"
+            android:exported="false" />
+        <activity
             android:name=".ui.voice.StartVoiceActivity"
             android:exported="false"
             android:theme="@style/Theme.VoiceExpense.Transparent" />

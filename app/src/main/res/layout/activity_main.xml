@@ -2,7 +2,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:gravity="center"
+    android:gravity="top"
     android:orientation="vertical"
     android:padding="24dp">
 
@@ -32,5 +32,23 @@
         android:layout_height="wrap_content"
         android:minHeight="48dp"
         android:text="@string/settings_title" />
+
+    <TextView
+        android:id="@+id/text_recent"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Recent activity"
+        android:textStyle="bold"
+        android:textSize="16sp"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="8dp" />
+
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/list_recent"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:clipToPadding="false"
+        android:paddingBottom="8dp" />
 
 </LinearLayout>
