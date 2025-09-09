@@ -2,6 +2,7 @@ package com.voiceexpense.ai.mediapipe
 
 import android.content.Context
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
+import android.util.Log
 import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -28,8 +29,15 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
         } else {
             try {
                 val out = llm!!.generateResponse(prompt)
-                if (out.isNullOrBlank()) Result.failure(IllegalStateException("Empty response")) else Result.success(out)
+                if (out.isNullOrBlank()) {
+                    Log.w("AI.MP", "Empty response from LLM")
+                    Result.failure(IllegalStateException("Empty response"))
+                } else {
+                    Log.d("AI.MP", "LLM respond ok, length=${out.length}")
+                    Result.success(out)
+                }
             } catch (t: Throwable) {
+                Log.w("AI.MP", "generateResponse failed: ${t.message}")
                 Result.failure(t)
             }
         }
@@ -42,15 +50,18 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
         try {
             val modelFile = File(context.filesDir, RELATIVE_MODEL_PATH)
             if (!modelFile.exists() || !modelFile.isFile) {
+                Log.d("AI.MP", "Model missing at ${modelFile.absolutePath}")
                 return false
             }
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
                 .build()
             llm = LlmInference.createFromOptions(context, options)
+            Log.i("AI.MP", "Model initialized: ${modelFile.absolutePath}")
             return true
-        } catch (_: Throwable) {
+        } catch (t: Throwable) {
             llm = null
+            Log.w("AI.MP", "Model init failed: ${t.message}")
             return false
         } finally {
             initializing.set(false)
