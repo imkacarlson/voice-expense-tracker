@@ -22,6 +22,8 @@ import com.voiceexpense.data.repository.TransactionRepository
 import dagger.hilt.android.AndroidEntryPoint
 import android.content.pm.ApplicationInfo
 import com.voiceexpense.ui.common.SettingsKeys
+import com.voiceexpense.ai.parsing.hybrid.ProcessingMonitor
+import android.os.Looper
 import javax.inject.Inject
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -162,7 +164,10 @@ class VoiceRecordingService : Service() {
     private fun isDebuggable(): Boolean = (applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) != 0
 
     private suspend fun handleTranscript(text: String) {
+        val before = ProcessingMonitor.snapshot()
         val parsed = parser.parse(text, ParsingContext(defaultDate = LocalDate.now()))
+        val after = ProcessingMonitor.snapshot()
+        val usedAi = after.ai > before.ai
         val txn = Transaction(
             userLocalDate = parsed.userLocalDate,
             amountUsd = parsed.amountUsd ?: BigDecimal("0.00"),
@@ -183,6 +188,16 @@ class VoiceRecordingService : Service() {
             status = TransactionStatus.DRAFT
         )
         repo.saveDraft(txn)
+        // Optional dev toast indicating parsing method
+        try {
+            val prefs = getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
+            if (prefs.getBoolean(SettingsKeys.DEBUG_LOGS, false)) {
+                val method = if (usedAi) "AI" else "Heuristic"
+                android.os.Handler(Looper.getMainLooper()).post {
+                    android.widget.Toast.makeText(applicationContext, "Parsed with: $method", android.widget.Toast.LENGTH_SHORT).show()
+                }
+            }
+        } catch (_: Throwable) { }
         // Notify listeners (optional)
         sendBroadcast(
             Intent(ACTION_DRAFT_READY)

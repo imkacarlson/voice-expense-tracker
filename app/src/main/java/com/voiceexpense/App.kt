@@ -7,12 +7,17 @@ import android.os.StrictMode
 import android.util.Log
 import androidx.work.Configuration
 import dagger.hilt.android.HiltAndroidApp
+import com.voiceexpense.ai.model.ModelManager
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import javax.inject.Inject
 import androidx.hilt.work.HiltWorkerFactory
 
 @HiltAndroidApp
 class App : Application(), Configuration.Provider {
     @Inject lateinit var workerFactory: HiltWorkerFactory
+    @Inject lateinit var modelManager: ModelManager
 
     override val workManagerConfiguration: Configuration
         get() = Configuration.Builder()
@@ -40,6 +45,12 @@ class App : Application(), Configuration.Provider {
 
         // Lightweight ANR watchdog: logs main thread stack if UI thread is blocked > 5s
         startAnrWatchdog()
+
+        // Warm AI model availability on app start so parser can use GenAI path
+        // This checks for the .task file in app-private storage and flips readiness.
+        CoroutineScope(Dispatchers.Default).launch {
+            runCatching { modelManager.ensureModelAvailable(applicationContext) }
+        }
     }
 
     private fun startAnrWatchdog(timeoutMs: Long = 5000L) {

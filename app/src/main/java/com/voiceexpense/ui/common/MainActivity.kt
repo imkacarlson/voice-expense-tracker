@@ -21,6 +21,8 @@ import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.service.voice.VoiceRecordingService
 import com.voiceexpense.ui.confirmation.TransactionConfirmationActivity
+import com.voiceexpense.ai.parsing.hybrid.ProcessingMonitor
+import com.voiceexpense.ui.common.SettingsKeys
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.launch
@@ -72,7 +74,12 @@ class MainActivity : AppCompatActivity() {
 
             lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 try {
+                    val before = ProcessingMonitor.snapshot()
                     val parsed = parser.parse(text, ParsingContext(defaultDate = LocalDate.now()))
+                    val after = ProcessingMonitor.snapshot()
+                    val usedAi = after.ai > before.ai
+                    val prefs = getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
+                    val debug = prefs.getBoolean(SettingsKeys.DEBUG_LOGS, false)
                     val txn = com.voiceexpense.data.model.Transaction(
                         userLocalDate = parsed.userLocalDate,
                         amountUsd = parsed.amountUsd ?: BigDecimal("0.00"),
@@ -97,6 +104,10 @@ class MainActivity : AppCompatActivity() {
                         // no-op
                     }
                     runOnUiThread {
+                        if (debug) {
+                            val method = if (usedAi) "AI" else "Heuristic"
+                            Toast.makeText(this@MainActivity, "Parsed with: $method", Toast.LENGTH_SHORT).show()
+                        }
                         create.isEnabled = true
                         create.text = getString(R.string.create_draft)
                         input.text?.clear()

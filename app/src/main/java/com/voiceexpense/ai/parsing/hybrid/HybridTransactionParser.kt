@@ -1,6 +1,7 @@
 package com.voiceexpense.ai.parsing.hybrid
 
 import com.voiceexpense.ai.parsing.*
+import android.util.Log
 import org.json.JSONObject
 import java.math.BigDecimal
 import kotlin.system.measureTimeMillis
@@ -53,6 +54,12 @@ class HybridTransactionParser(
         val confidence = ConfidenceScorer.score(method, validated, parsed)
         val result = HybridParsingResult(parsed!!, method, validated, confidence, stats, rawJson, errors)
         ProcessingMonitor.record(result)
+        try {
+            Log.i(
+                "AI.Parse",
+                "method=${method.name} validated=$validated durationMs=${stats.durationMs} errors=${errors.size}"
+            )
+        } catch (_: Throwable) { /* ignore logging issues */ }
         return result
     }
 
