@@ -112,5 +112,95 @@
             android:minHeight="48dp"
             android:text="@string/setup_guide_title" />
 
+        <!-- Dropdown Configuration Section -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="16dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Dropdown Configuration"
+            android:textStyle="bold"
+            android:paddingBottom="8dp" />
+
+        <Spinner
+            android:id="@+id/spinner_option_type"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content" />
+
+        <ListView
+            android:id="@+id/list_options"
+            android:layout_width="match_parent"
+            android:layout_height="150dp"
+            android:dividerHeight="1dp"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal">
+            <EditText
+                android:id="@+id/input_new_option"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:hint="New option label" />
+            <Button
+                android:id="@+id/btn_add_option"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Add" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="8dp">
+            <Button
+                android:id="@+id/btn_move_up"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Move Up" />
+            <View
+                android:layout_width="8dp"
+                android:layout_height="match_parent" />
+            <Button
+                android:id="@+id/btn_move_down"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Move Down" />
+            <View
+                android:layout_width="8dp"
+                android:layout_height="match_parent" />
+            <Button
+                android:id="@+id/btn_delete_option"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Delete" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:paddingTop="8dp">
+            <Spinner
+                android:id="@+id/spinner_default_option"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+            <Button
+                android:id="@+id/btn_set_default"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Set Default" />
+        </LinearLayout>
+
     </LinearLayout>
 </ScrollView>

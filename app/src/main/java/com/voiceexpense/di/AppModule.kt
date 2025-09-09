@@ -13,6 +13,8 @@ import com.voiceexpense.data.local.AppDatabase
 import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.remote.AppsScriptClient
 import com.voiceexpense.data.repository.TransactionRepository
+import com.voiceexpense.data.config.ConfigDao
+import com.voiceexpense.data.config.ConfigRepository
 import com.voiceexpense.ui.confirmation.voice.CorrectionIntentParser
 import com.voiceexpense.ui.confirmation.voice.PromptRenderer
 import com.voiceexpense.ui.confirmation.voice.TtsEngine
@@ -31,9 +33,14 @@ import javax.inject.Singleton
 object AppModule {
     @Provides @Singleton
     fun provideDb(@ApplicationContext ctx: Context): AppDatabase =
-        Room.databaseBuilder(ctx, AppDatabase::class.java, "voice_expense.db").build()
+        Room.databaseBuilder(ctx, AppDatabase::class.java, "voice_expense.db")
+            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
+            .build()
 
     @Provides fun provideDao(db: AppDatabase): TransactionDao = db.transactionDao()
+
+    @Provides fun provideConfigDao(db: AppDatabase): ConfigDao = db.configDao()
+    @Provides @Singleton fun provideConfigRepository(dao: ConfigDao): ConfigRepository = ConfigRepository(dao)
 
     @Provides @Singleton
     fun provideRepo(

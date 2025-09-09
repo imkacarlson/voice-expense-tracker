@@ -9,6 +9,7 @@ import com.voiceexpense.ui.confirmation.voice.PromptRenderer
 import com.voiceexpense.ui.confirmation.voice.TtsEngine
 import com.voiceexpense.ui.confirmation.voice.VoiceCorrectionController
 import com.voiceexpense.data.model.Transaction
+import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.repository.TransactionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -26,11 +27,28 @@ class ConfirmationViewModel(
 ) : ViewModel() {
     private val _transaction = MutableStateFlow<Transaction?>(null)
     val transaction: StateFlow<Transaction?> = _transaction
+    private val validator = ValidationEngine()
+    private val _validation = MutableStateFlow<ValidationResult?>(null)
+    val validation: StateFlow<ValidationResult?> = _validation
+
+    data class UiVisibility(
+        val showAmount: Boolean,
+        val showExpenseCategory: Boolean,
+        val showIncomeCategory: Boolean,
+        val showAccount: Boolean,
+        val showOverall: Boolean
+    )
+
+    private val _selectedType = MutableStateFlow<TransactionType?>(null)
+    private val _visibility = MutableStateFlow(UiVisibility(true, true, false, true, true))
+    val visibility: StateFlow<UiVisibility> = _visibility
 
     fun setDraft(draft: Transaction) {
         _transaction.value = draft
+        _selectedType.value = draft.type
+        recomputeVisibility(draft.type)
         // Bridge controller updates on first draft set
-        viewModelScope.launch { controller.updates.collect { _transaction.value = it } }
+        viewModelScope.launch { controller.updates.collect { _transaction.value = it; recomputeValidation() } }
         viewModelScope.launch {
             controller.confirmed.collect { txn ->
                 repo.confirm(txn.id)
@@ -40,6 +58,39 @@ class ConfirmationViewModel(
         }
         viewModelScope.launch { controller.cancelled.collect { _transaction.value = null } }
         controller.start(draft)
+        recomputeValidation()
+    }
+
+    fun setSelectedType(type: TransactionType) {
+        _selectedType.value = type
+        recomputeVisibility(type)
+    }
+
+    private fun recomputeVisibility(type: TransactionType) {
+        val vis = when (type) {
+            TransactionType.Expense -> UiVisibility(
+                showAmount = true,
+                showExpenseCategory = true,
+                showIncomeCategory = false,
+                showAccount = true,
+                showOverall = true
+            )
+            TransactionType.Income -> UiVisibility(
+                showAmount = true,
+                showExpenseCategory = false,
+                showIncomeCategory = true,
+                showAccount = true,
+                showOverall = false
+            )
+            TransactionType.Transfer -> UiVisibility(
+                showAmount = false,
+                showExpenseCategory = false,
+                showIncomeCategory = false,
+                showAccount = false,
+                showOverall = false
+            )
+        }
+        _visibility.value = vis
     }
 
     fun applyCorrection(utterance: String) {
@@ -74,6 +125,7 @@ class ConfirmationViewModel(
     // Apply manual edits from UI and persist as draft before confirmation
     fun applyManualEdits(updated: Transaction) {
         _transaction.value = updated
+        recomputeValidation()
         viewModelScope.launch { repo.saveDraft(updated) }
     }
 
@@ -88,5 +140,10 @@ class ConfirmationViewModel(
 
     fun interruptTts() {
         controller.interrupt()
+    }
+
+    private fun recomputeValidation() {
+        val t = _transaction.value ?: return
+        _validation.value = validator.validate(t)
     }
 }

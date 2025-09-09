@@ -26,6 +26,13 @@ import android.util.Log
 import com.google.android.gms.common.api.ApiException
 import com.voiceexpense.ai.model.ModelManager
 import com.google.android.material.appbar.MaterialToolbar
+import com.voiceexpense.data.config.ConfigOption
+import com.voiceexpense.data.config.ConfigRepository
+import com.voiceexpense.data.config.ConfigType
+import com.voiceexpense.data.config.DefaultField
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.collectLatest
+import java.util.UUID
 
 object SettingsKeys {
     const val PREFS = "settings"
@@ -40,6 +47,7 @@ object SettingsKeys {
 class SettingsActivity : AppCompatActivity() {
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var tokenProvider: TokenProvider
+    @Inject lateinit var configRepository: ConfigRepository
     private val emailScope = Scope("https://www.googleapis.com/auth/userinfo.email")
 
     // No special request codes required; Google Sign-In handled via ActivityResult API.
@@ -68,6 +76,16 @@ class SettingsActivity : AppCompatActivity() {
         val openSetup: Button = findViewById(R.id.btn_open_setup_guide)
         val modelManager = ModelManager()
         val asrFallback: androidx.appcompat.widget.SwitchCompat = findViewById(R.id.switch_asr_online_fallback)
+        // Dropdown configuration views
+        val typeSpinner: android.widget.Spinner = findViewById(R.id.spinner_option_type)
+        val listView: android.widget.ListView = findViewById(R.id.list_options)
+        val inputNew: EditText = findViewById(R.id.input_new_option)
+        val addBtn: Button = findViewById(R.id.btn_add_option)
+        val delBtn: Button = findViewById(R.id.btn_delete_option)
+        val upBtn: Button = findViewById(R.id.btn_move_up)
+        val downBtn: Button = findViewById(R.id.btn_move_down)
+        val defaultSpinner: android.widget.Spinner = findViewById(R.id.spinner_default_option)
+        val setDefaultBtn: Button = findViewById(R.id.btn_set_default)
 
         fun updateAuthStatus(account: GoogleSignInAccount?) {
             if (account != null) {
@@ -100,6 +118,117 @@ class SettingsActivity : AppCompatActivity() {
                 backup.setText(bt)
                 accounts.setText(ka)
                 asrFallback.isChecked = asrOnline
+                // Populate type spinner and list/default adapters
+                val types = ConfigType.values()
+                val typeAdapter = android.widget.ArrayAdapter(this@SettingsActivity, android.R.layout.simple_spinner_item, types)
+                typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                typeSpinner.adapter = typeAdapter
+                typeSpinner.setSelection(0)
+                val listAdapter = android.widget.ArrayAdapter<String>(this@SettingsActivity, android.R.layout.simple_list_item_activated_1, mutableListOf())
+                listView.adapter = listAdapter
+                listView.choiceMode = android.widget.ListView.CHOICE_MODE_SINGLE
+                fun observeType(sel: ConfigType) {
+                    lifecycleScope.launch {
+                        configRepository.options(sel).collectLatest { opts ->
+                            val sorted = opts.sortedBy { it.position }
+                            listAdapter.clear()
+                            listAdapter.addAll(sorted.map { it.label })
+                            listAdapter.notifyDataSetChanged()
+                            val defAdapter = android.widget.ArrayAdapter(this@SettingsActivity, android.R.layout.simple_spinner_item, sorted.map { it.label })
+                            defAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                            defaultSpinner.adapter = defAdapter
+                            val df = mapDefaultField(sel)
+                            if (df != null) {
+                                lifecycleScope.launch {
+                                    configRepository.defaultFor(df).collectLatest { defId ->
+                                        val idx = sorted.indexOfFirst { it.id == defId }
+                                        if (idx >= 0 && idx < defaultSpinner.count) defaultSpinner.setSelection(idx)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+                typeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
+                    override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
+                        observeType(types[position])
+                    }
+                    override fun onNothingSelected(parent: android.widget.AdapterView<*>?) { }
+                }
+                observeType(types[0])
+                addBtn.setOnClickListener {
+                    val sel = typeSpinner.selectedItem as ConfigType
+                    val label = inputNew.text?.toString()?.trim().orEmpty()
+                    if (label.isBlank()) {
+                        android.widget.Toast.makeText(this@SettingsActivity, "Label required", android.widget.Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        var nextPos = 0
+                        configRepository.options(sel).collect { list ->
+                            nextPos = (list.maxOfOrNull { it.position } ?: -1) + 1
+                            this.cancel()
+                        }
+                        val option = ConfigOption(id = UUID.randomUUID().toString(), type = sel, label = label, position = nextPos, active = true)
+                        configRepository.upsert(option)
+                    }
+                    inputNew.setText("")
+                }
+                delBtn.setOnClickListener {
+                    val selType = typeSpinner.selectedItem as ConfigType
+                    val pos = listView.checkedItemPosition
+                    if (pos == android.widget.AdapterView.INVALID_POSITION) {
+                        android.widget.Toast.makeText(this@SettingsActivity, "Select an option to delete", android.widget.Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        configRepository.options(selType).collect { opts ->
+                            val sorted = opts.sortedBy { it.position }
+                            val target = sorted.getOrNull(pos)
+                            target?.let { configRepository.delete(it.id) }
+                            this.cancel()
+                        }
+                    }
+                }
+                fun move(delta: Int) {
+                    val selType = typeSpinner.selectedItem as ConfigType
+                    val pos = listView.checkedItemPosition
+                    if (pos == android.widget.AdapterView.INVALID_POSITION) return
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        configRepository.options(selType).collect { opts ->
+                            val sorted = opts.sortedBy { it.position }.toMutableList()
+                            val newPos = (pos + delta).coerceIn(0, sorted.lastIndex)
+                            if (newPos != pos) {
+                                java.util.Collections.swap(sorted, pos, newPos)
+                                sorted.forEachIndexed { index, option ->
+                                    if (option.position != index) {
+                                        configRepository.upsert(option.copy(position = index))
+                                    }
+                                }
+                            }
+                            this.cancel()
+                        }
+                    }
+                }
+                upBtn.setOnClickListener { move(-1) }
+                downBtn.setOnClickListener { move(1) }
+                setDefaultBtn.setOnClickListener {
+                    val selType = typeSpinner.selectedItem as ConfigType
+                    val df = mapDefaultField(selType)
+                    if (df == null) {
+                        android.widget.Toast.makeText(this@SettingsActivity, "No default for this type", android.widget.Toast.LENGTH_SHORT).show()
+                        return@setOnClickListener
+                    }
+                    lifecycleScope.launch(Dispatchers.IO) {
+                        configRepository.options(selType).collect { opts ->
+                            val sorted = opts.sortedBy { it.position }
+                            val idx = defaultSpinner.selectedItemPosition
+                            val optionId = sorted.getOrNull(idx)?.id
+                            configRepository.setDefault(df, optionId)
+                            this.cancel()
+                        }
+                    }
+                }
                 updateAuthStatus(existing)
                 gatingView.text = when {
                     !hasConfig -> getString(R.string.sync_gating_message_default)
@@ -220,6 +349,14 @@ class SettingsActivity : AppCompatActivity() {
             }
             withContext(Dispatchers.Main) { gatingView.text = text }
         }
+    }
+
+    private fun mapDefaultField(type: ConfigType): DefaultField? = when (type) {
+        ConfigType.ExpenseCategory -> DefaultField.DefaultExpenseCategory
+        ConfigType.IncomeCategory -> DefaultField.DefaultIncomeCategory
+        ConfigType.TransferCategory -> DefaultField.DefaultTransferCategory
+        ConfigType.Account -> DefaultField.DefaultAccount
+        ConfigType.Tag -> null
     }
 
 }

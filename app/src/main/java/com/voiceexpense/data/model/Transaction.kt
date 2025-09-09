@@ -20,6 +20,9 @@ data class Transaction(
     val type: TransactionType,
     val expenseCategory: String?,
     val incomeCategory: String?,
+    // For Transfer type transactions
+    val transferCategory: String? = null,
+    val transferDestination: String? = null,
     val tags: List<String> = emptyList(),
     val account: String?,
     val splitOverallChargedUsd: BigDecimal?,
@@ -30,4 +33,3 @@ data class Transaction(
     val status: TransactionStatus = TransactionStatus.DRAFT,
     val sheetRef: SheetReference? = null
 )
-

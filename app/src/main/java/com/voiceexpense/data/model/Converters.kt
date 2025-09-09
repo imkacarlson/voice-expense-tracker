@@ -1,6 +1,8 @@
 package com.voiceexpense.data.model
 
 import androidx.room.TypeConverter
+import com.voiceexpense.data.config.ConfigType
+import com.voiceexpense.data.config.DefaultField
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
@@ -80,5 +82,22 @@ object Converters {
             SheetReference(parts[0], parts[1], row)
         } else null
     }
-}
 
+    // ConfigType <-> String
+    @TypeConverter
+    @JvmStatic
+    fun fromConfigType(value: ConfigType?): String? = value?.name
+
+    @TypeConverter
+    @JvmStatic
+    fun toConfigType(value: String?): ConfigType? = value?.let { ConfigType.valueOf(it) }
+
+    // DefaultField <-> String
+    @TypeConverter
+    @JvmStatic
+    fun fromDefaultField(value: DefaultField?): String? = value?.name
+
+    @TypeConverter
+    @JvmStatic
+    fun toDefaultField(value: String?): DefaultField? = value?.let { DefaultField.valueOf(it) }
+}
