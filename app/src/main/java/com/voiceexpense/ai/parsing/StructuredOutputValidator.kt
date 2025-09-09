@@ -72,20 +72,23 @@ object StructuredOutputValidator {
      * Attempt to extract the first complete JSON object payload robustly.
      */
     fun normalizeMlKitJson(text: String): String {
-        // Strip common markdown fences
-        val stripped = text
+        // 1) Remove any Markdown code fences and leading language labels
+        var s = text
+            .replace("\r", "")
             .replace("```json", "```")
             .replace("```JSON", "```")
+            .replace("```", "")
             .trim()
 
-        val fenceRegex = Regex("```+(.*?)```+", RegexOption.DOT_MATCHES_ALL)
-        val fenced = fenceRegex.find(stripped)?.groupValues?.getOrNull(1)?.trim()
-        val candidate = fenced ?: stripped
+        // Remove a leading language token like 'json' if present
+        s = s.replace(Regex("^(?i)json\\s*"), "").trim()
 
-        // Extract first top-level JSON object by brace matching
+        // 2) Extract the first top-level JSON object by brace matching
+        val candidate = s
         var depth = 0
         var start = -1
-        for ((i, ch) in candidate.withIndex()) {
+        for (i in candidate.indices) {
+            val ch = candidate[i]
             if (ch == '{') {
                 if (depth == 0) start = i
                 depth++
@@ -96,6 +99,7 @@ object StructuredOutputValidator {
                 }
             }
         }
+        // If we didn't find a balanced object, return the best-effort string
         return candidate
     }
 
