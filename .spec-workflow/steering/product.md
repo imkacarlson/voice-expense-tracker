@@ -1,62 +1,83 @@
 # Product Overview
 
 ## Product Purpose
-Build an Android app that lets a user verbally log financial transactions into a Google Spreadsheet using only on-device AI processing. The app removes the friction of manual entry (currently via a Google Form) by parsing natural speech into a structured transaction, confirming with the user in a voice-first loop, and posting to Google Sheets. AI runs fully on-device for privacy; network is only required to sync the final transaction to the sheet.
+Build an Android app that lets users log financial transactions into a Google Spreadsheet using voice OR text input with on-device AI processing. The app removes the friction of manual entry by parsing natural speech or text into a structured transaction, allowing manual editing and confirmation in an intuitive form interface, and posting to Google Sheets. AI runs fully on-device for privacy; network is only required to sync the final transaction to the sheet.
 
 ## Target Users
 - Single primary user (initially) on a Google Pixel 7a who manages personal expenses.
-- Secondary: Power users comfortable with Google Sheets who want voice-first capture with full data ownership and privacy.
+- Secondary: Power users comfortable with Google Sheets who want flexible capture (voice OR text) with full data ownership and privacy.
 
 ## Target User Flow
-1. User taps an Android home screen widget.
-2. Widget starts voice capture and records a short utterance (e.g., "I spent $23 at Starbucks this morning for coffee").
-3. On-device ASR transcribes audio to text; on-device LLM (Gemini Nano via ML Kit GenAI) parses text into structured transaction data.
-4. App shows a compact confirmation UI (widget or activity) with parsed fields.
-5. User provides verbal corrections (e.g., "actually twenty-five", "tags: Auto-Paid, Subscription", or "overall charged one twenty on my card"); the loop updates the draft transaction.
-6. Loop continues until user says "yes" or "looks good".
-7. App posts transaction to Google Sheets via a Google Apps Script Web App. If offline, it queues and syncs automatically when online.
+1. User has two options to start:
+   - Tap an Android home screen widget for voice capture
+   - Open the app and type a transaction description directly
+2. **Voice Path**: Widget starts voice capture and records a short utterance (e.g., "I spent $23 at Starbucks this morning for coffee")
+3. **Text Path**: User types transaction in the main app input field (e.g., "Starbucks $5 latte charged to my Citi card")
+4. On-device ASR transcribes audio to text (voice path) or uses typed text directly; on-device LLM (Gemma 3 1B via MediaPipe Tasks) parses text into structured transaction data.
+5. App shows confirmation screen with a **complete form interface** containing all parsed fields as editable inputs.
+6. User can:
+   - **Edit any field directly** using the form inputs (amounts, merchant, category, tags, account, date, etc.)
+   - **Use voice corrections** optionally by tapping "Speak Correction" 
+   - **Use dropdowns** for categories, accounts, tags (configurable in settings)
+   - **Use date picker** for transaction date
+7. User confirms when satisfied; app posts transaction to Google Sheets via Google Apps Script Web App. If offline, it queues and syncs automatically when online.
+8. **Home Screen History**: Main screen shows the 10 most recent transactions with status indicators (Draft, Queued, Confirmed, Posted, Failed) that users can click to view/edit.
 
 ## Technical Constraints
 - Device: Google Pixel 7a (Android 14+ recommended).
-- AI Processing: On-device only. Use Gemini Nano via ML Kit GenAI APIs for NLU/structuring. Use offline speech recognition; no cloud AI calls.
+- AI Processing: On-device only. Use Gemma 3 1B via MediaPipe Tasks (.task file) for NLU/structuring. Use offline speech recognition; no cloud AI calls.
 - Privacy: No cloud-based AI processing; user owns data. Minimal permissions.
 - Connectivity: Work offline for capture/parsing and confirmation; require network only to post to Google Sheets.
 - Currency: USD-only for v1 (no multi-currency handling).
 - Data Destination: Existing user-owned Google Spreadsheet (configurable spreadsheet and tab).
 
 ## Spreadsheet Columns Mapping (Exact Sheet)
-Use the existing columns as the contract. The app will append rows with the following mapping for Expense/Income/Transfer types.
+Based on user's actual transaction data, the app will append rows with the following mapping:
 
-Columns (left-to-right as provided):
-- Timestamp | Date | Amount? (No $ sign) | Description | Type | Expense Category | Tags | Income Category | [empty] | Account / Credit Card | [If splitwise] how much overall charged to my card? | Transfer Category | Account transfer is going into | [remaining columns left blank]
+**Column Structure:**
+1. **Timestamp** - Auto-filled by Apps Script when transaction is saved
+2. **Date** - User-selectable date (can be different from timestamp for backdated entries)
+3. **Amount? (No $ sign)** - User's personal share amount (number input)
+4. **Description** - Merchant/description (free text)
+5. **Type** - Dropdown: Expense | Income | Transfer
+6. **Expense Category** - Configurable dropdown (for expenses only)
+7. **Tags** - Configurable multi-select dropdown (comma-separated)
+8. **Income Category** - Configurable dropdown (for income only)
+9. **[empty]** - Left blank
+10. **Account / Credit Card** - Configurable dropdown of user's accounts/cards
+11. **[If splitwise] how much overall charged to my card?** - Number input (for split expenses)
+12. **Transfer Category** - Configurable dropdown (for transfers only)
+13. **Account transfer is going into** - Configurable dropdown (for transfers only)
 
-Field mapping rules:
-- Timestamp: UTC timestamp when saved (e.g., 2025-07-15 04:21:47)
-- Date: User-local date of the expense (parsed or "today")
-- Amount? (No $ sign): For Expense/Income, the amount in USD without symbol
-  - Expense: user's personal share amount
-  - Income: income amount
-  - Transfer: blank
-- Description: Merchant or description; may include short note
-- Type: one of Expense | Income | Transfer
-- Expense Category: set for Expense; blank for Income/Transfer
-- Tags: comma-separated list (e.g., "Auto-Paid, Splitwise, Subscription")
-- Income Category: set for Income; blank otherwise
-- [empty]: left blank
-- Account / Credit Card: Card matching will be handled through a preset list of user cards that can be matched based on spoken input
-- [If splitwise] how much overall charged to my card?: total amount charged to card in split cases; blank otherwise
-  - Example: You paid $120 for dinner, user's share is $60 → Amount=60, Overall Charged=120, Tags includes "Splitwise"
-- Transfer Category: set only for Type=Transfer
-- Account transfer is going into: set only for Type=Transfer
-- Remaining trailing columns: left blank
+## Form Interface Requirements
+
+### **Input Types by Field:**
+- **Date**: Date picker widget (allows logging past transactions)
+- **Amount**: Number input with decimal support
+- **Description**: Free text input (merchant/description)
+- **Type**: Dropdown with 3 options (Expense/Income/Transfer)
+- **Expense Category**: Configurable dropdown (user manages options in settings)
+- **Tags**: Configurable multi-select dropdown (user manages options in settings)
+- **Income Category**: Configurable dropdown (user manages options in settings)
+- **Account/Credit Card**: Configurable dropdown (user manages options in settings)
+- **Overall Charged**: Number input (for splitwise transactions)
+- **Transfer Category**: Configurable dropdown (user manages options in settings)
+- **Transfer Destination**: Configurable dropdown (user manages options in settings)
+
+### **Dropdown Configuration:**
+All dropdown fields must be configurable in the app settings. Users should be able to:
+- Add new options to any dropdown
+- Edit existing options
+- Remove unused options
+- Reorder options by preference
 
 ## Data Models and Transaction Schema
 - Transaction fields:
-  - id (UUID), createdAt (UTC ISO), userLocalDate, amountUsd (decimal), merchant (string), description (string), type ("Expense"|"Income"|"Transfer"), expenseCategory? (string), incomeCategory? (string), tags (string[]), account (string), splitOverallChargedUsd? (decimal), note? (string), confidence (0–1), correctionsCount (int), source ("voice"), status ("draft"|"confirmed"|"queued"|"posted"|"failed"), sheetRef (spreadsheetId/sheetId/row if posted).
+  - id (UUID), createdAt (UTC ISO), userLocalDate, amountUsd (decimal), merchant (string), description (string), type ("Expense"|"Income"|"Transfer"), expenseCategory? (string), incomeCategory? (string), tags (string[]), account (string), splitOverallChargedUsd? (decimal), note? (string), confidence (0–1), correctionsCount (int), source ("voice"|"text"), status ("draft"|"confirmed"|"queued"|"posted"|"failed"), sheetRef (spreadsheetId/sheetId/row if posted).
 - Parsing intent: support capturing both the user share amount and, when present, the overall charged amount for split expenses. If only one amount is spoken, treat it as the Amount field and leave Overall Charged blank.
 
 ## API Contracts (Structured Parsing)
-- Input: Recognized text from ASR, optional context (recent merchants/categories/tags, default account, user locale, time).
+- Input: Recognized text from ASR or direct text input, optional context (recent merchants/categories/tags, default account, user locale, time).
 - Output (JSON): { amountUsd, merchant, description?, type, expenseCategory?, incomeCategory?, tags[], userLocalDate, account?, splitOverallChargedUsd?, note?, confidence }
 - Constraints: Strict JSON schema; enforce USD; reject currency tokens; request clarification on invalid/ambiguous fields.
 
@@ -72,10 +93,26 @@ Field mapping rules:
 - Posting: WorkManager job posts confirmed transactions to the Apps Script Web App; retries with exponential backoff; handles token refresh; server appends to the configured sheet.
 - Offline: Queue entries locally; when connectivity returns, batch post.
 
-## Confirmation UI and Voice Feedback Loop
-- UI: Compact activity or bottom sheet launched from widget; single screen with fields and a large mic button.
-- Flow: Display parsed draft; prompt user with concise TTS; accept verbal corrections (amount, merchant, category, tags, account, overall charged, date). Structured tag phrases: "tags: Auto-Paid, Subscription"; split phrases: "overall charged one twenty".
-- Termination: "yes"/"looks good"/"save" confirms and enqueues post; "cancel" discards.
+## Confirmation UI and Form Interface
+- **UI**: Full-screen form activity launched from widget or main app with complete transaction editing capabilities.
+- **Form Fields**: All transaction fields are directly editable with appropriate input types (text, number, dropdown, date picker, multi-select).
+- **Smart Defaults**: AI parsing pre-fills form fields with high confidence; user can edit any field manually.
+- **Validation**: Client-side validation ensures required fields (merchant, amount for expenses/income) are filled before saving.
+- **Voice Corrections**: Optional "Speak Correction" button allows voice-based edits for users who prefer voice interaction.
+- **Termination**: "Confirm" button validates and saves transaction, enqueues sync; "Cancel" discards draft.
+
+## Home Screen Experience
+- **Recent Transactions List**: Shows 10 most recent transactions with:
+  - Merchant name and date
+  - Amount and transaction type
+  - Status indicators with color coding:
+    - Draft (gray) - incomplete transactions
+    - Queued (amber) - waiting for sync
+    - Confirmed (blue) - saved locally
+    - Posted (green) - successfully synced to Google Sheets
+    - Failed (gray) - sync errors requiring attention
+- **Click Actions**: Users can click any transaction to view details or edit drafts
+- **Auto-truncation**: List automatically maintains only 10 most recent entries
 
 ## Error Handling and Edge Cases
 - Ambiguous amounts ("twenty-three fifty") → clarify or default with lower confidence.
@@ -97,7 +134,7 @@ Field mapping rules:
    - Widget → Activity/Service intents and parameters.
 3. Performance benchmarks with automated timing assertions (<3s parsing).
 4. Mock strategies:
-   - Replace Gemini Nano parser with deterministic mock returning fixtures.
+   - Replace Gemma 3 parser with deterministic mock returning fixtures.
    - Stub Apps Script client with local fake server or in-memory adapter.
    - Simulate SpeechRecognizer outputs for CI.
 5. Integration tests:
@@ -107,23 +144,24 @@ Field mapping rules:
 
 ## Product Principles
 1. Privacy-first and on-device AI only; transparent scopes and storage.
-2. Speed-first capture; voice-first corrections; minimal taps.
+2. Flexible input (voice OR text) with intuitive form-based confirmation.
 3. Offline-first with reliable sync; never lose a transaction.
-4. Accessibility: Voice-first, large controls, screen-reader compatible.
+4. Accessibility: Multiple input methods, large controls, screen-reader compatible.
 
 ## Success Metrics
 - Parsing accuracy: >90% for common transactions.
 - Parsing latency: <3s median; end-to-end flow <30s.
 - Post success rate: >99% within 24h including retries.
-- Adoption proxy: repeat widget usage per day; queue drain times.
+- User preference: Track usage split between voice vs text input.
+- Adoption proxy: repeat usage per day; queue drain times.
 
 ## Out of Scope (Initial)
 - Receipt photo processing, bank account aggregation, advanced analytics, multi-user.
 
 ## Implementation Phases
-- Phase 1: Prototype widget, ASR, structured parsing mock, basic confirmation UI.
+- Phase 1: Form interface with manual input, basic AI parsing, home screen history.
 - Phase 2: Apps Script posting with offline queue; Room persistence; exact column mapping.
-- Phase 3: Voice correction loop (tags, account, split overall charged), ambiguity handling, metrics & logging.
+- Phase 3: Voice input path, configurable dropdowns, settings management.
 - Phase 4: Polish, battery/perf tuning, accessibility and internationalization pass.
 
 ## Risks and Mitigations
@@ -131,3 +169,4 @@ Field mapping rules:
 - LLM format drift → enforce strict JSON schema with validators and retry on invalid output.
 - OAuth complexity → use proven libraries; narrow scopes; robust token handling.
 - Battery spikes → shorten sessions, limit model context, defer work to background.
+- Small model accuracy → hybrid prompting strategies, field-by-field parsing fallbacks.

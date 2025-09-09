@@ -10,8 +10,11 @@ voice-expense-tracker/
 │   │   │   ├── java/com/voiceexpense/
 │   │   │   │   ├── ui/           # User interface components
 │   │   │   │   │   ├── widget/   # Home screen widget implementation
-│   │   │   │   │   ├── confirmation/ # Transaction confirmation activity
-│   │   │   │   │   └── common/   # Shared UI components
+│   │   │   │   │   ├── confirmation/ # Transaction confirmation form activity
+│   │   │   │   │   │   └── voice/ # Voice correction components
+│   │   │   │   │   ├── common/   # MainActivity, adapters, ViewModels
+│   │   │   │   │   ├── setup/    # Initial app setup screens
+│   │   │   │   │   └── settings/ # Configuration management UI
 │   │   │   │   ├── service/      # Foreground services
 │   │   │   │   │   ├── voice/    # Voice recording and processing
 │   │   │   │   │   └── sync/     # Background sync services
@@ -22,13 +25,18 @@ voice-expense-tracker/
 │   │   │   │   │   └── model/    # Data models and entities
 │   │   │   │   ├── ai/           # On-device AI processing
 │   │   │   │   │   ├── speech/   # ML Kit Speech Recognition
-│   │   │   │   │   ├── parsing/  # Gemini Nano structured parsing
-│   │   │   │   │   └── model/    # AI model management
+│   │   │   │   │   ├── parsing/  # Gemma 3 structured parsing
+│   │   │   │   │   │   └── hybrid/ # Hybrid AI + heuristic processing
+│   │   │   │   │   ├── model/    # MediaPipe Tasks model management
+│   │   │   │   │   ├── mediapipe/ # MediaPipe GenAI client
+│   │   │   │   │   ├── performance/ # AI performance optimization
+│   │   │   │   │   └── error/    # AI error handling
 │   │   │   │   ├── auth/         # Google OAuth implementation
 │   │   │   │   ├── worker/       # WorkManager background tasks
+│   │   │   │   ├── di/           # Hilt dependency injection modules
 │   │   │   │   └── util/         # Utility classes and extensions
 │   │   │   ├── res/              # Android resources
-│   │   │   │   ├── layout/       # XML layouts
+│   │   │   │   ├── layout/       # XML layouts (form interface, lists)
 │   │   │   │   ├── values/       # Strings, colors, dimensions
 │   │   │   │   ├── drawable/     # Icons and graphics
 │   │   │   │   └── xml/          # App widget configurations
@@ -36,19 +44,25 @@ voice-expense-tracker/
 │   │   ├── test/                 # Unit tests
 │   │   │   └── java/com/voiceexpense/
 │   │   │       ├── ai/           # AI parsing tests with fixtures
+│   │   │       │   ├── parsing/  # Transaction parser tests
+│   │   │       │   └── hybrid/   # Hybrid processing tests
 │   │   │       ├── data/         # Repository and model tests
+│   │   │       ├── ui/           # UI component tests
 │   │   │       └── util/         # Utility testing
 │   │   └── androidTest/          # Instrumentation tests
 │   │       └── java/com/voiceexpense/
 │   │           ├── ui/           # UI and widget integration tests
 │   │           ├── service/      # Service lifecycle tests
-│   │           └── data/         # Database integration tests
+│   │           ├── data/         # Database integration tests
+│   │           └── ai/           # AI integration tests
 │   ├── build.gradle.kts          # App module build configuration
 │   └── proguard-rules.pro        # Code obfuscation rules
 ├── gradle/                       # Gradle wrapper and configurations
 ├── scripts/                      # Build and utility scripts
 │   └── build_apk.py             # APK build automation script
 ├── docs/                        # Project documentation
+│   ├── voice-correction-loop-v1.md # Voice interaction documentation
+│   └── hybrid-ml-kit-integration.md # AI processing documentation
 ├── .spec-workflow/              # Specification workflow files
 │   └── steering/                # Steering documents (product, tech, structure)
 ├── build.gradle.kts             # Project-level build configuration
@@ -69,6 +83,7 @@ voice-expense-tracker/
 - **Workers**: `PascalCase` with suffix (e.g., `SyncWorker`, `RetryWorker`)
 - **Utilities**: `PascalCase` with suffix (e.g., `DateUtils`, `CurrencyFormatter`, `AudioHelper`)
 - **Tests**: `PascalCase` with suffix (e.g., `TransactionRepositoryTest`, `ParsingServiceTest`)
+- **Form Components**: `PascalCase` with suffix (e.g., `CategoryDropdown`, `DatePickerHelper`)
 
 ### Code
 - **Classes/Data Classes**: `PascalCase` (e.g., `Transaction`, `VoiceProcessor`, `AppsScriptClient`)
@@ -81,7 +96,7 @@ voice-expense-tracker/
 
 ### Import Order
 1. Android framework imports
-2. External library imports (ML Kit, Google APIs, Room, WorkManager)
+2. External library imports (MediaPipe Tasks, Google APIs, Room, WorkManager)
 3. Internal module imports (same package)
 4. Internal cross-package imports
 5. Static imports
@@ -94,7 +109,7 @@ import android.speech.SpeechRecognizer
 import androidx.work.WorkManager
 import androidx.room.Database
 import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.mlkit.nl.languageid.LanguageIdentification
+import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.ai.parsing.TransactionParser
 import java.util.UUID
@@ -125,11 +140,13 @@ class TransactionConfirmationActivity : AppCompatActivity() {
     
     // 4. UI setup and event handlers
     private fun setupViews() { }
+    private fun setupFormValidation() { }
     private fun handleVoiceInput() { }
     
     // 5. Helper methods
     private fun updateUI(transaction: Transaction) { }
     private fun showError(message: String) { }
+    private fun validateForm(): Boolean { }
 }
 ```
 
@@ -152,6 +169,27 @@ class TransactionRepository @Inject constructor(
 }
 ```
 
+### Form Component Organization
+```kotlin
+class TransactionFormManager(
+    private val context: Context,
+    private val configRepository: ConfigRepository
+) {
+    // 1. Form field management
+    fun setupFormFields(binding: ActivityTransactionConfirmationBinding)
+    fun populateDropdowns()
+    fun validateFields(): ValidationResult
+    
+    // 2. Data binding
+    fun bindTransactionToForm(transaction: Transaction)
+    fun extractFormData(): Transaction
+    
+    // 3. Configuration management
+    private fun loadDropdownOptions(fieldType: FieldType): List<String>
+    private fun saveDropdownChanges(fieldType: FieldType, options: List<String>)
+}
+```
+
 ### Data Class Organization
 ```kotlin
 @Entity(tableName = "transactions")
@@ -171,7 +209,7 @@ data class Transaction(
     val note: String?,
     val confidence: Float,
     val correctionsCount: Int = 0,
-    val source: String = "voice",
+    val source: String = "voice", // "voice" or "text"
     val status: TransactionStatus = TransactionStatus.DRAFT,
     val sheetRef: SheetReference? = null
 )
@@ -179,30 +217,34 @@ data class Transaction(
 
 ## Code Organization Principles
 
-1. **Single Responsibility**: Each file handles one specific concern (voice processing, database operations, UI state)
+1. **Single Responsibility**: Each file handles one specific concern (voice processing, form management, database operations, UI state)
 2. **Layer Separation**: Clear boundaries between UI, business logic, and data layers
 3. **Dependency Injection**: Use Hilt for dependency management across the application
 4. **Reactive Patterns**: Flow/LiveData for data streams, StateFlow for UI state
 5. **Error Handling**: Consistent Result/Either pattern for operation outcomes
 6. **Testing**: Each component is testable in isolation with clear mocking points
+7. **Configuration Management**: Centralized storage and access for user-configurable options
 
 ## Module Boundaries
 
 ### Core Application Layers
-- **UI Layer**: Activities, Fragments, ViewModels, Widgets - handles user interactions
-- **Domain Layer**: Use cases, business logic - processes voice input and transaction rules  
+- **UI Layer**: Activities, Fragments, ViewModels, Widgets, Form Components - handles user interactions
+- **Domain Layer**: Use cases, business logic - processes voice input, text input, and transaction rules  
 - **Data Layer**: Repositories, data sources, models - manages local and remote data
 
 ### Feature Boundaries
-- **Voice Capture**: Widget → Service → AI Processing pipeline (isolated from UI)
+- **Input Capture**: Widget → Service (voice) OR MainActivity (text) → AI Processing pipeline
 - **Transaction Management**: Repository pattern with Room + Apps Script integration
+- **Form Interface**: Comprehensive editing with validation, dropdowns, date pickers
+- **Configuration Management**: Settings UI for managing dropdown options
 - **Authentication**: OAuth flow isolated with secure token storage
 - **Background Sync**: WorkManager tasks independent from main app lifecycle
 
 ### Dependencies Direction
 ```
 UI Layer → Domain Layer → Data Layer
-Widget → Service → Repository → DataSource
+Widget/MainActivity → Service/Parser → Repository → DataSource
+Form Components → Validation → Configuration Storage
 ```
 - No circular dependencies
 - Inner layers don't know about outer layers
@@ -211,21 +253,24 @@ Widget → Service → Repository → DataSource
 ## Code Size Guidelines
 
 ### File Size Limits
-- **Activity/Fragment**: Maximum 300 lines (prefer ViewModels for logic)
+- **Activity/Fragment**: Maximum 300 lines (prefer ViewModels for logic, extract form management)
 - **ViewModel/Repository**: Maximum 400 lines (split by responsibility)
 - **Service/Worker**: Maximum 200 lines (focused single-purpose classes)
+- **Form Components**: Maximum 250 lines (separate validation and data binding)
 - **Data Classes**: Maximum 100 lines (use composition for complex models)
 - **Utility Classes**: Maximum 150 lines (group related functions)
 
 ### Function/Method Size
 - **Public methods**: Maximum 30 lines (prefer composition)
 - **Private helpers**: Maximum 15 lines (single responsibility)
+- **Form handlers**: Maximum 20 lines (extract validation logic)
 - **Complex operations**: Break into smaller functions with descriptive names
 
 ### Class Complexity
 - **Maximum cyclomatic complexity**: 10 per method
 - **Maximum nesting depth**: 3 levels (early returns, guard clauses)
 - **Constructor parameters**: Maximum 5 (use data classes or builders)
+- **Form field count**: Group related fields into sections
 
 ## AI Processing Structure
 
@@ -237,30 +282,75 @@ app/src/main/java/com/voiceexpense/ai/
 │   ├── AudioRecordingManager.kt       # Audio capture and processing
 │   └── TranscriptionListener.kt       # ASR result handling
 ├── parsing/
-│   ├── TransactionParser.kt           # Gemini Nano integration
-│   ├── StructuredOutputValidator.kt   # JSON schema validation
+│   ├── TransactionParser.kt           # Main parsing orchestrator
+│   ├── ParsingPrompts.kt              # System instructions and templates
+│   ├── TransactionPrompts.kt          # Structured prompt templates
 │   ├── ParsedResult.kt                # Parsing result models
-│   └── ParsingPrompts.kt              # Prompt templates and examples
-└── model/
-    ├── ModelManager.kt                # AI model lifecycle management
-    ├── OnDeviceConfig.kt              # Model configuration
-    └── ModelMetrics.kt                # Performance tracking
+│   ├── ParsingContext.kt              # Context for parsing (recent data)
+│   ├── StructuredOutputValidator.kt   # JSON schema validation
+│   └── hybrid/                        # Hybrid processing strategy
+│       ├── HybridTransactionParser.kt # AI + heuristic orchestrator
+│       ├── GenAiGateway.kt            # MediaPipe abstraction
+│       ├── PromptBuilder.kt           # Intelligent prompt composition
+│       ├── FewShotExampleRepository.kt # Example management
+│       ├── ValidationPipeline.kt      # Output validation
+│       ├── ConfidenceScorer.kt        # Parsing quality assessment
+│       ├── ProcessingModels.kt        # Data models for processing
+│       ├── ProcessingMonitor.kt       # Performance tracking
+│       └── SchemaTemplates.kt         # JSON schema definitions
+├── mediapipe/
+│   └── MediaPipeGenAiClient.kt        # MediaPipe Tasks integration
+├── model/
+│   ├── ModelManager.kt                # AI model lifecycle management
+│   └── OnDeviceConfig.kt              # Model configuration
+├── performance/
+│   └── AiPerformanceOptimizer.kt      # Performance monitoring
+└── error/
+    └── AiErrorHandler.kt              # AI error handling and fallbacks
+```
+
+### Form Interface Structure
+```
+app/src/main/java/com/voiceexpense/ui/
+├── confirmation/
+│   ├── TransactionConfirmationActivity.kt  # Main form interface
+│   ├── ConfirmationViewModel.kt            # Form state management
+│   ├── FormValidationManager.kt            # Field validation logic
+│   ├── DropdownConfigManager.kt            # Dropdown option management
+│   └── voice/                              # Voice correction components
+│       ├── VoiceCorrectionController.kt    # Voice interaction handler
+│       ├── TtsEngine.kt                    # Text-to-speech
+│       ├── CorrectionIntentParser.kt       # Voice command parsing
+│       └── PromptRenderer.kt               # Voice prompt generation
+├── common/
+│   ├── MainActivity.kt                     # Home screen with history
+│   ├── MainViewModel.kt                    # Recent transactions
+│   ├── RecentTransactionsAdapter.kt        # Transaction list
+│   └── TransactionDetailsActivity.kt       # Transaction view/edit
+└── settings/
+    ├── SettingsActivity.kt                 # Configuration management
+    ├── DropdownEditorActivity.kt           # Edit dropdown options
+    └── ModelSetupActivity.kt               # AI model configuration
 ```
 
 ### Separation of Concerns
 - Speech recognition isolated from parsing logic
-- Structured output validation separate from AI model calls
+- Form management separate from AI processing
+- Dropdown configuration independent of transaction logic
 - Model management handles loading/unloading efficiently
-- Clear error boundaries between ASR failures and parsing failures
+- Clear error boundaries between ASR failures, parsing failures, and form validation
+- Validation separated from data binding and UI updates
 
 ## Documentation Standards
 
 - All public APIs documented with KDoc
 - Complex business logic includes inline comments explaining "why" not "what"
+- Form field validation rules documented in code comments
 - README files for major feature modules (ai/, data/, ui/)
 - Architecture Decision Records (ADRs) for significant technical choices
 - API contract documentation for structured parsing input/output
 - Testing documentation with fixture examples for AI parsing scenarios
+- Configuration management documentation for dropdown setup
 
 ## Testing Structure
 
@@ -270,11 +360,23 @@ app/src/test/java/com/voiceexpense/
 ├── ai/
 │   ├── parsing/
 │   │   ├── TransactionParserTest.kt           # Unit tests with fixtures
+│   │   ├── TransactionPromptsTest.kt          # Prompt template tests
+│   │   └── hybrid/
+│   │       ├── HybridTransactionParserTest.kt # Hybrid processing tests
+│   │       ├── PromptBuilderTest.kt           # Prompt composition tests
+│   │       ├── ValidationPipelineTest.kt      # Validation tests
+│   │       └── FewShotExampleRepositoryTest.kt # Example selection tests
 │   │   └── fixtures/
 │   │       ├── ValidUtterances.kt             # Sample inputs/outputs
 │   │       └── EdgeCaseInputs.kt              # Ambiguous/invalid cases
 │   └── speech/
 │       └── SpeechRecognitionServiceTest.kt    # Mock ASR integration
+├── ui/
+│   ├── confirmation/
+│   │   ├── ConfirmationViewModelTest.kt       # Form state tests
+│   │   └── FormValidationManagerTest.kt       # Validation logic tests
+│   └── common/
+│       └── MainViewModelTest.kt               # Recent transactions tests
 ├── data/
 │   ├── repository/
 │   │   └── TransactionRepositoryTest.kt       # Repository behavior tests
@@ -286,7 +388,40 @@ app/src/test/java/com/voiceexpense/
 
 ### Testing Principles
 - Use fixture data for consistent AI parsing tests
-- Mock external dependencies (Apps Script client, ML Kit)
-- Integration tests for critical paths (widget → service → confirmation)
+- Mock external dependencies (Apps Script client, MediaPipe Tasks)
+- Integration tests for critical paths (widget → service → confirmation, text input → parsing → form)
+- Form validation tests with edge cases
 - Performance tests for parsing latency requirements (<3s)
 - Error scenario testing for offline/auth failures
+- Configuration management tests for dropdown persistence
+
+## Configuration Management Structure
+
+### Settings Storage
+```
+app/src/main/java/com/voiceexpense/data/config/
+├── ConfigRepository.kt                 # Configuration data access
+├── DropdownOptionsDao.kt               # Database storage for options
+├── UserPreferencesManager.kt           # SharedPreferences wrapper
+└── DefaultOptionsProvider.kt           # Default dropdown values
+```
+
+### Configuration Models
+```kotlin
+data class DropdownConfig(
+    val fieldType: FieldType,
+    val options: List<String>,
+    val defaultOption: String?
+)
+
+enum class FieldType {
+    EXPENSE_CATEGORY,
+    INCOME_CATEGORY,
+    TAGS,
+    ACCOUNTS,
+    TRANSFER_CATEGORY,
+    TRANSFER_DESTINATION
+}
+```
+
+**Note**: Updated structure reflects the hybrid voice+text input approach, comprehensive form interface, and MediaPipe Tasks integration with Gemma 3 1B model.
