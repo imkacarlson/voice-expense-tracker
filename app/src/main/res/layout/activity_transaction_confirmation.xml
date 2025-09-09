@@ -41,6 +41,14 @@
                 android:orientation="vertical"
                 android:layout_marginBottom="16dp">
 
+                <TextView
+                    android:id="@+id/label_amount"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_amount"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
+
                 <EditText
                     android:id="@+id/field_amount"
                     android:layout_width="match_parent"
@@ -48,6 +56,14 @@
                     android:hint="@string/hint_amount"
                     android:inputType="numberDecimal"
                     android:textSize="16sp" />
+
+                <TextView
+                    android:id="@+id/label_overall"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_overall"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
 
                 <EditText
                     android:id="@+id/field_overall"
@@ -57,6 +73,14 @@
                     android:inputType="numberDecimal"
                     android:textSize="14sp" />
 
+                <TextView
+                    android:id="@+id/label_merchant"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_merchant"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
+
                 <EditText
                     android:id="@+id/field_merchant"
                     android:layout_width="match_parent"
@@ -64,6 +88,14 @@
                     android:hint="@string/hint_merchant"
                     android:inputType="textCapWords"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/label_description"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_description"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
 
                 <EditText
                     android:id="@+id/field_description"
@@ -73,15 +105,39 @@
                     android:inputType="textCapSentences"
                     android:textSize="14sp" />
 
+                <TextView
+                    android:id="@+id/label_type"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_type"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
+
                 <Spinner
                     android:id="@+id/spinner_type"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
 
+                <TextView
+                    android:id="@+id/label_category"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_category"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
+
                 <Spinner
                     android:id="@+id/spinner_category"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/label_tags"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_tags"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
 
                 <EditText
                     android:id="@+id/field_tags"
@@ -93,10 +149,26 @@
                     android:inputType="none"
                     android:textSize="14sp" />
 
+                <TextView
+                    android:id="@+id/label_account"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_account"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
+
                 <Spinner
                     android:id="@+id/spinner_account"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content" />
+
+                <TextView
+                    android:id="@+id/label_date"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_date"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
 
                 <TextView
                     android:id="@+id/field_date"
@@ -108,6 +180,14 @@
                     android:focusable="false"
                     android:clickable="true"
                     android:textSize="14sp" />
+
+                <TextView
+                    android:id="@+id/label_note"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="@string/hint_note"
+                    android:textStyle="bold"
+                    android:paddingTop="8dp" />
 
                 <EditText
                     android:id="@+id/field_note"

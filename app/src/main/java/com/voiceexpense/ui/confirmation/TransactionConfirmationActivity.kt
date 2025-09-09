@@ -222,10 +222,21 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         // Observe and apply visibility
         lifecycleScope.launch {
             viewModel.visibility.collect { vis ->
-                findViewById<android.view.View>(R.id.field_amount).visibility = if (vis.showAmount) android.view.View.VISIBLE else android.view.View.GONE
-                findViewById<android.view.View>(R.id.field_overall).visibility = if (vis.showOverall) android.view.View.VISIBLE else android.view.View.GONE
-                findViewById<android.view.View>(R.id.spinner_category).visibility = if (vis.showExpenseCategory || vis.showIncomeCategory) android.view.View.VISIBLE else android.view.View.GONE
-                findViewById<android.view.View>(R.id.spinner_account).visibility = if (vis.showAccount) android.view.View.VISIBLE else android.view.View.GONE
+                val v = if (vis.showAmount) android.view.View.VISIBLE else android.view.View.GONE
+                findViewById<android.view.View>(R.id.field_amount).visibility = v
+                findViewById<android.view.View>(R.id.label_amount).visibility = v
+
+                val vOverall = if (vis.showOverall) android.view.View.VISIBLE else android.view.View.GONE
+                findViewById<android.view.View>(R.id.field_overall).visibility = vOverall
+                findViewById<android.view.View>(R.id.label_overall).visibility = vOverall
+
+                val vCat = if (vis.showExpenseCategory || vis.showIncomeCategory) android.view.View.VISIBLE else android.view.View.GONE
+                findViewById<android.view.View>(R.id.spinner_category).visibility = vCat
+                findViewById<android.view.View>(R.id.label_category).visibility = vCat
+
+                val vAcc = if (vis.showAccount) android.view.View.VISIBLE else android.view.View.GONE
+                findViewById<android.view.View>(R.id.spinner_account).visibility = vAcc
+                findViewById<android.view.View>(R.id.label_account).visibility = vAcc
             }
         }
 
