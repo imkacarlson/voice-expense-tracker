@@ -38,20 +38,18 @@ class HybridTransactionParser(
                         return@measureTimeMillis
                     } else {
                         errors = listOfNotNull(outcome.errors.joinToString("; ").ifBlank { null })
-                        // Extra validation logging in debug builds
+                        // Extra validation logging
                         try {
-                            if (com.voiceexpense.BuildConfig.DEBUG) {
-                                val snippet = ok.replace("\n", " ").take(200)
-                                Log.w(
-                                    "AI.Validate",
-                                    "invalid structured output: error='${errors.firstOrNull() ?: "unknown"}' snippet='$snippet'"
-                                )
-                            }
+                            val snippet = ok.replace("\n", " ").take(200)
+                            Log.w(
+                                "AI.Validate",
+                                "invalid structured output: error='${errors.firstOrNull() ?: "unknown"}' snippet='$snippet'"
+                            )
                         } catch (_: Throwable) {}
                         com.voiceexpense.ai.error.AiErrorHandler.recordHybridFailure()
                     }
                 } else {
-                    try { if (com.voiceexpense.BuildConfig.DEBUG) Log.w("AI.Validate", "LLM returned blank output") } catch (_: Throwable) {}
+                    try { Log.w("AI.Validate", "LLM returned blank output") } catch (_: Throwable) {}
                     com.voiceexpense.ai.error.AiErrorHandler.recordHybridFailure()
                 }
             }
