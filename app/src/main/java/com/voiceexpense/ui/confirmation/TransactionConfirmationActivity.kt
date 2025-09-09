@@ -21,6 +21,7 @@ import com.voiceexpense.ui.confirmation.voice.VoiceCorrectionController
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.data.config.ConfigRepository
 import com.voiceexpense.data.config.ConfigType
+import kotlinx.coroutines.flow.first
 import com.voiceexpense.data.config.DefaultField
 import com.voiceexpense.worker.enqueueSyncNow
 import com.voiceexpense.ui.common.MainActivity
@@ -153,12 +154,10 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                                         com.voiceexpense.data.model.TransactionType.Transfer -> DefaultField.DefaultTransferCategory
                                     }
                                     lifecycleScope.launch {
-                                        configRepo.defaultFor(df).collect { defId ->
-                                            val sorted = opts.sortedBy { it.position }
-                                            val defIdx = sorted.indexOfFirst { it.id == defId }
-                                            if (defIdx >= 0) categorySpinner.setSelection(defIdx)
-                                            this.cancel()
-                                        }
+                                        val defId = configRepo.defaultFor(df).first()
+                                        val sorted = opts.sortedBy { it.position }
+                                        val defIdx = sorted.indexOfFirst { it.id == defId }
+                                        if (defIdx >= 0) categorySpinner.setSelection(defIdx)
                                     }
                                 }
                             }
@@ -173,18 +172,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                             accountSpinner.adapter = adapter
                             val accIdx = labels.indexOf(t.account ?: "")
-                            if (accIdx >= 0) {
-                                accountSpinner.setSelection(accIdx)
-                            } else {
-                                lifecycleScope.launch {
-                                    configRepo.defaultFor(DefaultField.DefaultAccount).collect { defId ->
-                                        val sorted = opts.sortedBy { it.position }
-                                        val defIdx = sorted.indexOfFirst { it.id == defId }
-                                        if (defIdx >= 0) accountSpinner.setSelection(defIdx)
-                                        this.cancel()
-                                    }
-                                }
-                            }
+                            if (accIdx >= 0) accountSpinner.setSelection(accIdx)
                         }
                     }
                     tagsView.setText(if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else "")
@@ -317,23 +305,21 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         // Tags multi-select dialog
         tagsView.setOnClickListener {
             lifecycleScope.launch {
-                configRepo.options(ConfigType.Tag).collect { opts ->
-                    val labels = opts.sortedBy { it.position }.map { it.label }
-                    val initial = (tagsView.text?.toString() ?: "").split(',').map { it.trim() }
-                    val checked = labels.map { initial.contains(it) }.toBooleanArray()
-                    android.app.AlertDialog.Builder(this@TransactionConfirmationActivity)
-                        .setTitle("Select tags")
-                        .setMultiChoiceItems(labels.toTypedArray(), checked) { _, which, isChecked ->
-                            checked[which] = isChecked
-                        }
-                        .setPositiveButton("OK") { _, _ ->
-                            val selected = labels.filterIndexed { index, _ -> checked[index] }
-                            tagsView.setText(selected.joinToString(", "))
-                        }
-                        .setNegativeButton("Cancel", null)
-                        .show()
-                    this.cancel()
-                }
+                val opts = configRepo.options(ConfigType.Tag).first()
+                val labels = opts.sortedBy { it.position }.map { it.label }
+                val initial = (tagsView.text?.toString() ?: "").split(',').map { it.trim() }
+                val checked = labels.map { initial.contains(it) }.toBooleanArray()
+                android.app.AlertDialog.Builder(this@TransactionConfirmationActivity)
+                    .setTitle("Select tags")
+                    .setMultiChoiceItems(labels.toTypedArray(), checked) { _, which, isChecked ->
+                        checked[which] = isChecked
+                    }
+                    .setPositiveButton("OK") { _, _ ->
+                        val selected = labels.filterIndexed { index, _ -> checked[index] }
+                        tagsView.setText(selected.joinToString(", "))
+                    }
+                    .setNegativeButton("Cancel", null)
+                    .show()
             }
         }
 

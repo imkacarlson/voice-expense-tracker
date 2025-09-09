@@ -32,6 +32,7 @@ import com.voiceexpense.data.config.ConfigType
 import com.voiceexpense.data.config.DefaultField
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import java.util.UUID
 
 object SettingsKeys {
@@ -164,11 +165,8 @@ class SettingsActivity : AppCompatActivity() {
                         return@setOnClickListener
                     }
                     lifecycleScope.launch(Dispatchers.IO) {
-                        var nextPos = 0
-                        configRepository.options(sel).collect { list ->
-                            nextPos = (list.maxOfOrNull { it.position } ?: -1) + 1
-                            this.cancel()
-                        }
+                        val list = configRepository.options(sel).first()
+                        val nextPos = (list.maxOfOrNull { it.position } ?: -1) + 1
                         val option = ConfigOption(id = UUID.randomUUID().toString(), type = sel, label = label, position = nextPos, active = true)
                         configRepository.upsert(option)
                     }
@@ -182,12 +180,10 @@ class SettingsActivity : AppCompatActivity() {
                         return@setOnClickListener
                     }
                     lifecycleScope.launch(Dispatchers.IO) {
-                        configRepository.options(selType).collect { opts ->
-                            val sorted = opts.sortedBy { it.position }
-                            val target = sorted.getOrNull(pos)
-                            target?.let { configRepository.delete(it.id) }
-                            this.cancel()
-                        }
+                        val opts = configRepository.options(selType).first()
+                        val sorted = opts.sortedBy { it.position }
+                        val target = sorted.getOrNull(pos)
+                        target?.let { configRepository.delete(it.id) }
                     }
                 }
                 fun move(delta: Int) {
@@ -195,18 +191,16 @@ class SettingsActivity : AppCompatActivity() {
                     val pos = listView.checkedItemPosition
                     if (pos == android.widget.AdapterView.INVALID_POSITION) return
                     lifecycleScope.launch(Dispatchers.IO) {
-                        configRepository.options(selType).collect { opts ->
-                            val sorted = opts.sortedBy { it.position }.toMutableList()
-                            val newPos = (pos + delta).coerceIn(0, sorted.lastIndex)
-                            if (newPos != pos) {
-                                java.util.Collections.swap(sorted, pos, newPos)
-                                sorted.forEachIndexed { index, option ->
-                                    if (option.position != index) {
-                                        configRepository.upsert(option.copy(position = index))
-                                    }
+                        val opts = configRepository.options(selType).first()
+                        val sorted = opts.sortedBy { it.position }.toMutableList()
+                        val newPos = (pos + delta).coerceIn(0, sorted.lastIndex)
+                        if (newPos != pos) {
+                            java.util.Collections.swap(sorted, pos, newPos)
+                            sorted.forEachIndexed { index, option ->
+                                if (option.position != index) {
+                                    configRepository.upsert(option.copy(position = index))
                                 }
                             }
-                            this.cancel()
                         }
                     }
                 }
@@ -220,13 +214,11 @@ class SettingsActivity : AppCompatActivity() {
                         return@setOnClickListener
                     }
                     lifecycleScope.launch(Dispatchers.IO) {
-                        configRepository.options(selType).collect { opts ->
-                            val sorted = opts.sortedBy { it.position }
-                            val idx = defaultSpinner.selectedItemPosition
-                            val optionId = sorted.getOrNull(idx)?.id
-                            configRepository.setDefault(df, optionId)
-                            this.cancel()
-                        }
+                        val opts = configRepository.options(selType).first()
+                        val sorted = opts.sortedBy { it.position }
+                        val idx = defaultSpinner.selectedItemPosition
+                        val optionId = sorted.getOrNull(idx)?.id
+                        configRepository.setDefault(df, optionId)
                     }
                 }
                 updateAuthStatus(existing)
