@@ -64,4 +64,7 @@
     <string name="asr_online_fallback_label">Allow online ASR fallback (dev)</string>
     <string name="asr_fallback_enabled">Online ASR fallback enabled</string>
     <string name="asr_fallback_disabled">Online ASR fallback disabled</string>
+    <string name="debug_logs_label">Enable debug logs (toasts + extra logging)</string>
+    <string name="debug_logs_enabled">Debug logs enabled</string>
+    <string name="debug_logs_disabled">Debug logs disabled</string>
 </resources>

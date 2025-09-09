@@ -105,6 +105,14 @@
             android:paddingTop="8dp"
             android:paddingBottom="8dp" />
 
+        <androidx.appcompat.widget.SwitchCompat
+            android:id="@+id/switch_debug_logs"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/debug_logs_label"
+            android:paddingTop="8dp"
+            android:paddingBottom="8dp" />
+
         <Button
             android:id="@+id/btn_open_setup_guide"
             android:layout_width="match_parent"
