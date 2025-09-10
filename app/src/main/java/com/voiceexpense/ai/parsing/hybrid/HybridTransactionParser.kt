@@ -80,6 +80,10 @@ class HybridTransactionParser(
                 "AI.Parse",
                 "method=${method.name} validated=$validated durationMs=${stats.durationMs} errors=${errors.size}"
             )
+            // Always log a concise summary with any first error and a small raw JSON snippet
+            val err = errors.firstOrNull() ?: ""
+            val rawSnippet = (rawJson ?: "").replace("\n", " ").take(200)
+            Log.i("AI.Summary", "method=${method.name} validated=$validated err='${err}' raw='${rawSnippet}'")
         } catch (_: Throwable) { /* ignore logging issues */ }
         return result
     }
