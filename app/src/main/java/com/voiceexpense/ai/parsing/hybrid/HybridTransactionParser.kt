@@ -34,6 +34,18 @@ class HybridTransactionParser(
                         usedAi = true
                         validated = true
                         rawJson = outcome.normalizedJson
+                        // Log normalized JSON and key fields on success for debugging/verification
+                        try {
+                            val snippet = outcome.normalizedJson.replace("\n", " ").take(500)
+                            Log.i("AI.Output", snippet)
+                            val p = parsed
+                            if (p != null) {
+                                Log.i(
+                                    "AI.Fields",
+                                    "amount=${p.amountUsd} merchant='${p.merchant}' type=${p.type} expCat=${p.expenseCategory} incCat=${p.incomeCategory} tags=${p.tags.joinToString(";")} account=${p.account} overall=${p.splitOverallChargedUsd}"
+                                )
+                            }
+                        } catch (_: Throwable) {}
                         com.voiceexpense.ai.error.AiErrorHandler.resetHybridFailures()
                         return@measureTimeMillis
                     } else {
