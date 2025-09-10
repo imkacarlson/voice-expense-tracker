@@ -18,23 +18,38 @@ data class ValidationOutcome(
  */
 object ValidationPipeline {
     fun validateRawResponse(text: String): ValidationOutcome {
+        try { 
+            android.util.Log.d("AI.Debug", "ValidationPipeline.validateRawResponse() started, text length=${text.length}")
+            android.util.Log.d("AI.Debug", "Raw AI text being validated: '$text'")
+        } catch (_: Throwable) {}
         val errs = mutableListOf<String>()
 
         // 1) Recover the JSON payload from potential prose or code fences
+        try { android.util.Log.d("AI.Debug", "Calling normalizeMlKitJson()") } catch (_: Throwable) {}
         val normalized = StructuredOutputValidator.normalizeMlKitJson(text)
+        try { 
+            android.util.Log.d("AI.Debug", "normalizeMlKitJson() completed, normalized length=${normalized.length}")
+            android.util.Log.d("AI.Debug", "Normalized JSON: '$normalized'")
+        } catch (_: Throwable) {}
 
         // 2) Schema-level validation (tags array shape etc.)
+        try { android.util.Log.d("AI.Debug", "Calling validateTransactionJson()") } catch (_: Throwable) {}
         val schemaRes = StructuredOutputValidator.validateTransactionJson(normalized)
+        try { android.util.Log.d("AI.Debug", "validateTransactionJson() completed, valid=${schemaRes.valid}") } catch (_: Throwable) {}
         if (!schemaRes.valid) {
             errs += schemaRes.error ?: "invalid schema"
+            try { android.util.Log.d("AI.Debug", "Schema validation failed, returning early") } catch (_: Throwable) {}
             return ValidationOutcome(false, null, errs, 0.0f)
         }
 
         // 3) Business rule checks over parsed object
+        try { android.util.Log.d("AI.Debug", "Creating JSONObject from normalized JSON") } catch (_: Throwable) {}
         val json = try { JSONObject(normalized) } catch (t: Throwable) {
             errs += "invalid json: ${t.message}"
+            try { android.util.Log.d("AI.Debug", "JSONObject creation failed: ${t.message}") } catch (_: Throwable) {}
             return ValidationOutcome(false, null, errs, 0.0f)
         }
+        try { android.util.Log.d("AI.Debug", "JSONObject created successfully") } catch (_: Throwable) {}
 
         // Required/typed fields
         val type = json.optString("type", "")
@@ -69,6 +84,7 @@ object ValidationPipeline {
 
         score = min(1.0f, max(0.0f, score))
         val valid = errs.isEmpty()
+        try { android.util.Log.d("AI.Debug", "ValidationPipeline completed, valid=$valid, errors=${errs.size}") } catch (_: Throwable) {}
         return ValidationOutcome(valid, if (valid) json.toString() else null, errs, score)
     }
 }

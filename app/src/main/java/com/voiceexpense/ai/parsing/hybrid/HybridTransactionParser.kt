@@ -29,7 +29,10 @@ class HybridTransactionParser(
                 try { Log.d("AI.Debug", "Calling genai.structured()") } catch (_: Throwable) {}
                 val ai = genai.structured(prompt)
                 val ok = ai.getOrNull()
-                try { Log.d("AI.Debug", "AI response received, length=${ok?.length ?: 0}") } catch (_: Throwable) {}
+                try { 
+                    Log.d("AI.Debug", "AI response received, length=${ok?.length ?: 0}")
+                    Log.d("AI.Debug", "Full AI response: '$ok'")
+                } catch (_: Throwable) {}
                 if (!ok.isNullOrBlank()) {
                     try { Log.d("AI.Debug", "Calling ValidationPipeline.validateRawResponse()") } catch (_: Throwable) {}
                     val outcome = ValidationPipeline.validateRawResponse(ok)
