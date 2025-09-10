@@ -27,38 +27,40 @@ object StructuredOutputValidator {
      * Rule: if present and non-null, `tags` must be an array of strings (no nulls, no numbers/objects).
      */
     fun validateTransactionJson(json: String): ValidationResult {
-        fun check(candidate: String): ValidationResult = try {
-            val reader = JsonReader.of(Buffer().writeUtf8(candidate)).apply { isLenient = true }
-            if (reader.peek() != JsonReader.Token.BEGIN_OBJECT) {
-                return ValidationResult(false, "invalid json: not object")
-            }
-            reader.beginObject()
-            while (reader.hasNext()) {
-                val name = reader.nextName()
-                if (name == "tags") {
-                    when (reader.peek()) {
-                        JsonReader.Token.NULL -> reader.nextNull<Unit>()
-                        JsonReader.Token.BEGIN_ARRAY -> {
-                            reader.beginArray()
-                            while (reader.hasNext()) {
-                                when (reader.peek()) {
-                                    JsonReader.Token.NULL -> return ValidationResult(false, "tags must be array of strings")
-                                    JsonReader.Token.STRING -> reader.nextString()
-                                    else -> return ValidationResult(false, "tags must be array of strings")
-                                }
-                            }
-                            reader.endArray()
-                        }
-                        else -> return ValidationResult(false, "tags must be array")
-                    }
-                } else {
-                    reader.skipValue()
+        fun check(candidate: String): ValidationResult {
+            return try {
+                val reader = JsonReader.of(Buffer().writeUtf8(candidate)).apply { isLenient = true }
+                if (reader.peek() != JsonReader.Token.BEGIN_OBJECT) {
+                    return ValidationResult(false, "invalid json: not object")
                 }
+                reader.beginObject()
+                while (reader.hasNext()) {
+                    val name = reader.nextName()
+                    if (name == "tags") {
+                        when (reader.peek()) {
+                            JsonReader.Token.NULL -> reader.nextNull<Unit>()
+                            JsonReader.Token.BEGIN_ARRAY -> {
+                                reader.beginArray()
+                                while (reader.hasNext()) {
+                                    when (reader.peek()) {
+                                        JsonReader.Token.NULL -> return ValidationResult(false, "tags must be array of strings")
+                                        JsonReader.Token.STRING -> reader.nextString()
+                                        else -> return ValidationResult(false, "tags must be array of strings")
+                                    }
+                                }
+                                reader.endArray()
+                            }
+                            else -> return ValidationResult(false, "tags must be array")
+                        }
+                    } else {
+                        reader.skipValue()
+                    }
+                }
+                reader.endObject()
+                ValidationResult(true)
+            } catch (t: Throwable) {
+                ValidationResult(false, "invalid json: ${t.message}")
             }
-            reader.endObject()
-            ValidationResult(true)
-        } catch (t: Throwable) {
-            ValidationResult(false, "invalid json: ${t.message}")
         }
 
         // First attempt (lenient)
@@ -66,9 +68,9 @@ object StructuredOutputValidator {
         if (first.valid) return first
 
         // Second attempt: strip trailing commas before } or ] and retry
-        val noTrailingCommas = json.replace(Regex(",\s*([}\"])"), "$1")
-            .replace(Regex(",\s*]"), "]")
-            .replace(Regex(",\s*}"), "}")
+        val noTrailingCommas = json
+            .replace(Regex(""",\s*]"""), "]")
+            .replace(Regex(""",\s*}"""), "}")
         val second = check(noTrailingCommas)
         return if (second.valid) second else first
     }
