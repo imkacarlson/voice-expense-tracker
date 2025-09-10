@@ -24,13 +24,20 @@ class HybridTransactionParser(
         val elapsed = measureTimeMillis {
             // Attempt AI path when model ready
             if (genai.isAvailable()) {
+                try { Log.d("AI.Debug", "Building prompt for input: ${input.take(100)}") } catch (_: Throwable) {}
                 val prompt = promptBuilder.build(input, context)
+                try { Log.d("AI.Debug", "Calling genai.structured()") } catch (_: Throwable) {}
                 val ai = genai.structured(prompt)
                 val ok = ai.getOrNull()
+                try { Log.d("AI.Debug", "AI response received, length=${ok?.length ?: 0}") } catch (_: Throwable) {}
                 if (!ok.isNullOrBlank()) {
+                    try { Log.d("AI.Debug", "Calling ValidationPipeline.validateRawResponse()") } catch (_: Throwable) {}
                     val outcome = ValidationPipeline.validateRawResponse(ok)
+                    try { Log.d("AI.Debug", "Validation outcome: valid=${outcome.valid}, errors=${outcome.errors}") } catch (_: Throwable) {}
                     if (outcome.valid && !outcome.normalizedJson.isNullOrBlank()) {
+                        try { Log.d("AI.Debug", "Calling mapJsonToParsedResult()") } catch (_: Throwable) {}
                         parsed = mapJsonToParsedResult(outcome.normalizedJson, context)
+                        try { Log.d("AI.Debug", "mapJsonToParsedResult() completed successfully") } catch (_: Throwable) {}
                         usedAi = true
                         validated = true
                         rawJson = outcome.normalizedJson
@@ -67,14 +74,20 @@ class HybridTransactionParser(
             }
 
             // Heuristic fallback
+            try { Log.d("AI.Debug", "Calling heuristicParse() fallback") } catch (_: Throwable) {}
             parsed = heuristicParse(input, context)
+            try { Log.d("AI.Debug", "heuristicParse() completed") } catch (_: Throwable) {}
         }
 
+        try { Log.d("AI.Debug", "Creating final result, usedAi=$usedAi, validated=$validated") } catch (_: Throwable) {}
         val method = if (usedAi) ProcessingMethod.AI else ProcessingMethod.HEURISTIC
         val stats = ProcessingStatistics(durationMs = elapsed)
         val confidence = ConfidenceScorer.score(method, validated, parsed)
+        try { Log.d("AI.Debug", "About to create HybridParsingResult") } catch (_: Throwable) {}
         val result = HybridParsingResult(parsed!!, method, validated, confidence, stats, rawJson, errors)
+        try { Log.d("AI.Debug", "HybridParsingResult created, calling ProcessingMonitor.record()") } catch (_: Throwable) {}
         ProcessingMonitor.record(result)
+        try { Log.d("AI.Debug", "ProcessingMonitor.record() completed") } catch (_: Throwable) {}
         try {
             Log.i(
                 "AI.Parse",
@@ -85,6 +98,7 @@ class HybridTransactionParser(
             val rawSnippet = (rawJson ?: "").replace("\n", " ").take(200)
             Log.i("AI.Summary", "method=${method.name} validated=$validated err='${err}' raw='${rawSnippet}'")
         } catch (_: Throwable) { /* ignore logging issues */ }
+        try { Log.d("AI.Debug", "About to return result") } catch (_: Throwable) {}
         return result
     }
 
