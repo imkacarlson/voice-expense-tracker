@@ -134,7 +134,7 @@ object StructuredOutputValidator {
             val end = if (lastTopLevelComma > start) lastTopLevelComma else candidate.lastIndex
             var trimmed = candidate.substring(start, (end + 1).coerceAtMost(candidate.length))
             // Remove a trailing comma and whitespace if present
-            trimmed = trimmed.replace(Regex(",\s*$"), "")
+            trimmed = trimmed.replace(Regex(""",\s*$"""), "")
             // Close the object
             return "$trimmed}"
         }
