@@ -29,6 +29,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -56,6 +57,7 @@ class VoiceRecordingService : Service() {
     @Inject lateinit var asr: SpeechRecognitionService
     @Inject lateinit var parser: TransactionParser
     @Inject lateinit var repo: TransactionRepository
+    @Inject lateinit var configRepo: com.voiceexpense.data.config.ConfigRepository
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -165,7 +167,20 @@ class VoiceRecordingService : Service() {
 
     private suspend fun handleTranscript(text: String) {
         val before = ProcessingMonitor.snapshot()
-        val parsed = parser.parse(text, ParsingContext(defaultDate = LocalDate.now()))
+        // Load allowed options to restrict/model choices
+        val expenseCats = configRepo.options(com.voiceexpense.data.config.ConfigType.ExpenseCategory).first().sortedBy { it.position }.map { it.label }
+        val incomeCats = configRepo.options(com.voiceexpense.data.config.ConfigType.IncomeCategory).first().sortedBy { it.position }.map { it.label }
+        val tags = configRepo.options(com.voiceexpense.data.config.ConfigType.Tag).first().sortedBy { it.position }.map { it.label }
+        val accounts = configRepo.options(com.voiceexpense.data.config.ConfigType.Account).first().sortedBy { it.position }.map { it.label }
+        val ctx = ParsingContext(
+            defaultDate = LocalDate.now(),
+            allowedExpenseCategories = expenseCats,
+            allowedIncomeCategories = incomeCats,
+            allowedTags = tags,
+            allowedAccounts = accounts,
+            knownAccounts = accounts
+        )
+        val parsed = parser.parse(text, ctx)
         val after = ProcessingMonitor.snapshot()
         val usedAi = after.ai > before.ai
         val txn = Transaction(

@@ -26,6 +26,7 @@ import com.voiceexpense.ai.parsing.hybrid.ProcessingMonitor
 import com.voiceexpense.ui.common.SettingsKeys
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.math.BigDecimal
 import java.time.LocalDate
@@ -35,6 +36,7 @@ class MainActivity : AppCompatActivity() {
     private val vm: MainViewModel by viewModels()
     @javax.inject.Inject lateinit var parser: TransactionParser
     @javax.inject.Inject lateinit var repo: TransactionRepository
+    @javax.inject.Inject lateinit var configRepo: com.voiceexpense.data.config.ConfigRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -76,7 +78,20 @@ class MainActivity : AppCompatActivity() {
             lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 try {
                     val before = ProcessingMonitor.snapshot()
-                    val parsed = parser.parse(text, ParsingContext(defaultDate = LocalDate.now()))
+                    // Load allowed options from settings to guide the model
+                    val expenseCats = configRepo.options(com.voiceexpense.data.config.ConfigType.ExpenseCategory).first().sortedBy { it.position }.map { it.label }
+                    val incomeCats = configRepo.options(com.voiceexpense.data.config.ConfigType.IncomeCategory).first().sortedBy { it.position }.map { it.label }
+                    val tags = configRepo.options(com.voiceexpense.data.config.ConfigType.Tag).first().sortedBy { it.position }.map { it.label }
+                    val accounts = configRepo.options(com.voiceexpense.data.config.ConfigType.Account).first().sortedBy { it.position }.map { it.label }
+                    val ctx = ParsingContext(
+                        defaultDate = LocalDate.now(),
+                        allowedExpenseCategories = expenseCats,
+                        allowedIncomeCategories = incomeCats,
+                        allowedTags = tags,
+                        allowedAccounts = accounts,
+                        knownAccounts = accounts
+                    )
+                    val parsed = parser.parse(text, ctx)
                     val after = ProcessingMonitor.snapshot()
                     val usedAi = after.ai > before.ai
                     val prefs = getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)

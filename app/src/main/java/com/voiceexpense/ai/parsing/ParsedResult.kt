@@ -22,6 +22,10 @@ data class ParsingContext(
     val recentMerchants: List<String> = emptyList(),
     val recentCategories: List<String> = emptyList(),
     val knownAccounts: List<String> = emptyList(),
-    val defaultDate: LocalDate = LocalDate.now()
+    val defaultDate: LocalDate = LocalDate.now(),
+    // Allowed options configured by the user; models should choose only from these.
+    val allowedExpenseCategories: List<String> = emptyList(),
+    val allowedIncomeCategories: List<String> = emptyList(),
+    val allowedTags: List<String> = emptyList(),
+    val allowedAccounts: List<String> = emptyList()
 )
-

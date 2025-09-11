@@ -45,6 +45,7 @@ class PromptBuilder(
             appendLine("- If type = Transfer: amountUsd is the moved amount; expenseCategory/incomeCategory = null")
             appendLine("- Default merchant 'Unknown' if not inferred")
             appendLine("- Keep tags as lowercase single words")
+            appendLine("- For fields with allowed options, choose ONLY from the provided lists. If no match, leave null.")
         }
     }
 
@@ -57,6 +58,18 @@ class PromptBuilder(
         }
         if (context.recentCategories.isNotEmpty()) {
             appendLine("recentCategories: ${context.recentCategories.joinToString()}")
+        }
+        if (context.allowedExpenseCategories.isNotEmpty()) {
+            appendLine("allowedExpenseCategories: ${context.allowedExpenseCategories.joinToString()}")
+        }
+        if (context.allowedIncomeCategories.isNotEmpty()) {
+            appendLine("allowedIncomeCategories: ${context.allowedIncomeCategories.joinToString()}")
+        }
+        if (context.allowedTags.isNotEmpty()) {
+            appendLine("allowedTags: ${context.allowedTags.joinToString()}")
+        }
+        if (context.allowedAccounts.isNotEmpty()) {
+            appendLine("allowedAccounts: ${context.allowedAccounts.joinToString()}")
         }
     }.trim()
 

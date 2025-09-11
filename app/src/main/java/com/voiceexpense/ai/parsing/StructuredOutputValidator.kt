@@ -95,19 +95,51 @@ object StructuredOutputValidator {
         val candidate = s
         var depth = 0
         var start = -1
+        var inString = false
+        var escape = false
+        var lastTopLevelComma = -1
         for (i in candidate.indices) {
             val ch = candidate[i]
-            if (ch == '{') {
-                if (depth == 0) start = i
-                depth++
-            } else if (ch == '}') {
-                depth--
-                if (depth == 0 && start >= 0) {
-                    return candidate.substring(start, i + 1)
+            if (inString) {
+                if (escape) {
+                    escape = false
+                } else if (ch == '\\') {
+                    escape = true
+                } else if (ch == '"') {
+                    inString = false
                 }
+                continue
+            }
+            when (ch) {
+                '"' -> inString = true
+                '{' -> {
+                    if (depth == 0) start = i
+                    depth++
+                }
+                '}' -> {
+                    depth--
+                    if (depth == 0 && start >= 0) {
+                        // Found a balanced top-level object
+                        return candidate.substring(start, i + 1)
+                    }
+                }
+                ',' -> if (depth == 1) lastTopLevelComma = i
             }
         }
-        // If we didn't find a balanced object, return the best-effort string
+
+        // If we didn't find a balanced object but we did see the start of one,
+        // attempt a best-effort salvage by truncating to the last complete
+        // top-level field (last comma) and closing the object.
+        if (start >= 0) {
+            val end = if (lastTopLevelComma > start) lastTopLevelComma else candidate.lastIndex
+            var trimmed = candidate.substring(start, (end + 1).coerceAtMost(candidate.length))
+            // Remove a trailing comma and whitespace if present
+            trimmed = trimmed.replace(Regex(",\s*$"), "")
+            // Close the object
+            return "$trimmed}"
+        }
+
+        // Fallback: return the cleaned string as-is
         return candidate
     }
 
