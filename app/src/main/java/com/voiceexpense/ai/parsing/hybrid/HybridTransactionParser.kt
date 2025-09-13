@@ -26,14 +26,17 @@ class HybridTransactionParser(
             if (genai.isAvailable()) {
                 try { Log.d("AI.Debug", "Building prompt for input: ${input.take(100)}") } catch (_: Throwable) {}
                 val prompt = promptBuilder.build(input, context)
+                // Log the complete prompt that will be sent to the model
+                try {
+                    Log.d("AI.Debug", "Full prompt built, length=${prompt.length}")
+                    Log.d("AI.Prompt", "${prompt}")
+                } catch (_: Throwable) {}
                 try { Log.d("AI.Debug", "Calling genai.structured()") } catch (_: Throwable) {}
                 val ai = genai.structured(prompt)
                 val ok = ai.getOrNull()
                 try {
-                    val len = ok?.length ?: 0
-                    val snippet = (ok ?: "").replace("\n", " ").take(200)
-                    Log.d("AI.Debug", "AI response received, length=${len}")
-                    Log.d("AI.Debug", "AI response snippet: '${snippet}${if (len > snippet.length) "…" else ""}'")
+                    Log.d("AI.Debug", "AI response received, length=${ok?.length ?: 0}")
+                    Log.d("AI.Debug", "Full AI response: '${ok}'")
                 } catch (_: Throwable) {}
                 if (!ok.isNullOrBlank()) {
                     try { Log.d("AI.Debug", "Calling ValidationPipeline.validateRawResponse()") } catch (_: Throwable) {}
