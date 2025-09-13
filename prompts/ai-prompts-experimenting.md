@@ -4,10 +4,10 @@
 Output ONLY a 1 or a 0 to indicate if this transaction descrbed was spit with another person.
 
 Ex: "I just got groceries at trader joes for 56.90 dollars using Chase Sapphire Preferred card and after splitwise with Emily I will only owe 35"
-1
+>1
 
 Ex: "groceries at trader joes for 56.90 dollars using Chase Sapphire Preferred card"
-0
+>0
 
 Now: "I just spent 95 dollars at Walmart for birthday gifts for my family and I used my Discover card"
 
