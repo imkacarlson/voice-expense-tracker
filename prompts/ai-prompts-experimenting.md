@@ -1,7 +1,7 @@
 ## TRUE or FALSE Check for Splitwise
 
 ```
-Output ONLY a 1 or a 0 to indicate if this transaction descrbed was spit with another person.
+Output ONLY a 1 or a 0 to indicate if this transaction descrbed was split with another person.
 
 Ex: "I just got groceries at trader joes for 56.90 dollars using Chase Sapphire Preferred card and after splitwise with Emily I will only owe 35"
 >1
