@@ -28,6 +28,8 @@ import com.voiceexpense.ui.common.MainActivity
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class TransactionConfirmationActivity : AppCompatActivity() {
@@ -51,9 +53,17 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             renderer = PromptRenderer()
         )
         viewModel = ConfirmationViewModel(repo, parser, controller)
-        // Enable debug logs if developer toggle is set
-        val prefs = getSharedPreferences(com.voiceexpense.ui.common.SettingsKeys.PREFS, android.content.Context.MODE_PRIVATE)
-        controller.setDebug(prefs.getBoolean(com.voiceexpense.ui.common.SettingsKeys.DEBUG_LOGS, false))
+        // Enable debug logs if developer toggle is set (avoid disk read on main thread)
+        lifecycleScope.launch {
+            val debug = withContext(Dispatchers.IO) {
+                val prefs = applicationContext.getSharedPreferences(
+                    com.voiceexpense.ui.common.SettingsKeys.PREFS,
+                    android.content.Context.MODE_PRIVATE
+                )
+                prefs.getBoolean(com.voiceexpense.ui.common.SettingsKeys.DEBUG_LOGS, false)
+            }
+            controller.setDebug(debug)
+        }
 
         val title: TextView = findViewById(R.id.txn_title)
         val confirm: Button = findViewById(R.id.btn_confirm)
