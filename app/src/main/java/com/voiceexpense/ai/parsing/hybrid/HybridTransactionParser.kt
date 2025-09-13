@@ -29,9 +29,11 @@ class HybridTransactionParser(
                 try { Log.d("AI.Debug", "Calling genai.structured()") } catch (_: Throwable) {}
                 val ai = genai.structured(prompt)
                 val ok = ai.getOrNull()
-                try { 
-                    Log.d("AI.Debug", "AI response received, length=${ok?.length ?: 0}")
-                    Log.d("AI.Debug", "Full AI response: '$ok'")
+                try {
+                    val len = ok?.length ?: 0
+                    val snippet = (ok ?: "").replace("\n", " ").take(200)
+                    Log.d("AI.Debug", "AI response received, length=${len}")
+                    Log.d("AI.Debug", "AI response snippet: '${snippet}${if (len > snippet.length) "…" else ""}'")
                 } catch (_: Throwable) {}
                 if (!ok.isNullOrBlank()) {
                     try { Log.d("AI.Debug", "Calling ValidationPipeline.validateRawResponse()") } catch (_: Throwable) {}
@@ -109,10 +111,12 @@ class HybridTransactionParser(
         val o = JSONObject(json)
         fun dec(name: String): BigDecimal? =
             if (o.has(name) && !o.isNull(name)) o.optDouble(name).let { d -> if (d.isNaN()) null else BigDecimal(d.toString()) } else null
+        fun decAlias(primary: String, alias: String? = null): BigDecimal? =
+            dec(primary) ?: (alias?.let { dec(it) })
         fun optStringOrNull(name: String): String? = if (o.has(name) && !o.isNull(name)) o.getString(name) else null
 
         val result = ParsedResult(
-            amountUsd = dec("amountUsd"),
+            amountUsd = decAlias("amountUsd", alias = "amount"),
             merchant = o.optString("merchant", "").ifBlank { "Unknown" },
             description = optStringOrNull("description"),
             type = o.optString("type", "Expense"),
@@ -121,7 +125,7 @@ class HybridTransactionParser(
             tags = o.optJSONArray("tags")?.let { arr -> (0 until arr.length()).map { arr.optString(it) } } ?: emptyList(),
             userLocalDate = context.defaultDate,
             account = optStringOrNull("account"),
-            splitOverallChargedUsd = dec("splitOverallChargedUsd"),
+            splitOverallChargedUsd = decAlias("splitOverallChargedUsd", alias = "overall"),
             note = optStringOrNull("note"),
             confidence = o.optDouble("confidence", 0.75).toFloat()
         )

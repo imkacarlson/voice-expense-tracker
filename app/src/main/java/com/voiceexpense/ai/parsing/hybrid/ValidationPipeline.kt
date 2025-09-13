@@ -51,6 +51,24 @@ object ValidationPipeline {
         }
         try { android.util.Log.d("AI.Debug", "JSONObject created successfully") } catch (_: Throwable) {}
 
+        // 3a) Field aliasing: tolerate common schema deviations from the LLM
+        // - Some models emit "amount" instead of "amountUsd"
+        // - Some may emit "overall"/"total" instead of "splitOverallChargedUsd"
+        try {
+            if (!json.has("amountUsd") && json.has("amount") && !json.isNull("amount")) {
+                val amt = json.optDouble("amount")
+                if (!amt.isNaN()) json.put("amountUsd", amt)
+            }
+            if (!json.has("splitOverallChargedUsd")) {
+                val overall = when {
+                    json.has("overall") && !json.isNull("overall") -> json.optDouble("overall")
+                    json.has("total") && !json.isNull("total") -> json.optDouble("total")
+                    else -> Double.NaN
+                }
+                if (!overall.isNaN()) json.put("splitOverallChargedUsd", overall)
+            }
+        } catch (_: Throwable) { /* best-effort normalization */ }
+
         // Required/typed fields
         val type = json.optString("type", "")
         val typeValid = type in setOf("Expense", "Income", "Transfer")
@@ -88,4 +106,3 @@ object ValidationPipeline {
         return ValidationOutcome(valid, if (valid) json.toString() else null, errs, score)
     }
 }
-

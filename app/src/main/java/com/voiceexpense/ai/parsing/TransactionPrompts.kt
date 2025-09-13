@@ -23,6 +23,7 @@ Return ONLY JSON. Do not include comments or extra text. Fields:
 - confidence: number (0..1)
 Rules:
 - USD only numbers (no currency symbols)
+- Do NOT emit a field named 'amount'; use 'amountUsd' only
 - If type = Transfer, amountUsd applies to the amount moved and expenseCategory/incomeCategory must be null
 - Keep tags concise lowercase single words
 """
@@ -59,4 +60,3 @@ Rules:
     fun transfer(amount: Number, from: String, to: String): String =
         "transfer $amount from $from to $to"
 }
-

@@ -50,26 +50,28 @@ class PromptBuilder(
     }
 
     private fun buildContextBlock(context: ParsingContext): String = buildString {
+        val cap = 8 // cap each list to keep prompt compact
+        fun <T> List<T>.takeCapped() = this.take(cap)
         if (context.recentMerchants.isNotEmpty()) {
-            appendLine("recentMerchants: ${context.recentMerchants.joinToString()}")
+            appendLine("recentMerchants: ${context.recentMerchants.takeCapped().joinToString()}")
         }
         if (context.knownAccounts.isNotEmpty()) {
-            appendLine("knownAccounts: ${context.knownAccounts.joinToString()}")
+            appendLine("knownAccounts: ${context.knownAccounts.takeCapped().joinToString()}")
         }
         if (context.recentCategories.isNotEmpty()) {
-            appendLine("recentCategories: ${context.recentCategories.joinToString()}")
+            appendLine("recentCategories: ${context.recentCategories.takeCapped().joinToString()}")
         }
         if (context.allowedExpenseCategories.isNotEmpty()) {
-            appendLine("allowedExpenseCategories: ${context.allowedExpenseCategories.joinToString()}")
+            appendLine("allowedExpenseCategories: ${context.allowedExpenseCategories.takeCapped().joinToString()}")
         }
         if (context.allowedIncomeCategories.isNotEmpty()) {
-            appendLine("allowedIncomeCategories: ${context.allowedIncomeCategories.joinToString()}")
+            appendLine("allowedIncomeCategories: ${context.allowedIncomeCategories.takeCapped().joinToString()}")
         }
         if (context.allowedTags.isNotEmpty()) {
-            appendLine("allowedTags: ${context.allowedTags.joinToString()}")
+            appendLine("allowedTags: ${context.allowedTags.takeCapped().joinToString()}")
         }
         if (context.allowedAccounts.isNotEmpty()) {
-            appendLine("allowedAccounts: ${context.allowedAccounts.joinToString()}")
+            appendLine("allowedAccounts: ${context.allowedAccounts.takeCapped().joinToString()}")
         }
     }.trim()
 
@@ -101,7 +103,7 @@ class PromptBuilder(
         // Add a small subset of edge cases to improve robustness
         chosen += examples.EDGE_CASES.take(3)
 
-        // Cap size to keep prompt compact
-        return chosen.take(12)
+        // Cap size to keep prompt compact (fewer shots -> faster responses)
+        return chosen.take(6)
     }
 }

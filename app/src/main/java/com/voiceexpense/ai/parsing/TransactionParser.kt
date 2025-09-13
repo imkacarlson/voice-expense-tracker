@@ -55,11 +55,13 @@ class TransactionParser(
             if (o.has(name) && !o.isNull(name)) o.optDouble(name).let { d ->
                 if (d.isNaN()) null else BigDecimal(d.toString())
             } else null
+        fun decAlias(primary: String, alias: String? = null): BigDecimal? =
+            dec(primary) ?: (alias?.let { dec(it) })
         fun optStringOrNull(name: String): String? =
             if (o.has(name) && !o.isNull(name)) o.getString(name) else null
 
         val result = ParsedResult(
-            amountUsd = dec("amountUsd"),
+            amountUsd = decAlias("amountUsd", alias = "amount"),
             merchant = o.optString("merchant", "").ifBlank { "Unknown" },
             description = optStringOrNull("description"),
             type = o.optString("type", "Expense"),
@@ -68,7 +70,7 @@ class TransactionParser(
             tags = o.optJSONArray("tags")?.let { arr -> (0 until arr.length()).map { arr.optString(it) } } ?: emptyList(),
             userLocalDate = context.defaultDate,
             account = optStringOrNull("account"),
-            splitOverallChargedUsd = dec("splitOverallChargedUsd"),
+            splitOverallChargedUsd = decAlias("splitOverallChargedUsd", alias = "overall"),
             note = optStringOrNull("note"),
             confidence = o.optDouble("confidence", 0.7).toFloat()
         )
