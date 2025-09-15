@@ -9,14 +9,11 @@ voice-expense-tracker/
 │   │   ├── main/
 │   │   │   ├── java/com/voiceexpense/
 │   │   │   │   ├── ui/           # User interface components
-│   │   │   │   │   ├── widget/   # Home screen widget implementation
 │   │   │   │   │   ├── confirmation/ # Transaction confirmation form activity
-│   │   │   │   │   │   └── voice/ # Voice correction components
 │   │   │   │   │   ├── common/   # MainActivity, adapters, ViewModels
 │   │   │   │   │   ├── setup/    # Initial app setup screens
 │   │   │   │   │   └── settings/ # Configuration management UI
-│   │   │   │   ├── service/      # Foreground services
-│   │   │   │   │   ├── voice/    # Voice recording and processing
+│   │   │   │   ├── service/      # Background services
 │   │   │   │   │   └── sync/     # Background sync services
 │   │   │   │   ├── data/         # Data layer
 │   │   │   │   │   ├── local/    # Room database, DAOs
@@ -24,7 +21,6 @@ voice-expense-tracker/
 │   │   │   │   │   ├── repository/ # Repository pattern implementations
 │   │   │   │   │   └── model/    # Data models and entities
 │   │   │   │   ├── ai/           # On-device AI processing
-│   │   │   │   │   ├── speech/   # ML Kit Speech Recognition
 │   │   │   │   │   ├── parsing/  # Gemma 3 structured parsing
 │   │   │   │   │   │   └── hybrid/ # Hybrid AI + heuristic processing
 │   │   │   │   │   ├── model/    # MediaPipe Tasks model management
@@ -76,17 +72,17 @@ voice-expense-tracker/
 
 ### Files
 - **Activities/Fragments**: `PascalCase` (e.g., `TransactionConfirmationActivity`, `WidgetConfigFragment`)
-- **Services**: `PascalCase` with suffix (e.g., `VoiceRecordingService`, `SyncService`)
+- **Services**: `PascalCase` with suffix (e.g., `SyncService`)
 - **ViewModels**: `PascalCase` with suffix (e.g., `TransactionViewModel`, `ConfirmationViewModel`)
 - **Repositories**: `PascalCase` with suffix (e.g., `TransactionRepository`, `AuthRepository`)
 - **Data Models**: `PascalCase` (e.g., `Transaction`, `ParsedExpense`, `SyncStatus`)
 - **Workers**: `PascalCase` with suffix (e.g., `SyncWorker`, `RetryWorker`)
-- **Utilities**: `PascalCase` with suffix (e.g., `DateUtils`, `CurrencyFormatter`, `AudioHelper`)
+- **Utilities**: `PascalCase` with suffix (e.g., `DateUtils`, `CurrencyFormatter`)
 - **Tests**: `PascalCase` with suffix (e.g., `TransactionRepositoryTest`, `ParsingServiceTest`)
 - **Form Components**: `PascalCase` with suffix (e.g., `CategoryDropdown`, `DatePickerHelper`)
 
 ### Code
-- **Classes/Data Classes**: `PascalCase` (e.g., `Transaction`, `VoiceProcessor`, `AppsScriptClient`)
+- **Classes/Data Classes**: `PascalCase` (e.g., `Transaction`, `AppsScriptClient`)
 - **Functions/Methods**: `camelCase` (e.g., `parseTransaction`, `saveToDatabase`, `authenticateUser`)
 - **Constants**: `UPPER_SNAKE_CASE` (e.g., `MAX_RETRIES`, `DEFAULT_TIMEOUT_MS`, `SHEETS_SCOPE`)
 - **Variables/Properties**: `camelCase` (e.g., `transactionAmount`, `userAccount`, `isOffline`)
@@ -105,7 +101,6 @@ voice-expense-tracker/
 ```kotlin
 // Example import structure
 import android.content.Context
-import android.speech.SpeechRecognizer
 import androidx.work.WorkManager
 import androidx.room.Database
 import com.google.android.gms.auth.api.signin.GoogleSignIn
@@ -141,7 +136,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
     // 4. UI setup and event handlers
     private fun setupViews() { }
     private fun setupFormValidation() { }
-    private fun handleVoiceInput() { }
     
     // 5. Helper methods
     private fun updateUI(transaction: Transaction) { }
@@ -209,7 +203,7 @@ data class Transaction(
     val note: String?,
     val confidence: Float,
     val correctionsCount: Int = 0,
-    val source: String = "voice", // "voice" or "text"
+    val source: String = "text", // "text" only
     val status: TransactionStatus = TransactionStatus.DRAFT,
     val sheetRef: SheetReference? = null
 )
@@ -217,7 +211,7 @@ data class Transaction(
 
 ## Code Organization Principles
 
-1. **Single Responsibility**: Each file handles one specific concern (voice processing, form management, database operations, UI state)
+1. **Single Responsibility**: Each file handles one specific concern (text processing, form management, database operations, UI state)
 2. **Layer Separation**: Clear boundaries between UI, business logic, and data layers
 3. **Dependency Injection**: Use Hilt for dependency management across the application
 4. **Reactive Patterns**: Flow/LiveData for data streams, StateFlow for UI state
@@ -233,7 +227,7 @@ data class Transaction(
 - **Data Layer**: Repositories, data sources, models - manages local and remote data
 
 ### Feature Boundaries
-- **Input Capture**: Widget → Service (voice) OR MainActivity (text) → AI Processing pipeline
+- **Input Capture**: MainActivity (text) → AI Processing pipeline
 - **Transaction Management**: Repository pattern with Room + Apps Script integration
 - **Form Interface**: Comprehensive editing with validation, dropdowns, date pickers
 - **Configuration Management**: Settings UI for managing dropdown options
@@ -274,7 +268,7 @@ Form Components → Validation → Configuration Storage
 
 ## AI Processing Structure
 
-### Voice Processing Pipeline
+### Text Processing Pipeline
 ```
 app/src/main/java/com/voiceexpense/ai/
 ├── speech/
@@ -424,4 +418,4 @@ enum class FieldType {
 }
 ```
 
-**Note**: Updated structure reflects the hybrid voice+text input approach, comprehensive form interface, and MediaPipe Tasks integration with Gemma 3 1B model.
+**Note**: Updated structure reflects the text-only input approach, comprehensive form interface, and MediaPipe Tasks integration with Gemma 3 1B model.

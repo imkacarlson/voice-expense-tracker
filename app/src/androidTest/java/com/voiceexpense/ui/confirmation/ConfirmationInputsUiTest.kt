@@ -7,7 +7,7 @@ import androidx.test.espresso.Espresso.onView
 import androidx.test.espresso.assertion.ViewAssertions.matches
 import androidx.test.espresso.matcher.ViewMatchers.*
 import com.voiceexpense.R
-import com.voiceexpense.service.voice.VoiceRecordingService
+import com.voiceexpense.ui.confirmation.TransactionConfirmationActivity
 import org.junit.Test
 import org.junit.runner.RunWith
 
@@ -15,7 +15,7 @@ import org.junit.runner.RunWith
 class ConfirmationInputsUiTest {
     @Test fun showsTypeAndDateControls() {
         val intent = Intent(androidx.test.platform.app.InstrumentationRegistry.getInstrumentation().targetContext, TransactionConfirmationActivity::class.java)
-        intent.putExtra(VoiceRecordingService.EXTRA_TRANSACTION_ID, "test-txn-id")
+        intent.putExtra(TransactionConfirmationActivity.EXTRA_TRANSACTION_ID, "test-txn-id")
         // Activity will attempt to load the transaction; in test, just verify controls exist regardless
         ActivityScenario.launch<TransactionConfirmationActivity>(intent).use {
             onView(withId(R.id.spinner_type)).check(matches(isDisplayed()))
@@ -23,4 +23,3 @@ class ConfirmationInputsUiTest {
         }
     }
 }
-

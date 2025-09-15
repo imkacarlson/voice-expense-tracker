@@ -20,7 +20,6 @@ import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.data.repository.TransactionRepository
-import com.voiceexpense.service.voice.VoiceRecordingService
 import com.voiceexpense.ui.confirmation.TransactionConfirmationActivity
 import com.voiceexpense.ai.parsing.hybrid.ProcessingMonitor
 import com.voiceexpense.ui.common.SettingsKeys
@@ -128,7 +127,7 @@ class MainActivity : AppCompatActivity() {
                         create.text = getString(R.string.create_draft)
                         input.text?.clear()
                         val intent = Intent(this@MainActivity, TransactionConfirmationActivity::class.java)
-                            .putExtra(VoiceRecordingService.EXTRA_TRANSACTION_ID, txn.id)
+                            .putExtra(TransactionConfirmationActivity.EXTRA_TRANSACTION_ID, txn.id)
                         startActivity(intent)
                     }
                 } catch (t: Throwable) {
@@ -148,7 +147,7 @@ class MainActivity : AppCompatActivity() {
         when (t.status) {
             TransactionStatus.DRAFT -> {
                 val intent = Intent(this, TransactionConfirmationActivity::class.java)
-                    .putExtra(VoiceRecordingService.EXTRA_TRANSACTION_ID, t.id)
+                    .putExtra(TransactionConfirmationActivity.EXTRA_TRANSACTION_ID, t.id)
                 startActivity(intent)
             }
             TransactionStatus.CONFIRMED, TransactionStatus.POSTED, TransactionStatus.QUEUED, TransactionStatus.FAILED -> {

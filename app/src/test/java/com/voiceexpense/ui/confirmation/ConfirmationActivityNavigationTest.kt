@@ -25,7 +25,7 @@ class ConfirmationActivityNavigationTest {
     @Test
     fun withId_extra_present_activityStarts_andShowsNoImmediateToast() {
         val intent = Intent(androidx.test.core.app.ApplicationProvider.getApplicationContext(), TransactionConfirmationActivity::class.java)
-        intent.putExtra(com.voiceexpense.service.voice.VoiceRecordingService.EXTRA_TRANSACTION_ID, "some-id")
+        intent.putExtra(com.voiceexpense.ui.confirmation.TransactionConfirmationActivity.EXTRA_TRANSACTION_ID, "some-id")
         val scenario = ActivityScenario.launch<TransactionConfirmationActivity>(intent)
         // It may still finish if no draft is found, but no toast should be shown immediately before repo load attempt
         // Assert that there is no toast prior to repo result (best-effort check)
@@ -40,4 +40,3 @@ class ConfirmationActivityNavigationTest {
         scenario.close()
     }
 }
-

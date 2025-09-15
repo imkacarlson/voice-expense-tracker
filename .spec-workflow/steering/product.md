@@ -1,32 +1,28 @@
 # Product Overview
 
 ## Product Purpose
-Build an Android app that lets users log financial transactions into a Google Spreadsheet using voice OR text input with on-device AI processing. The app removes the friction of manual entry by parsing natural speech or text into a structured transaction, allowing manual editing and confirmation in an intuitive form interface, and posting to Google Sheets. AI runs fully on-device for privacy; network is only required to sync the final transaction to the sheet.
+Build an Android app that lets users log financial transactions into a Google Spreadsheet using text input with on-device AI processing. The app removes the friction of manual entry by parsing typed text into a structured transaction, allowing manual editing and confirmation in an intuitive form interface, and posting to Google Sheets. AI runs fully on-device for privacy; network is only required to sync the final transaction to the sheet. Users can optionally use Android's built-in voice-to-text via Google Keyboard for voice input.
 
 ## Target Users
 - Single primary user (initially) on a Google Pixel 7a who manages personal expenses.
-- Secondary: Power users comfortable with Google Sheets who want flexible capture (voice OR text) with full data ownership and privacy.
+- Secondary: Power users comfortable with Google Sheets who want streamlined text-based capture with full data ownership and privacy.
 
 ## Target User Flow
-1. User has two options to start:
-   - Tap an Android home screen widget for voice capture
-   - Open the app and type a transaction description directly
-2. **Voice Path**: Widget starts voice capture and records a short utterance (e.g., "I spent $23 at Starbucks this morning for coffee")
-3. **Text Path**: User types transaction in the main app input field (e.g., "Starbucks $5 latte charged to my Citi card")
-4. On-device ASR transcribes audio to text (voice path) or uses typed text directly; on-device LLM (Gemma 3 1B via MediaPipe Tasks) parses text into structured transaction data.
-5. App shows confirmation screen with a **complete form interface** containing all parsed fields as editable inputs.
-6. User can:
+1. User opens the app and types a transaction description in the main input field (e.g., "Starbucks $5 latte charged to my Citi card")
+2. Optionally, user can use Android's built-in voice-to-text via Google Keyboard to dictate the transaction
+3. On-device LLM (Gemma 3 1B via MediaPipe Tasks) parses the typed text into structured transaction data.
+4. App shows confirmation screen with a **complete form interface** containing all parsed fields as editable inputs.
+5. User can:
    - **Edit any field directly** using the form inputs (amounts, merchant, category, tags, account, date, etc.)
-   - **Use voice corrections** optionally by tapping "Speak Correction" 
    - **Use dropdowns** for categories, accounts, tags (configurable in settings)
    - **Use date picker** for transaction date
-7. User confirms when satisfied; app posts transaction to Google Sheets via Google Apps Script Web App. If offline, it queues and syncs automatically when online.
-8. **Home Screen History**: Main screen shows the 10 most recent transactions with status indicators (Draft, Queued, Confirmed, Posted, Failed) that users can click to view/edit.
+6. User confirms when satisfied; app posts transaction to Google Sheets via Google Apps Script Web App. If offline, it queues and syncs automatically when online.
+7. **Home Screen History**: Main screen shows the 10 most recent transactions with status indicators (Draft, Queued, Confirmed, Posted, Failed) that users can click to view/edit.
 
 ## Technical Constraints
 - Device: Google Pixel 7a (Android 14+ recommended).
-- AI Processing: On-device only. Use Gemma 3 1B via MediaPipe Tasks (.task file) for NLU/structuring. Use offline speech recognition; no cloud AI calls.
-- Privacy: No cloud-based AI processing; user owns data. Minimal permissions.
+- AI Processing: On-device only. Use Gemma 3 1B via MediaPipe Tasks (.task file) for NLU/structuring of text input; no cloud AI calls.
+- Privacy: No cloud-based AI processing; user owns data. Minimal permissions (no microphone access required).
 - Connectivity: Work offline for capture/parsing and confirmation; require network only to post to Google Sheets.
 - Currency: USD-only for v1 (no multi-currency handling).
 - Data Destination: Existing user-owned Google Spreadsheet (configurable spreadsheet and tab).
@@ -73,11 +69,11 @@ All dropdown fields must be configurable in the app settings. Users should be ab
 
 ## Data Models and Transaction Schema
 - Transaction fields:
-  - id (UUID), createdAt (UTC ISO), userLocalDate, amountUsd (decimal), merchant (string), description (string), type ("Expense"|"Income"|"Transfer"), expenseCategory? (string), incomeCategory? (string), tags (string[]), account (string), splitOverallChargedUsd? (decimal), note? (string), confidence (0–1), correctionsCount (int), source ("voice"|"text"), status ("draft"|"confirmed"|"queued"|"posted"|"failed"), sheetRef (spreadsheetId/sheetId/row if posted).
-- Parsing intent: support capturing both the user share amount and, when present, the overall charged amount for split expenses. If only one amount is spoken, treat it as the Amount field and leave Overall Charged blank.
+  - id (UUID), createdAt (UTC ISO), userLocalDate, amountUsd (decimal), merchant (string), description (string), type ("Expense"|"Income"|"Transfer"), expenseCategory? (string), incomeCategory? (string), tags (string[]), account (string), splitOverallChargedUsd? (decimal), note? (string), confidence (0–1), correctionsCount (int), source ("text"), status ("draft"|"confirmed"|"queued"|"posted"|"failed"), sheetRef (spreadsheetId/sheetId/row if posted).
+- Parsing intent: support capturing both the user share amount and, when present, the overall charged amount for split expenses. If only one amount is typed, treat it as the Amount field and leave Overall Charged blank.
 
 ## API Contracts (Structured Parsing)
-- Input: Recognized text from ASR or direct text input, optional context (recent merchants/categories/tags, default account, user locale, time).
+- Input: Direct text input, optional context (recent merchants/categories/tags, default account, user locale, time).
 - Output (JSON): { amountUsd, merchant, description?, type, expenseCategory?, incomeCategory?, tags[], userLocalDate, account?, splitOverallChargedUsd?, note?, confidence }
 - Constraints: Strict JSON schema; enforce USD; reject currency tokens; request clarification on invalid/ambiguous fields.
 
@@ -94,11 +90,10 @@ All dropdown fields must be configurable in the app settings. Users should be ab
 - Offline: Queue entries locally; when connectivity returns, batch post.
 
 ## Confirmation UI and Form Interface
-- **UI**: Full-screen form activity launched from widget or main app with complete transaction editing capabilities.
+- **UI**: Full-screen form activity launched from main app with complete transaction editing capabilities.
 - **Form Fields**: All transaction fields are directly editable with appropriate input types (text, number, dropdown, date picker, multi-select).
 - **Smart Defaults**: AI parsing pre-fills form fields with high confidence; user can edit any field manually.
 - **Validation**: Client-side validation ensures required fields (merchant, amount for expenses/income) are filled before saving.
-- **Voice Corrections**: Optional "Speak Correction" button allows voice-based edits for users who prefer voice interaction.
 - **Termination**: "Confirm" button validates and saves transaction, enqueues sync; "Cancel" discards draft.
 
 ## Home Screen Experience
@@ -118,41 +113,37 @@ All dropdown fields must be configurable in the app settings. Users should be ab
 - Ambiguous amounts ("twenty-three fifty") → clarify or default with lower confidence.
 - Unknown merchants → set Description accordingly and capture in tags/note if needed.
 - Split expenses with two amounts (share + overall) → validate consistency; ensure Amount ≤ Overall.
-- Background noise/unclear speech → request repeat with brief prompt; cap retries and fail gracefully.
 - Offline posting → queue with visible status; notify when synced.
 - Auth failures → prompt re-auth; never drop transactions.
 
 ## Performance and Battery
-- Targets: Parsing <3s per utterance; end-to-end <30s; accuracy >90% for common transactions.
-- Techniques: Short recordings; stop listening on silence; run LLM with structured output to reduce compute; batch network posts; use foreground service only while recording; defer heavy work to WorkManager.
+- Targets: Parsing <3s per text input; end-to-end <30s; accuracy >90% for common transactions.
+- Techniques: Run LLM with structured output to reduce compute; batch network posts; defer heavy work to WorkManager.
 
 ## Testing Strategy (Test-Ready)
 1. Test scenarios per user story with acceptance criteria (happy paths, edge cases, failure modes).
 2. API contract tests:
-   - ASR text → structured JSON parsing using the 5 fixtures above plus minimal variants (tags, split amounts, account parsing).
+   - Text → structured JSON parsing using the 5 fixtures above plus minimal variants (tags, split amounts, account parsing).
    - Apps Script posting (success, auth errors, network failures, retries) with the exact column mapping.
-   - Widget → Activity/Service intents and parameters.
 3. Performance benchmarks with automated timing assertions (<3s parsing).
 4. Mock strategies:
    - Replace Gemma 3 parser with deterministic mock returning fixtures.
    - Stub Apps Script client with local fake server or in-memory adapter.
-   - Simulate SpeechRecognizer outputs for CI.
 5. Integration tests:
-   - Widget lifecycle + foreground service + confirmation UI.
+   - Text input → parsing → confirmation UI workflow.
    - Offline queue to online sync transition.
    - Error recovery flows (auth refresh, network backoff).
 
 ## Product Principles
 1. Privacy-first and on-device AI only; transparent scopes and storage.
-2. Flexible input (voice OR text) with intuitive form-based confirmation.
+2. Simple text input with intuitive form-based confirmation.
 3. Offline-first with reliable sync; never lose a transaction.
-4. Accessibility: Multiple input methods, large controls, screen-reader compatible.
+4. Accessibility: Keyboard input, large controls, screen-reader compatible.
 
 ## Success Metrics
 - Parsing accuracy: >90% for common transactions.
 - Parsing latency: <3s median; end-to-end flow <30s.
 - Post success rate: >99% within 24h including retries.
-- User preference: Track usage split between voice vs text input.
 - Adoption proxy: repeat usage per day; queue drain times.
 
 ## Out of Scope (Initial)
@@ -161,12 +152,11 @@ All dropdown fields must be configurable in the app settings. Users should be ab
 ## Implementation Phases
 - Phase 1: Form interface with manual input, basic AI parsing, home screen history.
 - Phase 2: Apps Script posting with offline queue; Room persistence; exact column mapping.
-- Phase 3: Voice input path, configurable dropdowns, settings management.
+- Phase 3: Enhanced UI polish, configurable dropdowns, settings management.
 - Phase 4: Polish, battery/perf tuning, accessibility and internationalization pass.
 
 ## Risks and Mitigations
-- Offline ASR variability → pre-download language models; fall back to concise prompts.
 - LLM format drift → enforce strict JSON schema with validators and retry on invalid output.
 - OAuth complexity → use proven libraries; narrow scopes; robust token handling.
-- Battery spikes → shorten sessions, limit model context, defer work to background.
+- Battery optimization → limit model context, defer work to background.
 - Small model accuracy → hybrid prompting strategies, field-by-field parsing fallbacks.

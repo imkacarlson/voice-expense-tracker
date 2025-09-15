@@ -15,10 +15,6 @@ import com.voiceexpense.data.remote.AppsScriptClient
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.data.config.ConfigDao
 import com.voiceexpense.data.config.ConfigRepository
-import com.voiceexpense.ui.confirmation.voice.CorrectionIntentParser
-import com.voiceexpense.ui.confirmation.voice.PromptRenderer
-import com.voiceexpense.ui.confirmation.voice.TtsEngine
-import com.voiceexpense.ui.confirmation.voice.VoiceCorrectionController
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
@@ -73,13 +69,5 @@ object AppModule {
     fun provideTokenProvider(@ApplicationContext ctx: Context, auth: com.voiceexpense.auth.AuthRepository): TokenProvider =
         GoogleIdentityTokenProvider(ctx, auth)
 
-    // Voice correction loop components
-    @Provides fun provideCorrectionIntentParser(): CorrectionIntentParser = CorrectionIntentParser()
-    @Provides fun providePromptRenderer(): PromptRenderer = PromptRenderer()
-    @Provides fun provideTtsEngine(): TtsEngine = TtsEngine()
-    @Provides fun provideVoiceCorrectionController(
-        tts: TtsEngine,
-        cip: CorrectionIntentParser,
-        renderer: PromptRenderer
-    ): VoiceCorrectionController = VoiceCorrectionController(tts = tts, parser = cip, renderer = renderer)
+    // Voice correction loop removed in text-first refactor
 }

@@ -7,13 +7,11 @@ import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
 import com.voiceexpense.ai.parsing.hybrid.PromptBuilder
 import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
-import com.voiceexpense.ai.speech.AudioRecordingManager
-import com.voiceexpense.ai.speech.SpeechRecognitionService
 import dagger.Module
 import dagger.Provides
 import dagger.hilt.InstallIn
-import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dagger.hilt.android.qualifiers.ApplicationContext
 import javax.inject.Singleton
 
 @Module
@@ -21,12 +19,6 @@ import javax.inject.Singleton
 object AiModule {
     @Provides @Singleton
     fun provideModelManager(): ModelManager = ModelManager()
-
-    @Provides
-    fun provideAudio(): AudioRecordingManager = AudioRecordingManager()
-
-    @Provides
-    fun provideAsr(@ApplicationContext ctx: Context): SpeechRecognitionService = SpeechRecognitionService(ctx)
 
     @Provides @Singleton
     fun provideMediaPipeClient(@ApplicationContext context: Context): MediaPipeGenAiClient = MediaPipeGenAiClient(context)

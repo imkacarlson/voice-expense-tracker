@@ -2,9 +2,7 @@
     <string name="app_name">Voice Expense</string>
     <string name="confirm">Confirm</string>
     <string name="cancel">Cancel</string>
-    <string name="speak_correction">Speak Correction</string>
     <string name="draft_transaction">Draft transaction</string>
-    <string name="widget_tap_to_capture">Tap to start voice capture</string>
     <string name="settings_title">Settings</string>
     <string name="web_app_url">Apps Script Web App URL</string>
     <string name="backup_auth_token">Backup Auth Token (optional)</string>
@@ -38,7 +36,6 @@
     <string name="setup_guide_status_error">LLM setup error: %1$s</string>
     <string name="setup_guide_import_success">Model imported successfully.</string>
     <string name="setup_guide_import_failure">Failed to import model: %1$s</string>
-    <string name="listening_now">Listening…</string>
     
     <!-- Typed input helpers -->
     <string name="type_utterance_hint">Type expense (e.g., "I spent $6 at Starbucks")</string>
@@ -61,9 +58,7 @@
     <string name="hint_note">Note (optional)</string>
     
     <!-- Developer options -->
-    <string name="asr_online_fallback_label">Allow online ASR fallback (dev)</string>
-    <string name="asr_fallback_enabled">Online ASR fallback enabled</string>
-    <string name="asr_fallback_disabled">Online ASR fallback disabled</string>
+    
     <string name="debug_logs_label">Enable debug logs (toasts + extra logging)</string>
     <string name="debug_logs_enabled">Debug logs enabled</string>
     <string name="debug_logs_disabled">Debug logs disabled</string>

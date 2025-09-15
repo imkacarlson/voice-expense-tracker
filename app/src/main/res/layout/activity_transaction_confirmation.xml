@@ -198,15 +198,7 @@
                     android:textSize="14sp" />
             </LinearLayout>
 
-            <!-- Voice correction actions -->
-            <Button
-                android:id="@+id/btn_speak"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:minHeight="48dp"
-                android:text="@string/speak_correction" />
-
-            <!-- Removed freeform typed correction row as per UX change -->
+            <!-- Voice correction actions removed in text-first refactor -->
         </LinearLayout>
     </ScrollView>
 

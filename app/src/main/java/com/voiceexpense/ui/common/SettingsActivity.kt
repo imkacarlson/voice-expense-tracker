@@ -41,7 +41,7 @@ object SettingsKeys {
     const val BACKUP_AUTH_TOKEN = "backup_auth_token"
     const val KNOWN_ACCOUNTS = "known_accounts" // comma-separated labels
     const val DEBUG_LOGS = "debug_logs" // developer toggle for verbose local logs
-    const val ASR_ONLINE_FALLBACK = "asr_online_fallback" // allow online ASR when offline model missing (dev aid)
+    // Removed: ASR_ONLINE_FALLBACK (voice features removed)
 }
 
 @AndroidEntryPoint
@@ -76,7 +76,6 @@ class SettingsActivity : AppCompatActivity() {
         val aiStatus: android.widget.TextView = findViewById(R.id.text_ai_status)
         val openSetup: Button = findViewById(R.id.btn_open_setup_guide)
         val modelManager = ModelManager()
-        val asrFallback: androidx.appcompat.widget.SwitchCompat = findViewById(R.id.switch_asr_online_fallback)
         val debugSwitch: androidx.appcompat.widget.SwitchCompat = findViewById(R.id.switch_debug_logs)
         // Dropdown configuration views
         val typeSpinner: android.widget.Spinner = findViewById(R.id.spinner_option_type)
@@ -112,14 +111,14 @@ class SettingsActivity : AppCompatActivity() {
             }
             val bt = p.getString(SettingsKeys.BACKUP_AUTH_TOKEN, "")
             val ka = p.getString(SettingsKeys.KNOWN_ACCOUNTS, "")
-            val asrOnline = p.getBoolean(SettingsKeys.ASR_ONLINE_FALLBACK, (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0)
+            
             val existing = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
             val hasConfig = !url.isNullOrBlank()
             withContext(Dispatchers.Main) {
                 webUrl.setText(url)
                 backup.setText(bt)
                 accounts.setText(ka)
-                asrFallback.isChecked = asrOnline
+                
                 // Populate type spinner and list/default adapters
                 val types = ConfigType.values()
                 val typeAdapter = android.widget.ArrayAdapter(this@SettingsActivity, android.R.layout.simple_spinner_item, types)
@@ -315,17 +314,10 @@ class SettingsActivity : AppCompatActivity() {
         // Initialize toggles from prefs
         runCatching {
             val p = prefsOrInit()
-            asrFallback.isChecked = p.getBoolean(SettingsKeys.ASR_ONLINE_FALLBACK, (applicationInfo.flags and android.content.pm.ApplicationInfo.FLAG_DEBUGGABLE) != 0)
             debugSwitch.isChecked = p.getBoolean(SettingsKeys.DEBUG_LOGS, false)
         }
 
-        // Persist ASR fallback toggle
-        asrFallback.setOnCheckedChangeListener { _, isChecked ->
-            prefsOrInit().edit().putBoolean(SettingsKeys.ASR_ONLINE_FALLBACK, isChecked).apply()
-            val msg = if (isChecked) R.string.asr_fallback_enabled else R.string.asr_fallback_disabled
-            android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
-        }
-
+        
         // Persist Debug logs toggle
         debugSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefsOrInit().edit().putBoolean(SettingsKeys.DEBUG_LOGS, isChecked).apply()

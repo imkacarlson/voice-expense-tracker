@@ -1,7 +1,7 @@
 # Technology Stack
 
 ## Project Type
-Android mobile application with flexible input interface (voice + text) and on-device AI processing
+Android mobile application with text input interface and on-device AI processing
 
 ## Core Technologies
 
@@ -12,19 +12,16 @@ Android mobile application with flexible input interface (voice + text) and on-d
 
 ### Key Dependencies/Libraries
 - **MediaPipe Tasks GenAI**: On-device Gemma 3 1B model via `.task` file for natural language understanding and structured parsing
-- **ML Kit Speech Recognition**: On-device speech-to-text conversion (optional voice input path)
 - **Google Play Services Auth**: OAuth 2.0 authentication for Google account integration
 - **Google Apps Script Web App**: For appending structured transaction data to the user's spreadsheet
 - **WorkManager**: Background task scheduling for offline queue processing and sync
 - **Room Database**: Local SQLite database for transaction persistence and offline queue
 - **EncryptedSharedPreferences**: Secure storage for OAuth tokens and sensitive data
-- **Android Widget Framework**: Home screen widget implementation
 - **OkHttp/Moshi**: HTTP client for Apps Script Web App communication
 
 ### Application Architecture
 Event-driven architecture with MVVM pattern:
-- **Multi-input capture**: Home screen widget for voice OR main app text input
-- **Service-based processing**: Foreground service handles ASR and AI processing (voice path)
+- **Text input capture**: Main app text input interface
 - **Activity-based confirmation**: Full-screen form UI with comprehensive field editing
 - **Background sync**: WorkManager handles offline queue and Apps Script posting
 
@@ -42,7 +39,6 @@ Event-driven architecture with MVVM pattern:
 
 ### Monitoring & Dashboard Technologies (if applicable)
 - **Dashboard Framework**: Native Android UI (Activities/Fragments) with comprehensive form interface
-- **Real-time Communication**: Local broadcasts for service-to-UI communication
 - **Visualization Libraries**: Native Android views for transaction confirmation and history
 - **State Management**: Android ViewModel with LiveData/StateFlow for reactive UI updates
 
@@ -165,7 +161,7 @@ For highly structured inputs:
 - **Security Requirements**: 
   - On-device AI processing only (no cloud AI calls)
   - Secure OAuth token storage with hardware-backed encryption
-  - Minimal permissions (microphone for voice path, internet for sync only)
+  - Minimal permissions (internet for sync only, no microphone required)
   - No sensitive data in logs or crash reports
   - Model file stored in app-private directory
 - **Privacy Model**: User owns all data, no telemetry or analytics collection
@@ -186,20 +182,20 @@ For highly structured inputs:
 5. **Configurable Dropdowns**: User-specific categories and accounts improve parsing accuracy
 6. **Field-by-Field Parsing Option**: Fallback strategy for smaller model limitations
 7. **Room Database**: Type-safe SQLite wrapper, excellent WorkManager integration for offline queue
-8. **Widget + App Input**: Accommodates different user preferences and contexts
 
 ### AI Processing Trade-offs
 - **Accuracy vs Speed**: 1B model trades some accuracy for faster inference
 - **Single vs Multi-Prompt**: Single-shot preferred for speed, multi-prompt for complex cases
 - **Examples vs Context**: Balance few-shot examples with user-specific context
 - **Validation Strictness**: Strict JSON validation prevents malformed outputs
+- **Text vs Voice Complexity**: Simplified text-only processing reduces complexity
 
 ## Known Limitations
 
 - **Device Compatibility**: Limited to devices supporting MediaPipe Tasks GenAI
 - **Model Size**: 500MB model file requires sufficient device storage
 - **Currency Support**: USD-only for initial version, no multi-currency handling
-- **Language Support**: English-only speech recognition and parsing
+- **Language Support**: English-only text parsing
 - **Network Dependency**: Requires internet connection for Apps Script sync (offline queue mitigates UX impact)
 - **Processing Power**: May be slower on older/lower-spec devices
 - **Model Accuracy**: 1B parameter model may have lower accuracy than larger cloud models

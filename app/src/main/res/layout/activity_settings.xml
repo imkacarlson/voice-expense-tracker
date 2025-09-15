@@ -97,13 +97,7 @@
             android:text="On-device AI status: Unknown"
             android:paddingBottom="8dp" />
 
-        <androidx.appcompat.widget.SwitchCompat
-            android:id="@+id/switch_asr_online_fallback"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:text="@string/asr_online_fallback_label"
-            android:paddingTop="8dp"
-            android:paddingBottom="8dp" />
+        
 
         <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switch_debug_logs"

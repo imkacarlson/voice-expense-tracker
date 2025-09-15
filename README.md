@@ -1,8 +1,8 @@
 Voice Expense Tracker (Android)
 
 Overview
-- Voice-first Android app to log expenses/income/transfers to a Google Sheet.
-- On-device only for ASR and parsing; network used only to sync via a Google Apps Script Web App.
+- Text-first Android app to log expenses/income/transfers to a Google Sheet.
+- On-device only for parsing; network used only to sync via a Google Apps Script Web App.
  - On-device LLM via MediaPipe Tasks (LlmInference) for structured parsing.
 
 Getting Started
@@ -32,9 +32,8 @@ Run & Build
 
 App Structure
 - `app/src/main/java/com/voiceexpense/` packages:
-  - `ui/` (widget, confirmation, common)
-  - `service/` (voice recording)
-  - `ai/` (speech, parsing, model management)
+  - `ui/` (confirmation, common, settings, setup)
+  - `ai/` (parsing, model management)
   - `data/` (local Room DB, remote Apps Script API, repository)
   - `auth/` (encrypted token storage)
   - `worker/` (WorkManager sync)
@@ -54,7 +53,7 @@ Testing
   - `TransactionPromptsTest`, setup guide UI test, and a baseline performance test.
 
 Notes
-- ASR uses Android SpeechRecognizer. LLM parsing uses MediaPipe `LlmInference` with a local `.task` model.
+- Users can use the Android keyboard mic button for voice-to-text; the app itself is text-only. LLM parsing uses MediaPipe `LlmInference` with a local `.task` model.
 - Sync posts to your Google Apps Script Web App. If unsigned or token invalid, transactions remain queued and WorkManager retries after sign-in.
 
 Sign-In & Sync Checklist

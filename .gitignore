@@ -1,4 +1,8 @@
+# SDD Artifacts
 .spec-workflow/approvals/
+.spec-workflow/templates/
+.spec-workflow/user-templates/
+.spec-workflow/config.example.toml
 
 # Gradle and build outputs
 /.gradle/

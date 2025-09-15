@@ -1,10 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
 
     <application
         android:name=".App"
@@ -28,31 +25,13 @@
         <activity
             android:name=".ui.common.TransactionDetailsActivity"
             android:exported="false" />
-        <activity
-            android:name=".ui.voice.StartVoiceActivity"
-            android:exported="false"
-            android:theme="@style/Theme.VoiceExpense.Transparent" />
-        <activity
-            android:name=".ui.voice.ListeningActivity"
-            android:exported="false" />
+        
         <activity android:name=".ui.setup.SetupGuidePage" />
         <activity android:name=".ui.common.SettingsActivity" />
 
-        <service
-            android:name=".service.voice.VoiceRecordingService"
-            android:exported="false"
-            android:foregroundServiceType="microphone" />
+        
 
-        <receiver
-            android:name=".ui.widget.ExpenseWidgetProvider"
-            android:exported="true">
-            <intent-filter>
-                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
-            </intent-filter>
-            <meta-data
-                android:name="android.appwidget.provider"
-                android:resource="@xml/widget_expense_info" />
-        </receiver>
+        
     </application>
 
 </manifest>

@@ -13,11 +13,6 @@ import com.google.android.material.appbar.MaterialToolbar
 import androidx.lifecycle.lifecycleScope
 import com.voiceexpense.R
 import com.voiceexpense.ai.parsing.TransactionParser
-import com.voiceexpense.ai.speech.SpeechRecognitionService
-import com.voiceexpense.ui.confirmation.voice.CorrectionIntentParser
-import com.voiceexpense.ui.confirmation.voice.PromptRenderer
-import com.voiceexpense.ui.confirmation.voice.TtsEngine
-import com.voiceexpense.ui.confirmation.voice.VoiceCorrectionController
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.data.config.ConfigRepository
 import com.voiceexpense.data.config.ConfigType
@@ -33,6 +28,9 @@ import kotlinx.coroutines.withContext
 
 @AndroidEntryPoint
 class TransactionConfirmationActivity : AppCompatActivity() {
+    companion object {
+        const val EXTRA_TRANSACTION_ID = "transaction_id"
+    }
     @Inject lateinit var repo: TransactionRepository
     private lateinit var viewModel: ConfirmationViewModel
     @Inject lateinit var parser: TransactionParser
@@ -47,12 +45,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         }
 
         // Basic wiring without DI; replaced by Hilt later
-        val controller = VoiceCorrectionController(
-            tts = TtsEngine(),
-            parser = CorrectionIntentParser(),
-            renderer = PromptRenderer()
-        )
-        viewModel = ConfirmationViewModel(repo, parser, controller)
+        viewModel = ConfirmationViewModel(repo, parser)
         // Enable debug logs if developer toggle is set (avoid disk read on main thread)
         lifecycleScope.launch {
             val debug = withContext(Dispatchers.IO) {
@@ -68,7 +61,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val title: TextView = findViewById(R.id.txn_title)
         val confirm: Button = findViewById(R.id.btn_confirm)
         val cancel: Button = findViewById(R.id.btn_cancel)
-        val speak: Button = findViewById(R.id.btn_speak)
         val amountView: EditText = findViewById(R.id.field_amount)
         val overallView: EditText = findViewById(R.id.field_overall)
         val merchantView: EditText = findViewById(R.id.field_merchant)
@@ -83,10 +75,9 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         title.text = getString(R.string.app_name)
         // Disable actions until draft loads
         confirm.isEnabled = false
-        speak.isEnabled = false
 
         // Load draft by id if provided
-        val id = intent?.getStringExtra(com.voiceexpense.service.voice.VoiceRecordingService.EXTRA_TRANSACTION_ID)
+        val id = intent?.getStringExtra(EXTRA_TRANSACTION_ID)
         if (id.isNullOrBlank()) {
             Toast.makeText(this, R.string.error_open_draft_failed, Toast.LENGTH_SHORT).show()
             finish()
@@ -111,7 +102,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                     if (t == null) return@collect
                     // Enable actions once draft is available
                     confirm.isEnabled = true
-                    speak.isEnabled = true
                     amountView.setText(t.amountUsd?.toPlainString() ?: "")
                     overallView.setText(t.splitOverallChargedUsd?.toPlainString() ?: "")
                     merchantView.setText(t.merchant)
@@ -345,18 +335,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         }
 
         // Placeholder voice correction using ASR debug
-        val asr = SpeechRecognitionService(this)
-        // Subscribe to TTS prompt events (no-op here; real app would speak)
-        lifecycleScope.launch { viewModel.ttsEvents.collect { /* hook TTS */ } }
-        speak.setOnClickListener {
-            viewModel.interruptTts()
-            // In real app, start listening and feed transcript; here we demo a sample correction
-            lifecycleScope.launch {
-                asr.transcribeDebug("actually 25.00").collect { text ->
-                    viewModel.applyCorrection(text)
-                }
-            }
-        }
+        // Voice correction removed in text-first refactor
 
         // Removed typed correction row per UX change
     }

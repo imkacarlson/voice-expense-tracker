@@ -91,7 +91,7 @@ dependencies {
     // On-device AI (MediaPipe LLM)
     implementation("com.google.mediapipe:tasks-genai:0.10.27")
 
-    // Speech recognition uses Android's built-in SpeechRecognizer API (no extra dep).
+    // Text-first input only; no custom speech recognition.
 
     // Coroutines
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
