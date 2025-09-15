@@ -70,9 +70,21 @@ object ValidationPipeline {
         } catch (_: Throwable) { /* best-effort normalization */ }
 
         // Required/typed fields
-        val type = json.optString("type", "")
-        val typeValid = type in setOf("Expense", "Income", "Transfer")
-        if (!typeValid) errs += "invalid type"
+        val rawType = json.optString("type", "")
+        val typeTrimmed = rawType.trim()
+        val typeNormalized = when (typeTrimmed.lowercase()) {
+            "expense" -> "Expense"
+            "income" -> "Income"
+            "transfer" -> "Transfer"
+            else -> typeTrimmed
+        }
+        val typeValid = typeNormalized in setOf("Expense", "Income", "Transfer")
+        if (!typeValid) {
+            errs += "invalid type"
+        } else {
+            // Normalize casing/whitespace in the output JSON
+            try { json.put("type", typeNormalized) } catch (_: Throwable) {}
+        }
 
         fun dec(name: String): Double? =
             if (json.has(name) && !json.isNull(name)) json.optDouble(name).let { if (it.isNaN()) null else it } else null

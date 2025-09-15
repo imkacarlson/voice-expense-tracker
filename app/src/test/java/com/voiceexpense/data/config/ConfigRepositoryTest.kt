@@ -29,22 +29,23 @@ class ConfigRepositoryTest {
 
     @After fun tearDown() { db.close() }
 
-    @Test fun upsertAndDefaults() = runBlocking {
-        val id1 = UUID.randomUUID().toString()
-        val id2 = UUID.randomUUID().toString()
-        repo.upsert(ConfigOption(id1, ConfigType.Account, label = "Visa", position = 0, active = true))
-        repo.upsert(ConfigOption(id2, ConfigType.Account, label = "Checking", position = 1, active = true))
+    @Test fun upsertAndDefaults() {
+        runBlocking {
+            val id1 = UUID.randomUUID().toString()
+            val id2 = UUID.randomUUID().toString()
+            repo.upsert(ConfigOption(id1, ConfigType.Account, label = "Visa", position = 0, active = true))
+            repo.upsert(ConfigOption(id2, ConfigType.Account, label = "Checking", position = 1, active = true))
 
-        val list = repo.options(ConfigType.Account).first()
-        assertThat(list.map { it.label }).containsExactly("Visa", "Checking").inOrder()
+            val list = repo.options(ConfigType.Account).first()
+            assertThat(list.map { it.label }).containsExactly("Visa", "Checking").inOrder()
 
-        repo.setDefault(DefaultField.DefaultAccount, id2)
-        val def = repo.defaultFor(DefaultField.DefaultAccount).first()
-        assertThat(def).isEqualTo(id2)
+            repo.setDefault(DefaultField.DefaultAccount, id2)
+            val def = repo.defaultFor(DefaultField.DefaultAccount).first()
+            assertThat(def).isEqualTo(id2)
 
-        repo.delete(id1)
-        val list2 = repo.options(ConfigType.Account).first()
-        assertThat(list2.map { it.label }).containsExactly("Checking")
+            repo.delete(id1)
+            val list2 = repo.options(ConfigType.Account).first()
+            assertThat(list2.map { it.label }).containsExactly("Checking")
+        }
     }
 }
-
