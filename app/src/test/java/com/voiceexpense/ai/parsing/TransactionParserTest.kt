@@ -17,7 +17,8 @@ class TransactionParserTest {
     }
     private val dummyGateway = object : GenAiGateway {
         override fun isAvailable(): Boolean = false
-        override suspend fun structured(prompt: String) = Result.failure(Exception("unavailable"))
+        override suspend fun structured(prompt: String): Result<String> =
+            Result.failure(Exception("unavailable"))
     }
     private val hybrid = HybridTransactionParser(dummyGateway, PromptBuilder())
     private val parser = TransactionParser(mmDisabled, hybrid)

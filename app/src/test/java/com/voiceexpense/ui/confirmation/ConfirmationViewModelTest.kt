@@ -31,7 +31,8 @@ class ConfirmationViewModelTest {
         val mmDisabled = mockk<com.voiceexpense.ai.model.ModelManager>().apply { every { isModelReady() } returns false }
         val dummyGateway = object : GenAiGateway {
             override fun isAvailable(): Boolean = false
-            override suspend fun structured(prompt: String) = Result.failure(Exception("unavailable"))
+            override suspend fun structured(prompt: String): Result<String> =
+                Result.failure(Exception("unavailable"))
         }
         val hybrid = HybridTransactionParser(dummyGateway, PromptBuilder())
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
