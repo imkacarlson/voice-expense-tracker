@@ -85,6 +85,8 @@ object ValidationPipeline {
             // Normalize casing/whitespace in the output JSON
             try { json.put("type", typeNormalized) } catch (_: Throwable) {}
         }
+        // Use a unified local name for subsequent rules
+        val type = typeNormalized
 
         fun dec(name: String): Double? =
             if (json.has(name) && !json.isNull(name)) json.optDouble(name).let { if (it.isNaN()) null else it } else null
