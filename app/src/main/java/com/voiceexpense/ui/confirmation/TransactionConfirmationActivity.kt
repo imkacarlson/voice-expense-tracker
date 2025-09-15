@@ -46,17 +46,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
 
         // Basic wiring without DI; replaced by Hilt later
         viewModel = ConfirmationViewModel(repo, parser)
-        // Enable debug logs if developer toggle is set (avoid disk read on main thread)
-        lifecycleScope.launch {
-            val debug = withContext(Dispatchers.IO) {
-                val prefs = applicationContext.getSharedPreferences(
-                    com.voiceexpense.ui.common.SettingsKeys.PREFS,
-                    android.content.Context.MODE_PRIVATE
-                )
-                prefs.getBoolean(com.voiceexpense.ui.common.SettingsKeys.DEBUG_LOGS, false)
-            }
-            controller.setDebug(debug)
-        }
+        // Voice correction removed; no controller debug configuration needed
 
         val title: TextView = findViewById(R.id.txn_title)
         val confirm: Button = findViewById(R.id.btn_confirm)
