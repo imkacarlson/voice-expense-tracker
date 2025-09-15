@@ -80,14 +80,10 @@ object ValidationPipeline {
             else -> typeTrimmed
         }
         val typeValid = typeNormalized in setOf("Expense", "Income", "Transfer")
-        if (!typeValid) {
-            errs += "invalid type"
-        } else {
-            // Normalize casing/whitespace in the output JSON
-            try { json.put("type", typeNormalized) } catch (_: Throwable) {}
-        }
-        // Use a unified local name for subsequent rules
-        val type = typeNormalized
+        // Be forgiving: default unknown/missing type to Expense instead of erroring
+        val type = if (typeValid) typeNormalized else "Expense"
+        // Normalize casing/whitespace/default in the output JSON for downstream mapping
+        try { json.put("type", type) } catch (_: Throwable) {}
 
         fun dec(name: String): Double? =
             if (json.has(name) && !json.isNull(name)) json.optDouble(name).let { if (it.isNaN()) null else it } else null
