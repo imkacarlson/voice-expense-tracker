@@ -7,13 +7,10 @@ import org.junit.Test
 
 class ModelManagerTest {
     @Test
-    fun ensureModelAvailableTransitionsToReady() = runBlocking {
+    fun ensureModelUnavailableWithoutContext() = runBlocking {
         val mm = ModelManager()
-        val status = mm.ensureModelAvailable()
-        assertThat(status).isInstanceOf(ModelManager.ModelStatus.Downloading::class.java)
-        // Allow simulated preparation to complete
-        delay(250)
-        assertThat(mm.isModelReady()).isTrue()
+        val status = mm.ensureModelAvailable(null)
+        assertThat(status).isInstanceOf(ModelManager.ModelStatus.Unavailable::class.java)
+        assertThat(mm.isModelReady()).isFalse()
     }
 }
-

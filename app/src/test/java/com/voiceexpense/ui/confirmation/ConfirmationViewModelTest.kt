@@ -6,6 +6,7 @@ import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
 import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
 import com.voiceexpense.ai.parsing.hybrid.PromptBuilder
 import io.mockk.mockk
+import io.mockk.every
 import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus

@@ -104,15 +104,15 @@ class TransactionParserGenAiTest {
         val mm = mockk<com.voiceexpense.ai.model.ModelManager>()
         every { mm.isModelReady() } returns true
 
+        val json = """
+            {"amountUsd": 10.0, "merchant":"Cafe", "description":"latte", "type":"Expense", "expenseCategory":"Dining", "tags":["coffee"], "confidence":0.9}
+        """.trimIndent()
         val gateway = object : GenAiGateway {
             override fun isAvailable(): Boolean = true
             override suspend fun structured(prompt: String): Result<String> = Result.success(json)
         }
         val hybrid = HybridTransactionParser(gateway, PromptBuilder())
         val parser = TransactionParser(mm, hybrid)
-        val json = """
-            {"amountUsd": 10.0, "merchant":"Cafe", "description":"latte", "type":"Expense", "expenseCategory":"Dining", "tags":["coffee"], "confidence":0.9}
-        """.trimIndent()
         val res = parser.parse("spent 10 at cafe")
         assertThat(res.type).isEqualTo("Expense")
         assertThat(res.merchant).isEqualTo("Cafe")

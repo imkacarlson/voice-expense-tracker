@@ -47,7 +47,7 @@ open class AppsScriptClient(
     private val reqAdapter = moshi.adapter(AppsScriptRequest::class.java)
     private val json = "application/json; charset=utf-8".toMediaType()
 
-    suspend fun postExpense(url: String, request: AppsScriptRequest): Result<AppsScriptResponse> = runCatching {
+    open suspend fun postExpense(url: String, request: AppsScriptRequest): Result<AppsScriptResponse> = runCatching {
         val body = reqAdapter.toJson(request).toRequestBody(json)
         val httpRequest = Request.Builder()
             .url(url)

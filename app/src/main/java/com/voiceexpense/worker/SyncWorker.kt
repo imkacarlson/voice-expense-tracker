@@ -14,6 +14,12 @@ class SyncWorker(
     appContext: Context,
     params: WorkerParameters,
 ) : CoroutineWorker(appContext, params) {
+    // Optional test hook to inject repository directly
+    private var injectedRepo: TransactionRepository? = null
+
+    constructor(appContext: Context, params: WorkerParameters, repo: TransactionRepository) : this(appContext, params) {
+        this.injectedRepo = repo
+    }
 
     @EntryPoint
     @InstallIn(SingletonComponent::class)
@@ -22,6 +28,7 @@ class SyncWorker(
     }
 
     private fun repo(): TransactionRepository {
+        injectedRepo?.let { return it }
         val entryPoint = EntryPointAccessors.fromApplication(
             applicationContext,
             WorkerEntryPoint::class.java
