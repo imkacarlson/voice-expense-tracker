@@ -39,7 +39,7 @@ data class AppsScriptResponse(
     val data: AppsScriptResponseData?
 )
 
-class AppsScriptClient(
+open class AppsScriptClient(
     private val client: OkHttpClient,
     private val moshi: Moshi
 ) {
@@ -62,4 +62,3 @@ class AppsScriptClient(
         }
     }
 }
-
