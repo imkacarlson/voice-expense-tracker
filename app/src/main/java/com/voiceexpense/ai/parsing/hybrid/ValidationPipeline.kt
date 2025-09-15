@@ -37,9 +37,9 @@ object ValidationPipeline {
         val schemaRes = StructuredOutputValidator.validateTransactionJson(normalized)
         try { android.util.Log.d("AI.Debug", "validateTransactionJson() completed, valid=${schemaRes.valid}") } catch (_: Throwable) {}
         if (!schemaRes.valid) {
+            // Record schema error but continue to attempt parsing and rule checks
             errs += schemaRes.error ?: "invalid schema"
-            try { android.util.Log.d("AI.Debug", "Schema validation failed, returning early") } catch (_: Throwable) {}
-            return ValidationOutcome(false, null, errs, 0.0f)
+            try { android.util.Log.d("AI.Debug", "Schema validation failed, continuing for robust handling") } catch (_: Throwable) {}
         }
 
         // 3) Business rule checks over parsed object
