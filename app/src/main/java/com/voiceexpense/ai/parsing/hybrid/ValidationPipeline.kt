@@ -70,8 +70,9 @@ object ValidationPipeline {
         } catch (_: Throwable) { /* best-effort normalization */ }
 
         // Required/typed fields
-        val rawType = json.optString("type", "")
-        val typeTrimmed = rawType.trim()
+        // Be tolerant to non-string or null types; treat anything non-string as empty
+        val rawTypeAny: Any? = try { json.opt("type") } catch (_: Throwable) { null }
+        val typeTrimmed = (rawTypeAny as? String)?.trim().orEmpty()
         val typeNormalized = when (typeTrimmed.lowercase()) {
             "expense" -> "Expense"
             "income" -> "Income"
