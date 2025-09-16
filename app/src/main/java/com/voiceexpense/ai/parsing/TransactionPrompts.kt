@@ -7,56 +7,109 @@ package com.voiceexpense.ai.parsing
  */
 object TransactionPrompts {
     const val SYSTEM_INSTRUCTION = """
-You convert short, informal spoken texts into STRICT JSON describing a financial transaction.
-Return ONLY JSON. Do not include comments or extra text. Fields:
+You convert informal spoken expense descriptions into STRICT JSON.
+Return JSON only, no prose or markdown. Schema fields:
 - amountUsd: number | null
 - merchant: string (default "Unknown")
 - description: string | null
 - type: "Expense" | "Income" | "Transfer"
 - expenseCategory: string | null
 - incomeCategory: string | null
-- tags: string[]
+- tags: string[] (lowercase single words)
 - userLocalDate: string (YYYY-MM-DD)
 - account: string | null
 - splitOverallChargedUsd: number | null
 - note: string | null
 - confidence: number (0..1)
 Rules:
-- USD only numbers (no currency symbols)
-- Do NOT emit a field named 'amount'; use 'amountUsd' only
-- If type = Transfer, amountUsd applies to the amount moved and expenseCategory/incomeCategory must be null
-- Keep tags concise lowercase single words
+- Numbers are USD (no $ symbol, commas allowed).
+- If heuristics provide field values, keep them unchanged; only fill null fields.
+- If type = Transfer, expenseCategory and incomeCategory must be null.
+- If splitOverallChargedUsd present, amountUsd ≤ splitOverallChargedUsd.
+- Tags array must be lowercase words; omit if none.
 """
 
-    // Compact example utterances that help guide the model.
-    val EXAMPLE_UTTERANCES: List<String> = listOf(
-        "bought coffee at starbucks 4.75",
-        "paycheck 2200, tag july",
-        "transfer 100 from checking to savings"
+    data class ExamplePair(
+        val id: String,
+        val input: String,
+        val outputJson: String,
+        val tags: Set<PromptCategory>
     )
 
-    fun expense(merchant: String, amount: Number, what: String? = null): String =
-        buildString {
-            append("spent ")
-            append(amount)
-            append(" at ")
-            append(merchant)
-            if (!what.isNullOrBlank()) {
-                append(" for ")
-                append(what)
-            }
-        }
+    enum class PromptCategory { EXPENSE, SPLIT, SUBSCRIPTION, INCOME, TRANSFER }
 
-    fun income(source: String, amount: Number, tag: String? = null): String =
-        buildString {
-            append("paycheck ")
-            append(amount)
-            if (!tag.isNullOrBlank()) {
-                append(", tag ")
-                append(tag)
-            }
-        }
-
-    fun transfer(amount: Number, from: String, to: String): String =
-        "transfer $amount from $from to $to"
+    val SAMPLE_MAPPINGS: List<ExamplePair> = listOf(
+        ExamplePair(
+            id = "splitwise-utilities",
+            input = "On September 11th the gas bill was charged to my Vanguard Cash Plus account for 22.24 and after splitting with Emily I will only owe 11.12",
+            outputJson = "{" +
+                "\"amountUsd\":11.12," +
+                "\"merchant\":\"Gas Bill\"," +
+                "\"description\":null," +
+                "\"type\":\"Expense\"," +
+                "\"expenseCategory\":\"Utilities\"," +
+                "\"incomeCategory\":null," +
+                "\"tags\":[\"auto-paid\",\"splitwise\"]," +
+                "\"userLocalDate\":\"2025-09-11\"," +
+                "\"account\":\"Vanguard Cash Plus (Savings)\"," +
+                "\"splitOverallChargedUsd\":22.24," +
+                "\"note\":null," +
+                "\"confidence\":0.92}",
+            tags = setOf(PromptCategory.EXPENSE, PromptCategory.SPLIT)
+        ),
+        ExamplePair(
+            id = "subscription-expense",
+            input = "On September 10th my New York Times subscription payment was auto charged and it was 26.50 and it was charged to my Chase Sapphire Preferred Card",
+            outputJson = "{" +
+                "\"amountUsd\":26.5," +
+                "\"merchant\":\"NY Times Subscription\"," +
+                "\"description\":null," +
+                "\"type\":\"Expense\"," +
+                "\"expenseCategory\":\"Personal\"," +
+                "\"incomeCategory\":null," +
+                "\"tags\":[\"auto-paid\",\"subscription\"]," +
+                "\"userLocalDate\":\"2025-09-10\"," +
+                "\"account\":\"Chase Sapphire Preferred\"," +
+                "\"splitOverallChargedUsd\":null," +
+                "\"note\":null," +
+                "\"confidence\":0.9}",
+            tags = setOf(PromptCategory.EXPENSE, PromptCategory.SUBSCRIPTION)
+        ),
+        ExamplePair(
+            id = "income-paycheck",
+            input = "On September 12th I got my paycheck deposit into my Vanguard Cash Plus account and it came out to 3030.09",
+            outputJson = "{" +
+                "\"amountUsd\":3030.09," +
+                "\"merchant\":\"Paycheck + incentive award\"," +
+                "\"description\":null," +
+                "\"type\":\"Income\"," +
+                "\"expenseCategory\":null," +
+                "\"incomeCategory\":\"Paycheck\"," +
+                "\"tags\":[]," +
+                "\"userLocalDate\":\"2025-09-12\"," +
+                "\"account\":\"Vanguard Cash Plus (Savings)\"," +
+                "\"splitOverallChargedUsd\":null," +
+                "\"note\":null," +
+                "\"confidence\":0.88}",
+            tags = setOf(PromptCategory.INCOME)
+        ),
+        ExamplePair(
+            id = "transfer-savings",
+            input = "On September 9th I transferred 250 dollars from my checking account into Vanguard Cash Plus savings",
+            outputJson = "{" +
+                "\"amountUsd\":250.0," +
+                "\"merchant\":\"Transfer\"," +
+                "\"description\":\"Transfer from checking\"," +
+                "\"type\":\"Transfer\"," +
+                "\"expenseCategory\":null," +
+                "\"incomeCategory\":null," +
+                "\"tags\":[]," +
+                "\"userLocalDate\":\"2025-09-09\"," +
+                "\"account\":\"Checking Account\"," +
+                "\"splitOverallChargedUsd\":null," +
+                "\"note\":null," +
+                "\"confidence\":0.85}",
+            tags = setOf(PromptCategory.TRANSFER)
+        )
+    )
 }

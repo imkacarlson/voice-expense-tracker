@@ -37,3 +37,4 @@ Thumbs.db
 # Keep Gradle wrapper scripts and metadata tracked
 # (Do NOT ignore `gradlew`, `gradlew.bat`, or `gradle/wrapper`)
 gradle/wrapper/gradle-wrapper.jar
+prompts/sample-utterances.md

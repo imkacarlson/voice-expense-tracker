@@ -2,6 +2,10 @@ package com.voiceexpense.ai.parsing.hybrid
 
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionPrompts
+import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
+import java.math.BigDecimal
+import java.time.format.DateTimeFormatter
+import java.util.LinkedHashSet
 
 /**
  * Builds structured prompts for on-device LLM inference (MediaPipe), combining:
@@ -9,16 +13,19 @@ import com.voiceexpense.ai.parsing.TransactionPrompts
  * - Targeted few-shot examples selected by heuristics
  * - Lightweight context hints (recent merchants/accounts)
  */
-class PromptBuilder(
-    private val examples: FewShotExampleRepository = FewShotExampleRepository
-) {
+class PromptBuilder {
     /** Build a composed prompt text suitable for ML Kit's rewrite API. */
-    fun build(input: String, context: ParsingContext = ParsingContext()): String {
+    @Suppress("UNUSED_PARAMETER")
+    fun build(
+        input: String,
+        context: ParsingContext = ParsingContext(),
+        heuristicDraft: HeuristicDraft? = null
+    ): String {
         val system = buildSystemInstruction()
-        val shots = selectExamples(input)
+        val shots = selectExamples(input, heuristicDraft)
         val contextBlock = buildContextBlock(context)
+        val knownFieldsBlock = buildKnownFieldsBlock(heuristicDraft)
 
-        val examplesBlock = shots.joinToString("\n") { "- $it" }
         return buildString {
             appendLine(system)
             if (contextBlock.isNotBlank()) {
@@ -26,9 +33,14 @@ class PromptBuilder(
                 appendLine("Context:")
                 appendLine(contextBlock)
             }
+            if (knownFieldsBlock.isNotBlank()) {
+                appendLine()
+                appendLine("Known fields (keep these values, fill remaining as nulls):")
+                appendLine(knownFieldsBlock)
+            }
             appendLine()
             appendLine("Examples:")
-            appendLine(examplesBlock)
+            appendLine(formatExamples(shots))
             appendLine()
             append("Input: ")
             append(input)
@@ -52,58 +64,109 @@ class PromptBuilder(
     private fun buildContextBlock(context: ParsingContext): String = buildString {
         val cap = 8 // cap each list to keep prompt compact
         fun <T> List<T>.takeCapped() = this.take(cap)
+        val summary = mutableListOf<String>()
         if (context.recentMerchants.isNotEmpty()) {
-            appendLine("recentMerchants: ${context.recentMerchants.takeCapped().joinToString()}")
+            summary += "recentMerchants=${context.recentMerchants.takeCapped().joinToString()}"
         }
         if (context.knownAccounts.isNotEmpty()) {
-            appendLine("knownAccounts: ${context.knownAccounts.takeCapped().joinToString()}")
+            summary += "knownAccounts=${context.knownAccounts.takeCapped().joinToString()}"
         }
         if (context.recentCategories.isNotEmpty()) {
-            appendLine("recentCategories: ${context.recentCategories.takeCapped().joinToString()}")
+            summary += "recentCategories=${context.recentCategories.takeCapped().joinToString()}"
         }
+        if (summary.isNotEmpty()) {
+            appendLine(summary.joinToString("; "))
+        }
+
+        val allowed = mutableListOf<String>()
         if (context.allowedExpenseCategories.isNotEmpty()) {
-            appendLine("allowedExpenseCategories: ${context.allowedExpenseCategories.takeCapped().joinToString()}")
+            allowed += "expenseCategories=${context.allowedExpenseCategories.takeCapped().joinToString()}"
         }
         if (context.allowedIncomeCategories.isNotEmpty()) {
-            appendLine("allowedIncomeCategories: ${context.allowedIncomeCategories.takeCapped().joinToString()}")
+            allowed += "incomeCategories=${context.allowedIncomeCategories.takeCapped().joinToString()}"
         }
         if (context.allowedTags.isNotEmpty()) {
-            appendLine("allowedTags: ${context.allowedTags.takeCapped().joinToString()}")
+            allowed += "tags=${context.allowedTags.takeCapped().joinToString()}"
         }
-        if (context.allowedAccounts.isNotEmpty()) {
-            appendLine("allowedAccounts: ${context.allowedAccounts.takeCapped().joinToString()}")
+        val accountOptions = (context.allowedAccounts.takeIf { it.isNotEmpty() } ?: context.knownAccounts)
+        if (accountOptions.isNotEmpty()) {
+            allowed += "accounts=${accountOptions.takeCapped().joinToString()}"
+        }
+        if (allowed.isNotEmpty()) {
+            appendLine("allowedOptions: ${allowed.joinToString("; ")}")
         }
     }.trim()
 
-    private fun selectExamples(input: String): List<String> {
-        val lower = input.lowercase()
-        val chosen = mutableListOf<String>()
-
-        val isTransfer = lower.contains("transfer") || lower.contains("moved")
-        val looksSplit = lower.contains("split") || lower.contains("my share") || lower.contains("overall")
-        val isIncome = lower.contains("paycheck") || lower.contains("refund") || lower.contains("interest") || lower.contains("from ") && lower.contains("venmo")
-
-        when {
-            isTransfer -> {
-                chosen += examples.TRANSFER
-                if (looksSplit) chosen += examples.SPLIT
-            }
-            isIncome -> {
-                chosen += examples.INCOME
-            }
-            looksSplit -> {
-                chosen += examples.SPLIT
-                chosen += examples.EXPENSE
-            }
-            else -> {
-                chosen += examples.EXPENSE
+    private fun buildKnownFieldsBlock(heuristicDraft: HeuristicDraft?): String {
+        val draft = heuristicDraft ?: return ""
+        val parts = mutableListOf<String>()
+        fun <T> appendField(name: String, value: T?, formatter: (T) -> String = { it.toString() }) {
+            if (value == null) {
+                parts += "\"$name\":null"
+            } else {
+                parts += "\"$name\":${formatter(value)}"
             }
         }
 
-        // Add a small subset of edge cases to improve robustness
-        chosen += examples.EDGE_CASES.take(3)
+        appendField("amountUsd", draft.amountUsd) { formatDecimal(it) }
+        appendField("merchant", draft.merchant) { quote(it) }
+        appendField("description", draft.description) { quote(it) }
+        appendField("type", draft.type) { quote(it) }
+        appendField("expenseCategory", draft.expenseCategory) { quote(it) }
+        appendField("incomeCategory", draft.incomeCategory) { quote(it) }
+        appendField("tags", draft.tags) { list ->
+            list.joinToString(prefix = "[", postfix = "]") { tag -> quote(tag) }
+        }
+        appendField("userLocalDate", draft.userLocalDate) { quote(it.format(DateTimeFormatter.ISO_DATE)) }
+        appendField("account", draft.account) { quote(it) }
+        appendField("splitOverallChargedUsd", draft.splitOverallChargedUsd) { formatDecimal(it) }
+        appendField("note", draft.note) { quote(it) }
 
-        // Cap size to keep prompt compact (fewer shots -> faster responses)
-        return chosen.take(6)
+        return parts.joinToString(prefix = "{", postfix = "}")
     }
+
+    private fun selectExamples(
+        input: String,
+        heuristicDraft: HeuristicDraft?
+    ): List<FewShotExampleRepository.ExamplePair> {
+        val lower = input.lowercase()
+        val picks = LinkedHashSet<FewShotExampleRepository.ExamplePair>()
+
+        FewShotExampleRepository.defaultExpense()?.let { picks += it }
+
+        val isIncome = (heuristicDraft?.type == "Income") || lower.contains("paycheck") || lower.contains("deposit") || lower.contains("income")
+        val isTransfer = (heuristicDraft?.type == "Transfer") || lower.contains("transfer") || lower.contains("moved")
+        val isSplit = (heuristicDraft?.splitOverallChargedUsd != null) ||
+            (heuristicDraft?.tags?.any { it.contains("split") } == true) ||
+            lower.contains("splitwise") || lower.contains("my share") || lower.contains("overall charged")
+
+        if (isSplit) {
+            FewShotExampleRepository.splitExpense()?.let { picks += it }
+        } else {
+            FewShotExampleRepository.subscriptionExpense()?.let { picks += it }
+        }
+
+        if (isIncome) {
+            FewShotExampleRepository.income()?.let { picks += it }
+        }
+
+        if (isTransfer) {
+            FewShotExampleRepository.transfer()?.let { picks += it }
+        }
+
+        return picks.take(3).toList()
+    }
+
+    private fun formatExamples(examples: List<FewShotExampleRepository.ExamplePair>): String =
+        examples.joinToString(separator = "\n") { example ->
+            "- Input: ${example.input}\n  Output: ${example.outputJson}"
+        }
+
+    private fun quote(value: String): String = buildString {
+        append('"')
+        append(value.replace("\"", "\\\""))
+        append('"')
+    }
+
+    private fun formatDecimal(value: BigDecimal): String = value.stripTrailingZeros().toPlainString()
 }

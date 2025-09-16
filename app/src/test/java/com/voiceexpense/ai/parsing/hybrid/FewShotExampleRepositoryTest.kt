@@ -6,18 +6,19 @@ import org.junit.Test
 class FewShotExampleRepositoryTest {
     @Test
     fun categories_have_examples() {
-        assertThat(FewShotExampleRepository.EXPENSE).isNotEmpty()
-        assertThat(FewShotExampleRepository.INCOME).isNotEmpty()
-        assertThat(FewShotExampleRepository.TRANSFER).isNotEmpty()
-        assertThat(FewShotExampleRepository.SPLIT).isNotEmpty()
+        assertThat(FewShotExampleRepository.defaultExpense()).isNotNull()
+        assertThat(FewShotExampleRepository.subscriptionExpense()).isNotNull()
+        assertThat(FewShotExampleRepository.splitExpense()).isNotNull()
+        assertThat(FewShotExampleRepository.income()).isNotNull()
+        assertThat(FewShotExampleRepository.transfer()).isNotNull()
     }
 
     @Test
     fun all_contains_diverse_examples() {
         val all = FewShotExampleRepository.all()
-        assertThat(all.any { it.contains("transfer", ignoreCase = true) }).isTrue()
-        assertThat(all.any { it.contains("overall", ignoreCase = true) || it.contains("my share", ignoreCase = true) }).isTrue()
-        assertThat(all.any { it.contains("paycheck", ignoreCase = true) || it.contains("refund", ignoreCase = true) }).isTrue()
+        val inputs = all.map { it.input.lowercase() }
+        assertThat(inputs.any { it.contains("transfer") }).isTrue()
+        assertThat(inputs.any { it.contains("split") || it.contains("overall") }).isTrue()
+        assertThat(inputs.any { it.contains("paycheck") || it.contains("deposit") }).isTrue()
     }
 }
-

@@ -60,4 +60,71 @@ class ConfirmationViewModelTest {
         // confirm() marks CONFIRMED then enqueues for sync
         assertThat(updated.status).isEqualTo(TransactionStatus.QUEUED)
     }
+
+    @Test
+    fun low_confidence_flag_exposed() = runBlocking {
+        val dao = com.voiceexpense.worker.FakeDao()
+        val repo = TransactionRepository(dao)
+        val mmDisabled = mockk<com.voiceexpense.ai.model.ModelManager>().apply { every { isModelReady() } returns false }
+        val dummyGateway = object : GenAiGateway {
+            override fun isAvailable(): Boolean = false
+            override suspend fun structured(prompt: String): Result<String> = Result.failure(Exception("unavailable"))
+        }
+        val hybrid = HybridTransactionParser(dummyGateway, PromptBuilder())
+        val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
+        val low = Transaction(
+            userLocalDate = LocalDate.now(),
+            amountUsd = BigDecimal("3.00"),
+            merchant = "Cafe",
+            description = null,
+            type = TransactionType.Expense,
+            expenseCategory = "Other",
+            incomeCategory = null,
+            tags = emptyList(),
+            account = null,
+            splitOverallChargedUsd = null,
+            note = null,
+            confidence = 0.4f
+        )
+        vm.setDraft(low)
+        mainRule.runCurrent()
+        val state = vm.confidence.value
+        assertThat(state.confidence).isEqualTo(0.4f)
+        assertThat(state.isLowConfidence).isTrue()
+    }
+
+    @Test
+    fun apply_manual_edits_updates_confidence_state() = runBlocking {
+        val dao = com.voiceexpense.worker.FakeDao()
+        val repo = TransactionRepository(dao)
+        val mmDisabled = mockk<com.voiceexpense.ai.model.ModelManager>().apply { every { isModelReady() } returns false }
+        val dummyGateway = object : GenAiGateway {
+            override fun isAvailable(): Boolean = false
+            override suspend fun structured(prompt: String): Result<String> = Result.failure(Exception("unavailable"))
+        }
+        val hybrid = HybridTransactionParser(dummyGateway, PromptBuilder())
+        val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
+        val base = Transaction(
+            userLocalDate = LocalDate.now(),
+            amountUsd = BigDecimal("8.00"),
+            merchant = "Cafe",
+            description = null,
+            type = TransactionType.Expense,
+            expenseCategory = "Other",
+            incomeCategory = null,
+            tags = emptyList(),
+            account = null,
+            splitOverallChargedUsd = null,
+            note = null,
+            confidence = 0.8f
+        )
+        vm.setDraft(base)
+        mainRule.runCurrent()
+        val updated = base.copy(confidence = 0.5f)
+        vm.applyManualEdits(updated)
+        mainRule.runCurrent()
+        val state = vm.confidence.value
+        assertThat(state.confidence).isEqualTo(0.5f)
+        assertThat(state.isLowConfidence).isTrue()
+    }
 }

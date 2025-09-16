@@ -23,6 +23,16 @@ class ConfirmationViewModel(
     private val _validation = MutableStateFlow<ValidationResult?>(null)
     val validation: StateFlow<ValidationResult?> = _validation
 
+    data class ConfidenceUiState(
+        val confidence: Float,
+        val isLowConfidence: Boolean
+    )
+
+    private val _confidence = MutableStateFlow(ConfidenceUiState(confidence = 1f, isLowConfidence = false))
+    val confidence: StateFlow<ConfidenceUiState> = _confidence
+
+    private val lowConfidenceThreshold = 0.75f
+
     data class UiVisibility(
         val showAmount: Boolean,
         val showExpenseCategory: Boolean,
@@ -39,6 +49,7 @@ class ConfirmationViewModel(
         _transaction.value = draft
         _selectedType.value = draft.type
         recomputeVisibility(draft.type)
+        updateConfidence(draft.confidence)
         recomputeValidation()
     }
 
@@ -85,11 +96,13 @@ class ConfirmationViewModel(
 
     fun cancel() {
         _transaction.value = null
+        _confidence.value = ConfidenceUiState(confidence = 1f, isLowConfidence = false)
     }
 
     // Apply manual edits from UI and persist as draft before confirmation
     fun applyManualEdits(updated: Transaction) {
         _transaction.value = updated
+        updateConfidence(updated.confidence)
         recomputeValidation()
         viewModelScope.launch { repo.saveDraft(updated) }
     }
@@ -97,5 +110,12 @@ class ConfirmationViewModel(
     private fun recomputeValidation() {
         val t = _transaction.value ?: return
         _validation.value = validator.validate(t)
+    }
+
+    private fun updateConfidence(value: Float) {
+        _confidence.value = ConfidenceUiState(
+            confidence = value,
+            isLowConfidence = value < lowConfidenceThreshold
+        )
     }
 }

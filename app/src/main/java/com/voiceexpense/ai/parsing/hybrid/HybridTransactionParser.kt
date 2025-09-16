@@ -1,9 +1,16 @@
 package com.voiceexpense.ai.parsing.hybrid
 
-import com.voiceexpense.ai.parsing.*
 import android.util.Log
+import com.voiceexpense.ai.parsing.ParsedResult
+import com.voiceexpense.ai.parsing.ParsingContext
+import com.voiceexpense.ai.parsing.StructuredOutputValidator
+import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
+import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
+import com.voiceexpense.ai.parsing.heuristic.HeuristicExtractor
+import com.voiceexpense.ai.parsing.heuristic.toParsedResult
 import org.json.JSONObject
 import java.math.BigDecimal
+import java.util.Locale
 import kotlin.system.measureTimeMillis
 
 /**
@@ -12,9 +19,16 @@ import kotlin.system.measureTimeMillis
  */
 class HybridTransactionParser(
     private val genai: GenAiGateway,
-    private val promptBuilder: PromptBuilder = PromptBuilder()
+    private val promptBuilder: PromptBuilder = PromptBuilder(),
+    private val heuristicExtractor: HeuristicExtractor = HeuristicExtractor(),
+    private val thresholds: FieldConfidenceThresholds = FieldConfidenceThresholds.DEFAULT
 ) {
     suspend fun parse(input: String, context: ParsingContext = ParsingContext()): HybridParsingResult {
+        val heuristicDraft = heuristicExtractor.extract(input, context)
+        try {
+            Log.d("AI.Debug", "Heuristic draft coverage=${heuristicDraft.coverageScore}")
+        } catch (_: Throwable) {}
+
         var parsed: ParsedResult? = null
         var usedAi = false
         var validated = false
@@ -22,14 +36,15 @@ class HybridTransactionParser(
         var errors: List<String> = emptyList()
 
         val elapsed = measureTimeMillis {
-            // Attempt AI path when model ready
-            if (genai.isAvailable()) {
+            val shouldCallAi = heuristicDraft.requiresAi(thresholds)
+            try { Log.d("AI.Debug", "shouldCallAi=$shouldCallAi") } catch (_: Throwable) {}
+
+            if (shouldCallAi && genai.isAvailable()) {
                 try { Log.d("AI.Debug", "Building prompt for input: ${input.take(100)}") } catch (_: Throwable) {}
-                val prompt = promptBuilder.build(input, context)
-                // Log the complete prompt that will be sent to the model
+                val prompt = promptBuilder.build(input, context, heuristicDraft)
                 try {
                     Log.d("AI.Debug", "Full prompt built, length=${prompt.length}")
-                    Log.d("AI.Prompt", "${prompt}")
+                    Log.d("AI.Prompt", prompt)
                 } catch (_: Throwable) {}
                 try { Log.d("AI.Debug", "Calling genai.structured()") } catch (_: Throwable) {}
                 val ai = genai.structured(prompt)
@@ -49,23 +64,13 @@ class HybridTransactionParser(
                         usedAi = true
                         validated = true
                         rawJson = outcome.normalizedJson
-                        // Log normalized JSON and key fields on success for debugging/verification
                         try {
                             val snippet = outcome.normalizedJson.replace("\n", " ").take(500)
                             Log.i("AI.Output", snippet)
-                            val p = parsed
-                            if (p != null) {
-                                Log.i(
-                                    "AI.Fields",
-                                    "amount=${p.amountUsd} merchant='${p.merchant}' type=${p.type} expCat=${p.expenseCategory} incCat=${p.incomeCategory} tags=${p.tags.joinToString(";")} account=${p.account} overall=${p.splitOverallChargedUsd}"
-                                )
-                            }
                         } catch (_: Throwable) {}
                         com.voiceexpense.ai.error.AiErrorHandler.resetHybridFailures()
-                        return@measureTimeMillis
                     } else {
                         errors = listOfNotNull(outcome.errors.joinToString("; ").ifBlank { null })
-                        // Extra validation logging
                         try {
                             val snippet = ok.replace("\n", " ").take(200)
                             Log.w(
@@ -79,16 +84,20 @@ class HybridTransactionParser(
                     try { Log.w("AI.Validate", "LLM returned blank output") } catch (_: Throwable) {}
                     com.voiceexpense.ai.error.AiErrorHandler.recordHybridFailure()
                 }
+            } else {
+                if (!shouldCallAi) {
+                    try { Log.d("AI.Debug", "Skipping AI call; heuristic coverage sufficient") } catch (_: Throwable) {}
+                } else {
+                    try { Log.d("AI.Debug", "Skipping AI call; genai unavailable") } catch (_: Throwable) {}
+                    com.voiceexpense.ai.error.AiErrorHandler.recordHybridFailure()
+                }
             }
 
-            // Heuristic fallback
-            try { Log.d("AI.Debug", "Calling heuristicParse() fallback") } catch (_: Throwable) {}
-            parsed = heuristicParse(input, context)
-            try { Log.d("AI.Debug", "heuristicParse() completed") } catch (_: Throwable) {}
+            parsed = mergeResults(heuristicDraft, parsed, context)
         }
 
         try { Log.d("AI.Debug", "Creating final result, usedAi=$usedAi, validated=$validated") } catch (_: Throwable) {}
-        val method = if (usedAi) ProcessingMethod.AI else ProcessingMethod.HEURISTIC
+        val method = if (usedAi && validated) ProcessingMethod.AI else ProcessingMethod.HEURISTIC
         val stats = ProcessingStatistics(durationMs = elapsed)
         val confidence = ConfidenceScorer.score(method, validated, parsed)
         try { Log.d("AI.Debug", "About to create HybridParsingResult") } catch (_: Throwable) {}
@@ -135,51 +144,64 @@ class HybridTransactionParser(
         return StructuredOutputValidator.sanitizeAmounts(result)
     }
 
-    private fun heuristicParse(text: String, context: ParsingContext): ParsedResult {
-        val lower = text.lowercase()
-        val isIncome = lower.contains("income") || lower.contains("paycheck") || lower.contains("refund")
-        val isTransfer = lower.contains("transfer") || lower.contains("moved")
-        val type = when {
-            isTransfer -> "Transfer"
-            isIncome -> "Income"
-            else -> "Expense"
-        }
-        val amountRegex = Regex("(\\d+)(?:\\.(\\d{1,2}))?")
-        val amount = amountRegex.find(text)?.value?.let { BigDecimal(it) }
-        val base = ParsedResult(
-            amountUsd = if (type == "Transfer") null else amount,
-            merchant = if (type == "Expense") guessMerchant(text, context) ?: "Unknown" else "",
-            description = null,
-            type = type,
-            expenseCategory = if (type == "Expense") "Uncategorized" else null,
-            incomeCategory = if (type == "Income") "Salary" else null,
-            tags = extractTags(text),
-            userLocalDate = context.defaultDate,
-            account = extractAccount(text, context),
-            splitOverallChargedUsd = extractOverall(text),
-            note = null,
-            confidence = 0.6f
+    private fun mergeResults(
+        heuristic: HeuristicDraft,
+        aiParsed: ParsedResult?,
+        context: ParsingContext
+    ): ParsedResult {
+        val base = aiParsed ?: heuristic.toParsedResult(context)
+
+        val merged = base.copy(
+            amountUsd = aiParsed?.amountUsd ?: heuristic.amountUsd,
+            merchant = when {
+                !base.merchant.isNullOrBlank() -> base.merchant
+                !heuristic.merchant.isNullOrBlank() -> heuristic.merchant ?: "Unknown"
+                else -> "Unknown"
+            },
+            description = aiParsed?.description ?: heuristic.description,
+            type = aiParsed?.type ?: heuristic.type ?: base.type,
+            expenseCategory = aiParsed?.expenseCategory ?: heuristic.expenseCategory,
+            incomeCategory = aiParsed?.incomeCategory ?: heuristic.incomeCategory,
+            tags = (base.tags + heuristic.tags).distinct(),
+            userLocalDate = heuristic.userLocalDate ?: base.userLocalDate,
+            account = aiParsed?.account ?: heuristic.account,
+            splitOverallChargedUsd = aiParsed?.splitOverallChargedUsd ?: heuristic.splitOverallChargedUsd,
+            note = aiParsed?.note ?: heuristic.note,
+            confidence = aiParsed?.confidence ?: heuristic.coverageScore.coerceIn(0f, 1f)
         )
-        return StructuredOutputValidator.sanitizeAmounts(base)
+        val normalized = normalizeToAllowedOptions(merged, context)
+        return StructuredOutputValidator.sanitizeAmounts(normalized)
     }
 
-    private fun guessMerchant(text: String, context: ParsingContext): String? =
-        context.recentMerchants.firstOrNull { text.contains(it, ignoreCase = true) }
-
-    private fun extractTags(text: String): List<String> {
-        val idx = text.indexOf("tags:", ignoreCase = true)
-        if (idx == -1) return emptyList()
-        return text.substring(idx + 5).split(',', ';').map { it.trim() }.filter { it.isNotEmpty() }
-    }
-
-    private fun extractAccount(text: String, context: ParsingContext): String? {
-        return context.knownAccounts.firstOrNull {
-            text.contains(it.filter { ch -> ch.isDigit() }, ignoreCase = true) || text.contains(it, ignoreCase = true)
+    private fun normalizeToAllowedOptions(result: ParsedResult, context: ParsingContext): ParsedResult {
+        fun matchOption(value: String?, options: List<String>): String? {
+            if (value.isNullOrBlank()) return null
+            if (options.isEmpty()) return value
+            val trimmed = value.trim()
+            val normalized = normalizeToken(trimmed)
+            val matched = options.firstOrNull { normalizeToken(it) == normalized }
+            return matched ?: if (options.isEmpty()) trimmed else null
         }
+
+        val expenseCategory = matchOption(result.expenseCategory, context.allowedExpenseCategories)
+        val incomeCategory = matchOption(result.incomeCategory, context.allowedIncomeCategories)
+
+        val accountOptions = if (context.allowedAccounts.isNotEmpty()) context.allowedAccounts else context.knownAccounts
+        val account = matchOption(result.account, accountOptions)
+
+        val tags = if (context.allowedTags.isNotEmpty()) {
+            result.tags.mapNotNull { matchOption(it, context.allowedTags) }.distinct()
+        } else {
+            result.tags
+        }
+
+        return result.copy(
+            expenseCategory = expenseCategory,
+            incomeCategory = incomeCategory,
+            account = account,
+            tags = tags
+        )
     }
 
-    private fun extractOverall(text: String): BigDecimal? {
-        val match = Regex("overall charged (\\d+(?:\\.\\d{1,2})?)", RegexOption.IGNORE_CASE).find(text)
-        return match?.groups?.get(1)?.value?.let { BigDecimal(it) }
-    }
+    private fun normalizeToken(value: String): String = value.trim().lowercase(Locale.US)
 }

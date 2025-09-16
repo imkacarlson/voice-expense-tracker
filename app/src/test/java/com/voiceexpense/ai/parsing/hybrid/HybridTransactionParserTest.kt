@@ -10,8 +10,12 @@ private class FakeGateway(
     var available: Boolean = true,
     var response: Result<String> = Result.failure(IllegalStateException("no response"))
 ) : GenAiGateway {
+    var callCount: Int = 0
     override fun isAvailable(): Boolean = available
-    override suspend fun structured(prompt: String): Result<String> = response
+    override suspend fun structured(prompt: String): Result<String> {
+        callCount += 1
+        return response
+    }
 }
 
 class HybridTransactionParserTest {
@@ -31,6 +35,7 @@ class HybridTransactionParserTest {
         assertThat(res.validated).isTrue()
         assertThat(res.result.merchant).isEqualTo("Starbucks")
         assertThat(res.result.type).isEqualTo("Expense")
+        assertThat(gw.callCount).isEqualTo(1)
     }
 
     @Test
@@ -42,6 +47,7 @@ class HybridTransactionParserTest {
         assertThat(res.method).isEqualTo(ProcessingMethod.HEURISTIC)
         assertThat(res.validated).isFalse()
         assertThat(res.result.type).isEqualTo("Transfer")
+        assertThat(gw.callCount).isEqualTo(1)
     }
 
     @Test
@@ -52,6 +58,58 @@ class HybridTransactionParserTest {
         assertThat(res.method).isEqualTo(ProcessingMethod.HEURISTIC)
         assertThat(res.result.type).isEqualTo("Expense")
         assertThat(res.validated).isFalse()
+        assertThat(gw.callCount).isEqualTo(0)
+    }
+
+    @Test
+    fun heuristic_coverage_skips_ai_call() = runBlocking {
+        val gw = FakeGateway(available = true)
+        val parser = HybridTransactionParser(gw)
+        val context = ParsingContext(
+            defaultDate = java.time.LocalDate.of(2025, 9, 13),
+            allowedAccounts = listOf("Citi Double Cash Card")
+        )
+
+        val res = parser.parse(
+            "On September 12th I spent 11.10 getting a takeout pizza from Domino's on my Citi Double Cash card",
+            context
+        )
+
+        assertThat(gw.callCount).isEqualTo(0)
+        assertThat(res.method).isEqualTo(ProcessingMethod.HEURISTIC)
+        assertThat(res.result.userLocalDate).isEqualTo(java.time.LocalDate.of(2025, 9, 12))
+        assertThat(res.result.account).isEqualTo("Citi Double Cash Card")
+        assertThat(res.result.amountUsd?.toPlainString()).isEqualTo("11.10")
+    }
+
+    @Test
+    fun normalizes_to_allowed_options() = runBlocking {
+        val json = "{" +
+            "\"amountUsd\":11.12," +
+            "\"merchant\":\"Gas Bill\"," +
+            "\"type\":\"Expense\"," +
+            "\"expenseCategory\":\"utilities\"," +
+            "\"tags\":[\"splitwise\"]," +
+            "\"account\":\"vanguard cash plus (savings)\"," +
+            "\"userLocalDate\":\"2025-09-11\"," +
+            "\"confidence\":0.8}"
+        val gw = FakeGateway(available = true, response = Result.success(json))
+        val parser = HybridTransactionParser(gw)
+        val context = ParsingContext(
+            defaultDate = java.time.LocalDate.of(2025, 9, 13),
+            allowedExpenseCategories = listOf("Utilities", "Groceries"),
+            allowedTags = listOf("Auto-Paid", "Splitwise"),
+            allowedAccounts = listOf("Vanguard Cash Plus (Savings)")
+        )
+
+        val res = parser.parse(
+            "On September 11th the gas bill was charged to my Vanguard Cash Plus account for 22.24 and I owe 11.12",
+            context
+        )
+
+        assertThat(res.validated).isTrue()
+        assertThat(res.result.expenseCategory).isEqualTo("Utilities")
+        assertThat(res.result.account).isEqualTo("Vanguard Cash Plus (Savings)")
+        assertThat(res.result.tags).containsExactly("Splitwise")
     }
 }
-

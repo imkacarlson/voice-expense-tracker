@@ -157,9 +157,17 @@ object StructuredOutputValidator {
             nonNeg.setScale(2, java.math.RoundingMode.HALF_UP)
         }
 
+        val normalizedAmount = normalize(parsed.amountUsd)
+        val normalizedOverall = normalize(parsed.splitOverallChargedUsd)
+        val adjustedOverall = if (normalizedAmount != null && normalizedOverall != null && normalizedAmount > normalizedOverall) {
+            normalizedAmount
+        } else {
+            normalizedOverall
+        }
+
         return parsed.copy(
-            amountUsd = normalize(parsed.amountUsd),
-            splitOverallChargedUsd = normalize(parsed.splitOverallChargedUsd),
+            amountUsd = normalizedAmount,
+            splitOverallChargedUsd = adjustedOverall,
             // merchant is non-nullable in ParsedResult; keep trimmed value
             merchant = parsed.merchant.trim(),
             description = parsed.description?.trim().takeUnless { it.isNullOrEmpty() },

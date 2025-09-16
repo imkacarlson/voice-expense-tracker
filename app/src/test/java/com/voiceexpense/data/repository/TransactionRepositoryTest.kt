@@ -45,7 +45,7 @@ class TransactionRepositoryTest {
             amountUsd = BigDecimal("12.34"),
             expenseCategory = "Dining",
             incomeCategory = null,
-            account = "Bilt Card (5217)",
+            account = "Bilt Card",
             tags = listOf("Subscription", "Auto-Paid")
         )
         val req = repo.mapToAppsScriptRequest(t, token = "tok")

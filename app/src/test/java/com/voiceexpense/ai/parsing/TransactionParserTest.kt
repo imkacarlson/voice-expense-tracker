@@ -77,6 +77,26 @@ class TransactionParserTest {
     }
 
     @Test
+    fun sanitize_amounts_enforces_share_not_exceed_overall() {
+        val res = ParsedResult(
+            amountUsd = java.math.BigDecimal("15.00"),
+            merchant = "Test",
+            description = null,
+            type = "Expense",
+            expenseCategory = null,
+            incomeCategory = null,
+            tags = emptyList(),
+            userLocalDate = LocalDate.now(),
+            account = null,
+            splitOverallChargedUsd = java.math.BigDecimal("10.00"),
+            note = null,
+            confidence = 0.6f
+        )
+        val sanitized = StructuredOutputValidator.sanitizeAmounts(res)
+        assertThat(sanitized.splitOverallChargedUsd).isEqualTo(java.math.BigDecimal("15.00"))
+    }
+
+    @Test
     fun parsesExpenseExample() = runBlocking {
         val res = parser.parse("I spent 23 at Starbucks for coffee")
         assertThat(res.type).isEqualTo("Expense")

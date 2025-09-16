@@ -19,25 +19,16 @@ class TransactionPromptsTest {
         ).forEach { key ->
             assertThat(s).contains(key)
         }
-        assertThat(s.lowercase()).contains("return only json")
+        assertThat(s.lowercase()).contains("return json only")
+        assertThat(s).contains("splitOverallChargedUsd")
     }
 
     @Test
-    fun templates_produce_expected_phrasing() {
-        val e = TransactionPrompts.expense("Starbucks", 4.75, "latte")
-        assertThat(e).contains("spent 4.75 at Starbucks for latte")
-
-        val i = TransactionPrompts.income("employer", 2200, "july")
-        assertThat(i).contains("paycheck 2200, tag july")
-
-        val t = TransactionPrompts.transfer(100, "checking", "savings")
-        assertThat(t).isEqualTo("transfer 100 from checking to savings")
-    }
-
-    @Test
-    fun example_utterances_present() {
-        assertThat(TransactionPrompts.EXAMPLE_UTTERANCES).isNotEmpty()
-        assertThat(TransactionPrompts.EXAMPLE_UTTERANCES.first().lowercase()).contains("coffee")
+    fun sample_mappings_cover_key_cases() {
+        val examples = TransactionPrompts.SAMPLE_MAPPINGS
+        assertThat(examples).isNotEmpty()
+        assertThat(examples.any { it.tags.contains(TransactionPrompts.PromptCategory.SPLIT) }).isTrue()
+        assertThat(examples.any { it.tags.contains(TransactionPrompts.PromptCategory.INCOME) }).isTrue()
+        assertThat(examples.any { it.tags.contains(TransactionPrompts.PromptCategory.TRANSFER) }).isTrue()
     }
 }
-
