@@ -1,5 +1,6 @@
 package com.voiceexpense.ai.parsing.hybrid
 
+import android.util.Log
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionPrompts
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
@@ -26,9 +27,44 @@ class PromptBuilder {
         val contextBlock = buildContextBlock(context)
         val knownFieldsBlock = buildKnownFieldsBlock(heuristicDraft)
 
+        val primary = composePrompt(system, shots, contextBlock, knownFieldsBlock, input, includeContext = true)
+        if (primary.length <= MAX_PROMPT_CHARS) return primary
+
+        val reducedShots = shots.take(2)
+        val shorter = composePrompt(system, reducedShots, contextBlock, knownFieldsBlock, input, includeContext = true)
+        if (shorter.length <= MAX_PROMPT_CHARS) {
+            Log.i(TAG, "PromptBuilder trimmed examples to stay within token budget (len=${shorter.length})")
+            return shorter
+        }
+
+        val single = composePrompt(system, reducedShots.take(1), contextBlock, knownFieldsBlock, input, includeContext = true)
+        if (single.length <= MAX_PROMPT_CHARS) {
+            Log.i(TAG, "PromptBuilder reduced to single example (len=${single.length})")
+            return single
+        }
+
+        val noContext = composePrompt(system, reducedShots.take(1), "", knownFieldsBlock, input, includeContext = false)
+        if (noContext.length <= MAX_PROMPT_CHARS) {
+            Log.i(TAG, "PromptBuilder dropped context block to meet length constraints (len=${noContext.length})")
+            return noContext
+        }
+
+        val fallback = composePrompt(system, emptyList(), "", knownFieldsBlock, input, includeContext = false)
+        Log.w(TAG, "PromptBuilder using minimal prompt (len=${fallback.length}) due to size constraints")
+        return fallback
+    }
+
+    private fun composePrompt(
+        system: String,
+        shots: List<FewShotExampleRepository.ExamplePair>,
+        contextBlock: String,
+        knownFieldsBlock: String,
+        input: String,
+        includeContext: Boolean
+    ): String {
         return buildString {
             appendLine(system)
-            if (contextBlock.isNotBlank()) {
+            if (includeContext && contextBlock.isNotBlank()) {
                 appendLine()
                 appendLine("Context:")
                 appendLine(contextBlock)
@@ -38,9 +74,11 @@ class PromptBuilder {
                 appendLine("Known fields (keep these values, fill remaining as nulls):")
                 appendLine(knownFieldsBlock)
             }
-            appendLine()
-            appendLine("Examples:")
-            appendLine(formatExamples(shots))
+            if (shots.isNotEmpty()) {
+                appendLine()
+                appendLine("Examples:")
+                appendLine(formatExamples(shots))
+            }
             appendLine()
             append("Input: ")
             append(input)
@@ -169,4 +207,9 @@ class PromptBuilder {
     }
 
     private fun formatDecimal(value: BigDecimal): String = value.stripTrailingZeros().toPlainString()
+
+    companion object {
+        private const val TAG = "AI.Trace"
+        private const val MAX_PROMPT_CHARS = 1800
+    }
 }
