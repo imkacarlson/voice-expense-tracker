@@ -1,5 +1,6 @@
 package com.voiceexpense.ai.model
 
+import android.util.Log
 import android.content.Context
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.sync.Mutex
@@ -35,13 +36,16 @@ class ModelManager {
             mutex.withLock {
                 if (ready) return@withLock ModelStatus.Ready
                 val path = context?.let { File(it.filesDir, DEFAULT_RELATIVE_MODEL_PATH) }
+                Log.i(TAG, "ensureModelAvailable() checking path=${path?.absolutePath}")
                 if (path == null || !path.exists() || !path.isFile) {
                     ready = false
+                    Log.w(TAG, "ensureModelAvailable() missing model file")
                     return@withLock ModelStatus.Unavailable(
                         "Model file missing at app files: $DEFAULT_RELATIVE_MODEL_PATH"
                     )
                 }
                 ready = true
+                Log.i(TAG, "ensureModelAvailable() marked ready=true")
                 return@withLock ModelStatus.Ready
             }
         }
@@ -63,5 +67,6 @@ class ModelManager {
 
     companion object {
         const val DEFAULT_RELATIVE_MODEL_PATH: String = "llm/model.task"
+        private const val TAG = "AI.Trace"
     }
 }

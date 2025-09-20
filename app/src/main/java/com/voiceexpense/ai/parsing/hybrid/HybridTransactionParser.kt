@@ -24,10 +24,12 @@ class HybridTransactionParser(
     private val thresholds: FieldConfidenceThresholds = FieldConfidenceThresholds.DEFAULT
 ) {
     suspend fun parse(input: String, context: ParsingContext = ParsingContext()): HybridParsingResult {
+        Log.i(TAG, "HybridTransactionParser.parse() start text='${input.take(120)}'")
         val heuristicDraft = heuristicExtractor.extract(input, context)
         try {
             Log.d("AI.Debug", "Heuristic draft coverage=${heuristicDraft.coverageScore}")
         } catch (_: Throwable) {}
+        Log.i(TAG, "Heuristic confidences=${heuristicDraft.confidences} coverage=${heuristicDraft.coverageScore}")
 
         var parsed: ParsedResult? = null
         var usedAi = false
@@ -37,9 +39,11 @@ class HybridTransactionParser(
 
         val elapsed = measureTimeMillis {
             val shouldCallAi = heuristicDraft.requiresAi(thresholds)
+            val genAiAvailable = genai.isAvailable()
+            Log.i(TAG, "shouldCallAi=$shouldCallAi genaiAvailable=$genAiAvailable circuitOpen=${com.voiceexpense.ai.error.AiErrorHandler.isHybridCircuitOpen()}")
             try { Log.d("AI.Debug", "shouldCallAi=$shouldCallAi") } catch (_: Throwable) {}
 
-            if (shouldCallAi && genai.isAvailable()) {
+            if (shouldCallAi && genAiAvailable) {
                 try { Log.d("AI.Debug", "Building prompt for input: ${input.take(100)}") } catch (_: Throwable) {}
                 val prompt = promptBuilder.build(input, context, heuristicDraft)
                 try {
@@ -54,6 +58,7 @@ class HybridTransactionParser(
                     Log.d("AI.Debug", "Full AI response: '${ok}'")
                 } catch (_: Throwable) {}
                 if (!ok.isNullOrBlank()) {
+                    Log.i(TAG, "LLM returned payload length=${ok.length}")
                     try { Log.d("AI.Debug", "Calling ValidationPipeline.validateRawResponse()") } catch (_: Throwable) {}
                     val outcome = ValidationPipeline.validateRawResponse(ok)
                     try { Log.d("AI.Debug", "Validation outcome: valid=${outcome.valid}, errors=${outcome.errors}") } catch (_: Throwable) {}
@@ -81,13 +86,16 @@ class HybridTransactionParser(
                         com.voiceexpense.ai.error.AiErrorHandler.recordHybridFailure()
                     }
                 } else {
+                    Log.w(TAG, "LLM response nullOrBlank; falling back to heuristics")
                     try { Log.w("AI.Validate", "LLM returned blank output") } catch (_: Throwable) {}
                     com.voiceexpense.ai.error.AiErrorHandler.recordHybridFailure()
                 }
             } else {
                 if (!shouldCallAi) {
+                    Log.i(TAG, "Skipping AI call because heuristics met thresholds")
                     try { Log.d("AI.Debug", "Skipping AI call; heuristic coverage sufficient") } catch (_: Throwable) {}
                 } else {
+                    Log.w(TAG, "Skipping AI call because genai unavailable")
                     try { Log.d("AI.Debug", "Skipping AI call; genai unavailable") } catch (_: Throwable) {}
                     com.voiceexpense.ai.error.AiErrorHandler.recordHybridFailure()
                 }
@@ -96,6 +104,7 @@ class HybridTransactionParser(
             parsed = mergeResults(heuristicDraft, parsed, context)
         }
 
+        Log.i(TAG, "HybridTransactionParser.parse() merging completed usedAi=$usedAi validated=$validated rawJsonBlank=${rawJson.isNullOrBlank()} errors=${errors.size}")
         try { Log.d("AI.Debug", "Creating final result, usedAi=$usedAi, validated=$validated") } catch (_: Throwable) {}
         val method = if (usedAi && validated) ProcessingMethod.AI else ProcessingMethod.HEURISTIC
         val stats = ProcessingStatistics(durationMs = elapsed)
@@ -116,6 +125,7 @@ class HybridTransactionParser(
             Log.i("AI.Summary", "method=${method.name} validated=$validated err='${err}' raw='${rawSnippet}'")
         } catch (_: Throwable) { /* ignore logging issues */ }
         try { Log.d("AI.Debug", "About to return result") } catch (_: Throwable) {}
+        Log.i(TAG, "HybridTransactionParser.parse() end method=${method.name} confidence=${confidence}")
         return result
     }
 
@@ -204,4 +214,8 @@ class HybridTransactionParser(
     }
 
     private fun normalizeToken(value: String): String = value.trim().lowercase(Locale.US)
+
+    companion object {
+        private const val TAG = "AI.Trace"
+    }
 }

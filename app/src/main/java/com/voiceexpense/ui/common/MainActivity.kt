@@ -5,6 +5,7 @@ import android.content.Context
 import android.os.Bundle
 import android.widget.Button
 import android.widget.EditText
+import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.viewModels
@@ -68,6 +69,7 @@ class MainActivity : AppCompatActivity() {
                 Toast.makeText(this, R.string.error_empty_input, Toast.LENGTH_SHORT).show()
                 return
             }
+            Log.i(TRACE_TAG, "MainActivity.submit() captured='${text.take(120)}'")
             create.isEnabled = false
             create.text = getString(R.string.creating_draft)
             // Hide keyboard
@@ -91,6 +93,7 @@ class MainActivity : AppCompatActivity() {
                         knownAccounts = accounts
                     )
                     val parsed = parser.parse(text, ctx)
+                    Log.i(TRACE_TAG, "MainActivity.submit() parse finished merchant='${parsed.merchant}' type=${parsed.type}")
                     val after = ProcessingMonitor.snapshot()
                     val usedAi = after.ai > before.ai
                     val prefs = getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
@@ -131,6 +134,7 @@ class MainActivity : AppCompatActivity() {
                         startActivity(intent)
                     }
                 } catch (t: Throwable) {
+                    Log.e(TRACE_TAG, "MainActivity.submit() failed: ${t.message}", t)
                     runOnUiThread {
                         create.isEnabled = true
                         create.text = getString(R.string.create_draft)
@@ -156,5 +160,9 @@ class MainActivity : AppCompatActivity() {
                 startActivity(intent)
             }
         }
+    }
+
+    companion object {
+        private const val TRACE_TAG = "AI.Trace"
     }
 }

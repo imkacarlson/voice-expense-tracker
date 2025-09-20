@@ -16,6 +16,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
     companion object {
         private const val RELATIVE_MODEL_PATH = "llm/model.task"
+        private const val TRACE_TAG = "AI.Trace"
     }
 
     @Volatile private var llm: LlmInference? = null
@@ -24,7 +25,9 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
     override fun isAvailable(): Boolean = tryInitSync()
 
     override suspend fun structured(prompt: String): Result<String> = withContext(Dispatchers.IO) {
+        Log.i(TRACE_TAG, "MediaPipeGenAiClient.structured() invoked length=${prompt.length}")
         if (!tryInitSync()) {
+            Log.w(TRACE_TAG, "structured() aborted: model not initialized")
             Result.failure(IllegalStateException("Model not initialized"))
         } else {
             try {
@@ -49,8 +52,10 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
         if (!initializing.compareAndSet(false, true)) return llm != null
         try {
             val modelFile = File(context.filesDir, RELATIVE_MODEL_PATH)
+            Log.i(TRACE_TAG, "tryInitSync() checking ${modelFile.absolutePath}")
             if (!modelFile.exists() || !modelFile.isFile) {
                 Log.d("AI.MP", "Model missing at ${modelFile.absolutePath}")
+                Log.w(TRACE_TAG, "tryInitSync() missing model file")
                 return false
             }
             val options = LlmInference.LlmInferenceOptions.builder()
@@ -58,10 +63,12 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
                 .build()
             llm = LlmInference.createFromOptions(context, options)
             Log.i("AI.MP", "Model initialized: ${modelFile.absolutePath}")
+            Log.i(TRACE_TAG, "tryInitSync() initialized model at ${modelFile.absolutePath}")
             return true
         } catch (t: Throwable) {
             llm = null
             Log.w("AI.MP", "Model init failed: ${t.message}")
+            Log.e(TRACE_TAG, "tryInitSync() failed: ${t.message}")
             return false
         } finally {
             initializing.set(false)
