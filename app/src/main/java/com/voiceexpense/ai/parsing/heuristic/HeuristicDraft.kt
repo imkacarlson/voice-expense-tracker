@@ -29,8 +29,6 @@ data class FieldConfidenceThresholds(
     fun thresholdFor(field: FieldKey): Float = mandatoryThresholds[field] ?: defaultThreshold
 
     companion object {
-        val DEFAULT = FieldConfidenceThresholds()
-
         private val DEFAULT_MANDATORY_THRESHOLDS: Map<FieldKey, Float> = mapOf(
             FieldKey.AMOUNT_USD to 0.8f,
             FieldKey.USER_LOCAL_DATE to 0.75f,
@@ -38,6 +36,8 @@ data class FieldConfidenceThresholds(
             FieldKey.MERCHANT to 0.6f,
             FieldKey.ACCOUNT to 0.7f
         )
+
+        val DEFAULT = FieldConfidenceThresholds()
     }
 }
 
