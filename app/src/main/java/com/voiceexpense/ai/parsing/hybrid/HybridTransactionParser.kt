@@ -5,6 +5,7 @@ import com.voiceexpense.ai.parsing.ParsedResult
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.StructuredOutputValidator
 import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
+import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
 import com.voiceexpense.ai.parsing.heuristic.HeuristicExtractor
 import com.voiceexpense.ai.parsing.heuristic.toParsedResult
@@ -161,8 +162,21 @@ class HybridTransactionParser(
     ): ParsedResult {
         val base = aiParsed ?: heuristic.toParsedResult(context)
 
+        val amountFromAi = aiParsed?.amountUsd
+        val amountFromHeuristic = heuristic.amountUsd
+        val preferHeuristicAmount = when {
+            amountFromAi == null || amountFromHeuristic == null -> false
+            amountFromAi <= amountFromHeuristic -> false
+            heuristic.confidence(FieldKey.AMOUNT_USD) < thresholds.thresholdFor(FieldKey.AMOUNT_USD) -> false
+            else -> true
+        }
+
         val merged = base.copy(
-            amountUsd = aiParsed?.amountUsd ?: heuristic.amountUsd,
+            amountUsd = when {
+                preferHeuristicAmount -> amountFromHeuristic
+                amountFromAi != null -> amountFromAi
+                else -> amountFromHeuristic
+            },
             merchant = when {
                 !base.merchant.isNullOrBlank() -> base.merchant
                 !heuristic.merchant.isNullOrBlank() -> heuristic.merchant ?: "Unknown"
