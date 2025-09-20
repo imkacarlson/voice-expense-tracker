@@ -61,7 +61,8 @@ class PromptBuilder {
         knownFieldsBlock: String,
         input: String,
         includeContext: Boolean
-    ): String = buildString {
+    ): String {
+        return buildString {
             appendLine(system)
             if (includeContext && contextBlock.isNotBlank()) {
                 appendLine()
