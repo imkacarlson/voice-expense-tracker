@@ -202,8 +202,8 @@ class HeuristicExtractor(
         private val SHARE_HINT_REGEX = Regex("(?i)(my share|owe|i owe|i will owe)")
         private val SPLIT_HINT_REGEX = Regex("(?i)(splitwise|my share|split|overall)")
         private val OVERALL_HINT_REGEX = Regex("(?i)(overall|total|charged|to my card|overall charged)")
-        private val MERCHANT_REGEX = Regex("(?i)(?:at|from)\s+([A-Za-z0-9&' ]{2,40})")
-        private val FOUR_DIGIT_REGEX = Regex("(\d{4})")
+        private val MERCHANT_REGEX = Regex("""(?i)(?:at|from)\s+([A-Za-z0-9&' ]{2,40})""")
+        private val FOUR_DIGIT_REGEX = Regex("""(\d{4})""")
 
         private val DATE_REGEX = Regex(
             "(?i)(january|february|march|april|may|june|july|august|september|october|november|december)\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(\\d{4}))?"
