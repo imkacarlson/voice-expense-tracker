@@ -11,7 +11,6 @@ class PromptBuilderTest {
     @Test
     fun includes_system_and_constraints() {
         val p = builder.build("coffee 4.75 at starbucks")
-        assertThat(p).contains("Additional constraints:")
         assertThat(p.lowercase()).contains("return json only")
         assertThat(p).contains("Examples:")
         assertThat(p).contains("Input: ")

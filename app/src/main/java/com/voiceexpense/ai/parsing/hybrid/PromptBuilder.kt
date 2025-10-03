@@ -52,8 +52,24 @@ class PromptBuilder {
         }
 
         val fallback = composePrompt(system, emptyList(), "", hintsBlock, input, includeContext = false)
-        Log.w(TAG, "PromptBuilder using minimal prompt (len=${fallback.length}) due to size constraints")
-        return fallback
+        if (fallback.length <= MAX_PROMPT_CHARS) {
+            Log.w(TAG, "PromptBuilder using minimal prompt (len=${fallback.length}) due to size constraints")
+            return fallback
+        }
+
+        val noHints = composePrompt(system, emptyList(), "", "", input, includeContext = false)
+        if (noHints.length <= MAX_PROMPT_CHARS) {
+            Log.w(TAG, "PromptBuilder dropped heuristic hints to satisfy token budget (len=${noHints.length})")
+            return noHints
+        }
+
+        val ultraMinimal = composePrompt(MINIMAL_SYSTEM_INSTRUCTION, emptyList(), "", "", input, includeContext = false)
+        if (ultraMinimal.length > MAX_PROMPT_CHARS) {
+            Log.w(TAG, "PromptBuilder ultra minimal prompt still long; truncating to ${MAX_PROMPT_CHARS} chars")
+            return ultraMinimal.take(MAX_PROMPT_CHARS)
+        }
+        Log.w(TAG, "PromptBuilder using ultra minimal prompt (len=${ultraMinimal.length})")
+        return ultraMinimal
     }
 
     private fun composePrompt(
@@ -87,19 +103,7 @@ class PromptBuilder {
         }
     }
 
-    private fun buildSystemInstruction(): String {
-        // Start from existing strict instruction and add concise constraints.
-        return buildString {
-            appendLine(TransactionPrompts.SYSTEM_INSTRUCTION.trim())
-            appendLine("Additional constraints:")
-            appendLine("- Output ONLY JSON (no prose, no code fences)")
-            appendLine("- If splitOverallChargedUsd present, amountUsd <= splitOverallChargedUsd")
-            appendLine("- If type = Transfer: amountUsd is the moved amount; expenseCategory/incomeCategory = null")
-            appendLine("- Default merchant 'Unknown' if not inferred")
-            appendLine("- Keep tags as lowercase single words")
-            appendLine("- For fields with allowed options, choose ONLY from the provided lists. If no match, leave null.")
-        }
-    }
+    private fun buildSystemInstruction(): String = TransactionPrompts.SYSTEM_INSTRUCTION.trim()
 
     private fun buildContextBlock(context: ParsingContext): String = buildString {
         val cap = 8 // cap each list to keep prompt compact
@@ -229,6 +233,7 @@ class PromptBuilder {
 
     companion object {
         private const val TAG = "AI.Trace"
-        private const val MAX_PROMPT_CHARS = 1800
+        private const val MAX_PROMPT_CHARS = 1700
+        private val MINIMAL_SYSTEM_INSTRUCTION = "Return ONLY valid JSON."
     }
 }
