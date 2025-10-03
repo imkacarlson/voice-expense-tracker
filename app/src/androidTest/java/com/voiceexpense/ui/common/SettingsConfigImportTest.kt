@@ -32,7 +32,6 @@ import com.voiceexpense.data.config.ConfigType
 import com.voiceexpense.data.local.AppDatabase
 import dagger.hilt.android.testing.HiltAndroidRule
 import dagger.hilt.android.testing.HiltAndroidTest
-import dagger.hilt.android.testing.UninstallModules
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.runBlocking
 import org.hamcrest.CoreMatchers.allOf as hamAllOf
@@ -49,7 +48,6 @@ import java.io.File
 import javax.inject.Inject
 
 @HiltAndroidTest
-@UninstallModules(com.voiceexpense.di.AppModule::class)
 @RunWith(AndroidJUnit4::class)
 class SettingsConfigImportTest {
 

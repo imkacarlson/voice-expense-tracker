@@ -14,13 +14,20 @@ import com.voiceexpense.data.config.ConfigRepository
 import com.voiceexpense.data.local.AppDatabase
 import dagger.Module
 import dagger.Provides
-import dagger.hilt.InstallIn
+import com.voiceexpense.data.local.TransactionDao
+import com.voiceexpense.data.remote.AppsScriptClient
+import com.voiceexpense.data.repository.TransactionRepository
 import dagger.hilt.android.qualifiers.ApplicationContext
 import dagger.hilt.components.SingletonComponent
+import dagger.hilt.android.testing.TestInstallIn
+import okhttp3.OkHttpClient
 import javax.inject.Singleton
 
 @Module
-@InstallIn(SingletonComponent::class)
+@TestInstallIn(
+    components = [SingletonComponent::class],
+    replaces = [com.voiceexpense.di.AppModule::class]
+)
 object TestConfigImportModule {
 
     @Provides
@@ -32,10 +39,13 @@ object TestConfigImportModule {
 
     @Provides
     @Singleton
-    fun provideDelegatingDao(db: AppDatabase): DelegatingConfigDao = DelegatingConfigDao(db.configDao())
+    fun provideDelegatingConfigDao(db: AppDatabase): DelegatingConfigDao = DelegatingConfigDao(db.configDao())
 
     @Provides
     fun provideConfigDao(delegate: DelegatingConfigDao): ConfigDao = delegate
+
+    @Provides
+    fun provideTransactionDao(db: AppDatabase): TransactionDao = db.transactionDao()
 
     @Provides
     @Singleton
@@ -56,6 +66,23 @@ object TestConfigImportModule {
     @Provides
     @Singleton
     fun provideTokenProvider(): TokenProvider = StaticTokenProvider()
+
+    @Provides
+    @Singleton
+    fun provideOkHttp(): OkHttpClient = OkHttpClient.Builder().build()
+
+    @Provides
+    @Singleton
+    fun provideAppsScriptClient(client: OkHttpClient, moshi: Moshi): AppsScriptClient = AppsScriptClient(client, moshi)
+
+    @Provides
+    @Singleton
+    fun provideTransactionRepository(
+        dao: TransactionDao,
+        apps: AppsScriptClient,
+        auth: AuthRepository,
+        tokenProvider: TokenProvider
+    ): TransactionRepository = TransactionRepository(dao, apps, auth, tokenProvider)
 }
 
 class DelegatingConfigDao(private val delegate: ConfigDao) : ConfigDao by delegate {
