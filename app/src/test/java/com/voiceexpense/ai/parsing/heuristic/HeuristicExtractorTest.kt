@@ -27,6 +27,7 @@ class HeuristicExtractorTest {
         assertEquals("Expense", draft.type)
         assertEquals(LocalDate.of(2025, 9, 12), draft.userLocalDate)
         assertEquals("Citi Double Cash Card", draft.account)
+        assertEquals("11.10", draft.amountUsd?.toPlainString())
         assertEquals(0, draft.tags.size)
         assertFalse(draft.requiresAi())
     }

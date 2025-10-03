@@ -27,7 +27,12 @@ class HeuristicExtractor(
             confidences[FieldKey.USER_LOCAL_DATE] = 0.85f
         }
 
-        val amountInfo = parseAmounts(normalized)
+        val dateNumberRanges = mutableListOf<IntRange>()
+        DATE_REGEX.findAll(normalized).forEach { match ->
+            match.groups[2]?.range?.let { dateNumberRanges += it }
+            match.groups.getOrNull(3)?.range?.let { dateNumberRanges += it }
+        }
+        val amountInfo = parseAmounts(normalized, dateNumberRanges)
         val amount = amountInfo.share?.also {
             confidences[FieldKey.AMOUNT_USD] = amountInfo.shareConfidence
         }
@@ -112,14 +117,14 @@ class HeuristicExtractor(
         return candidate
     }
 
-    private fun parseAmounts(text: String): AmountParseResult {
+    private fun parseAmounts(text: String, excludeRanges: List<IntRange> = emptyList()): AmountParseResult {
         val matches = NUMBER_REGEX.findAll(text)
-            .map { match ->
+            .mapNotNull { match ->
+                if (excludeRanges.any { rangesOverlap(it, match.range) }) return@mapNotNull null
                 val value = match.value.replace(",", "")
-                val decimal = value.toBigDecimalOrNull() ?: return@map null
+                val decimal = value.toBigDecimalOrNull() ?: return@mapNotNull null
                 AmountCandidate(decimal, match.range.first, match.range.last)
             }
-            .filterNotNull()
             .toList()
         if (matches.isEmpty()) return AmountParseResult()
 
@@ -142,6 +147,8 @@ class HeuristicExtractor(
 
         return AmountParseResult(share, overall, shareConfidence, overallConfidence)
     }
+
+    private fun rangesOverlap(a: IntRange, b: IntRange): Boolean = a.first <= b.last && b.first <= a.last
 
     private fun inferType(lower: String): Pair<String, Float>? {
         return when {
