@@ -23,10 +23,13 @@ Return JSON only, no prose or markdown. Schema fields:
 - confidence: number (0..1)
 Rules:
 - Numbers are USD (no $ symbol, commas allowed).
-- If heuristics provide field values, keep them unchanged; only fill null fields.
 - If type = Transfer, expenseCategory and incomeCategory must be null.
 - If splitOverallChargedUsd present, amountUsd ≤ splitOverallChargedUsd.
 - Tags array must be lowercase words; omit if none.
+- Heuristic hints may be provided; treat them as suggestions and correct them if the utterance disagrees.
+- Match amountUsd to the spoken spend/share; never invent implausibly large values.
+- When the utterance mentions a card or account, map it to the closest allowed account option (case-insensitive, tolerate small spelling differences).
+- For expenses, choose an expenseCategory from allowed options that best fits the merchant/description.
 """
 
     data class ExamplePair(

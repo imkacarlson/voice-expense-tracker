@@ -4,9 +4,11 @@ import android.util.Log
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionPrompts
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
+import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import java.math.BigDecimal
 import java.time.format.DateTimeFormatter
 import java.util.LinkedHashSet
+import java.util.Locale
 
 /**
  * Builds structured prompts for on-device LLM inference (MediaPipe), combining:
@@ -25,31 +27,31 @@ class PromptBuilder {
         val system = buildSystemInstruction()
         val shots = selectExamples(input, heuristicDraft)
         val contextBlock = buildContextBlock(context)
-        val knownFieldsBlock = buildKnownFieldsBlock(heuristicDraft)
+        val hintsBlock = buildHintsBlock(heuristicDraft)
 
-        val primary = composePrompt(system, shots, contextBlock, knownFieldsBlock, input, includeContext = true)
+        val primary = composePrompt(system, shots, contextBlock, hintsBlock, input, includeContext = true)
         if (primary.length <= MAX_PROMPT_CHARS) return primary
 
         val reducedShots = shots.take(2)
-        val shorter = composePrompt(system, reducedShots, contextBlock, knownFieldsBlock, input, includeContext = true)
+        val shorter = composePrompt(system, reducedShots, contextBlock, hintsBlock, input, includeContext = true)
         if (shorter.length <= MAX_PROMPT_CHARS) {
             Log.i(TAG, "PromptBuilder trimmed examples to stay within token budget (len=${shorter.length})")
             return shorter
         }
 
-        val single = composePrompt(system, reducedShots.take(1), contextBlock, knownFieldsBlock, input, includeContext = true)
+        val single = composePrompt(system, reducedShots.take(1), contextBlock, hintsBlock, input, includeContext = true)
         if (single.length <= MAX_PROMPT_CHARS) {
             Log.i(TAG, "PromptBuilder reduced to single example (len=${single.length})")
             return single
         }
 
-        val noContext = composePrompt(system, reducedShots.take(1), "", knownFieldsBlock, input, includeContext = false)
+        val noContext = composePrompt(system, reducedShots.take(1), "", hintsBlock, input, includeContext = false)
         if (noContext.length <= MAX_PROMPT_CHARS) {
             Log.i(TAG, "PromptBuilder dropped context block to meet length constraints (len=${noContext.length})")
             return noContext
         }
 
-        val fallback = composePrompt(system, emptyList(), "", knownFieldsBlock, input, includeContext = false)
+        val fallback = composePrompt(system, emptyList(), "", hintsBlock, input, includeContext = false)
         Log.w(TAG, "PromptBuilder using minimal prompt (len=${fallback.length}) due to size constraints")
         return fallback
     }
@@ -58,7 +60,7 @@ class PromptBuilder {
         system: String,
         shots: List<FewShotExampleRepository.ExamplePair>,
         contextBlock: String,
-        knownFieldsBlock: String,
+        hintsBlock: String,
         input: String,
         includeContext: Boolean
     ): String {
@@ -69,10 +71,10 @@ class PromptBuilder {
                 appendLine("Context:")
                 appendLine(contextBlock)
             }
-            if (knownFieldsBlock.isNotBlank()) {
+            if (hintsBlock.isNotBlank()) {
                 appendLine()
-                appendLine("Known fields (keep these values, fill remaining as nulls):")
-                appendLine(knownFieldsBlock)
+                appendLine("Heuristic hints (confidence 0..1; adjust if incorrect):")
+                appendLine(hintsBlock)
             }
             if (shots.isNotEmpty()) {
                 appendLine()
@@ -135,32 +137,50 @@ class PromptBuilder {
         }
     }.trim()
 
-    private fun buildKnownFieldsBlock(heuristicDraft: HeuristicDraft?): String {
+    private fun buildHintsBlock(heuristicDraft: HeuristicDraft?): String {
         val draft = heuristicDraft ?: return ""
-        val parts = mutableListOf<String>()
-        fun <T> appendField(name: String, value: T?, formatter: (T) -> String = { it.toString() }) {
-            if (value == null) {
-                parts += "\"$name\":null"
-            } else {
-                parts += "\"$name\":${formatter(value)}"
+        val hints = mutableListOf<String>()
+
+        fun appendHint(name: String, rawValue: String?, confidence: Float) {
+            if (rawValue == null) return
+            hints += buildString {
+                append('"')
+                append(name)
+                append("\":{")
+                append("\"value\":")
+                append(rawValue)
+                if (confidence > 0f) {
+                    append(","confidence":")
+                    append(String.format(Locale.US, "%.2f", confidence))
+                }
+                append('}')
             }
         }
 
-        appendField("amountUsd", draft.amountUsd) { formatDecimal(it) }
-        appendField("merchant", draft.merchant) { quote(it) }
-        appendField("description", draft.description) { quote(it) }
-        appendField("type", draft.type) { quote(it) }
-        appendField("expenseCategory", draft.expenseCategory) { quote(it) }
-        appendField("incomeCategory", draft.incomeCategory) { quote(it) }
-        appendField("tags", draft.tags) { list ->
-            list.joinToString(prefix = "[", postfix = "]") { tag -> quote(tag) }
-        }
-        appendField("userLocalDate", draft.userLocalDate) { quote(it.format(DateTimeFormatter.ISO_DATE)) }
-        appendField("account", draft.account) { quote(it) }
-        appendField("splitOverallChargedUsd", draft.splitOverallChargedUsd) { formatDecimal(it) }
-        appendField("note", draft.note) { quote(it) }
+        appendHint("amountUsd", draft.amountUsd?.let { formatDecimal(it) }, draft.confidence(FieldKey.AMOUNT_USD))
+        appendHint("merchant", draft.merchant?.let { quote(it) }, draft.confidence(FieldKey.MERCHANT))
+        appendHint("type", draft.type?.let { quote(it) }, draft.confidence(FieldKey.TYPE))
+        appendHint("expenseCategory", draft.expenseCategory?.let { quote(it) }, draft.confidence(FieldKey.EXPENSE_CATEGORY))
+        appendHint("incomeCategory", draft.incomeCategory?.let { quote(it) }, draft.confidence(FieldKey.INCOME_CATEGORY))
+        appendHint(
+            "tags",
+            draft.tags.takeIf { it.isNotEmpty() }?.joinToString(prefix = "[", postfix = "]") { quote(it) },
+            draft.confidence(FieldKey.TAGS)
+        )
+        appendHint(
+            "userLocalDate",
+            draft.userLocalDate?.let { quote(it.format(DateTimeFormatter.ISO_DATE)) },
+            draft.confidence(FieldKey.USER_LOCAL_DATE)
+        )
+        appendHint("account", draft.account?.let { quote(it) }, draft.confidence(FieldKey.ACCOUNT))
+        appendHint(
+            "splitOverallChargedUsd",
+            draft.splitOverallChargedUsd?.let { formatDecimal(it) },
+            draft.confidence(FieldKey.SPLIT_OVERALL_CHARGED_USD)
+        )
+        appendHint("note", draft.note?.let { quote(it) }, draft.confidence(FieldKey.NOTE))
 
-        return parts.joinToString(prefix = "{", postfix = "}")
+        return if (hints.isEmpty()) "" else hints.joinToString(prefix = "{", postfix = "}")
     }
 
     private fun selectExamples(

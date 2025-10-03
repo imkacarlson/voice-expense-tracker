@@ -43,7 +43,7 @@ class PromptBuilderTest {
     }
 
     @Test
-    fun injects_known_fields_block() {
+    fun injects_hint_block() {
         val ctx = ParsingContext(
             defaultDate = java.time.LocalDate.of(2025, 9, 13),
             allowedAccounts = listOf("Citi Double Cash Card")
@@ -57,8 +57,8 @@ class PromptBuilderTest {
             ctx,
             heuristic
         )
-        assertThat(p).contains("Known fields (keep these values, fill remaining as nulls):")
-        assertThat(p).contains("\"account\":\"Citi Double Cash Card\"")
+        assertThat(p).contains("Heuristic hints (confidence 0..1; adjust if incorrect):")
+        assertThat(p).contains("\\"account\\":{\\"value\\":\\"Citi Double Cash Card\\"")
     }
 
     @Test
