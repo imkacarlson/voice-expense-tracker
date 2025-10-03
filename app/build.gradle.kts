@@ -51,6 +51,10 @@ android {
     }
 }
 
+kapt {
+    correctErrorTypes = true
+}
+
 dependencies {
     // Kotlin and Android core
     implementation("androidx.core:core-ktx:1.13.1")
