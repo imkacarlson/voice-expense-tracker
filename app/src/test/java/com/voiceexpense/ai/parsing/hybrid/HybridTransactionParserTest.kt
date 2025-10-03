@@ -99,6 +99,24 @@ class HybridTransactionParserTest {
     }
 
     @Test
+    fun ai_outlier_amount_uses_heuristic_value() = runBlocking {
+        val json = "{\"amountUsd\":1110000000000,\"merchant\":\"Domino's\"}"
+        val gw = FakeGateway(available = true, response = Result.success(json))
+        val parser = HybridTransactionParser(gw)
+        val context = ParsingContext(
+            defaultDate = java.time.LocalDate.of(2025, 9, 13),
+            allowedAccounts = listOf("Citi Double Cash Card")
+        )
+
+        val res = parser.parse(
+            "On September 12th I spent $11.10 getting a takeout pizza from Domino's on my Citi Double Cash card",
+            context
+        )
+
+        assertThat(res.result.amountUsd?.toPlainString()).isEqualTo("11.10")
+    }
+
+    @Test
     fun normalizes_to_allowed_options() = runBlocking {
         val json = "{" +
             "\"amountUsd\":11.12," +

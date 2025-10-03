@@ -150,6 +150,23 @@ class HeuristicExtractor(
 
     private fun rangesOverlap(a: IntRange, b: IntRange): Boolean = a.first <= b.last && b.first <= a.last
 
+    private fun stripAccountMentions(candidate: String): String {
+        val lower = candidate.lowercase(Locale.US)
+        val cues = listOf(" card", " account", " visa", " mastercard", " debit", " checking", " savings")
+        val patterns = listOf(" on my ", " using my ", " with my ")
+        var cutIndex = candidate.length
+        for (pattern in patterns) {
+            val idx = lower.indexOf(pattern)
+            if (idx >= 0) {
+                val tail = lower.substring(idx)
+                if (cues.any { tail.contains(it) }) {
+                    cutIndex = minOf(cutIndex, idx)
+                }
+            }
+        }
+        return candidate.substring(0, cutIndex).trimEnd()
+    }
+
     private fun inferType(lower: String): Pair<String, Float>? {
         return when {
             lower.contains("transfer") || lower.contains("moved") -> "Transfer" to 0.85f
@@ -166,6 +183,10 @@ class HeuristicExtractor(
         val atMatch = MERCHANT_REGEX.find(original)
         val merchant = atMatch?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }
         if (merchant != null) {
+            val cleaned = stripAccountMentions(merchant)
+            if (cleaned.isNotBlank()) {
+                return cleaned to 0.65f
+            }
             return merchant to 0.65f
         }
         return null

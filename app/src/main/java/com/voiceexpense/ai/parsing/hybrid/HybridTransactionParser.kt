@@ -164,9 +164,26 @@ class HybridTransactionParser(
 
         val amountFromAi = aiParsed?.amountUsd
         val amountFromHeuristic = heuristic.amountUsd
+        val heuristicAmountConfidence = heuristic.confidence(FieldKey.AMOUNT_USD)
+        val heuristicThreshold = thresholds.thresholdFor(FieldKey.AMOUNT_USD)
+        val aiWildlyOutOfRange = if (amountFromAi != null && amountFromHeuristic != null) {
+            val heurAbs = amountFromHeuristic.abs()
+            val aiAbs = amountFromAi.abs()
+            val heurReliable = heuristicAmountConfidence >= heuristicThreshold && heurAbs > BigDecimal.ZERO
+            if (!heurReliable) {
+                false
+            } else {
+                val ratioTooHigh = aiAbs > heurAbs.multiply(AI_DEVIATION_MULTIPLIER)
+                val absoluteTooHigh = aiAbs > MAX_REASONABLE_AI_AMOUNT
+                ratioTooHigh || absoluteTooHigh
+            }
+        } else {
+            false
+        }
         val preferHeuristicAmount = when {
             amountFromAi == null || amountFromHeuristic == null -> false
             heuristic.confidence(FieldKey.AMOUNT_USD) < thresholds.thresholdFor(FieldKey.AMOUNT_USD) -> false
+            aiWildlyOutOfRange -> true
             amountFromHeuristic < amountFromAi -> false
             else -> true
         }
@@ -247,5 +264,7 @@ class HybridTransactionParser(
 
     companion object {
         private const val TAG = "AI.Trace"
+        private val AI_DEVIATION_MULTIPLIER = BigDecimal("10")
+        private val MAX_REASONABLE_AI_AMOUNT = BigDecimal("1000000")
     }
 }
