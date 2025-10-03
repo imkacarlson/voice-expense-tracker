@@ -30,7 +30,7 @@ class HeuristicExtractor(
         val dateNumberRanges = mutableListOf<IntRange>()
         DATE_REGEX.findAll(normalized).forEach { match ->
             match.groups[2]?.range?.let { dateNumberRanges += it }
-            match.groups.getOrNull(3)?.range?.let { dateNumberRanges += it }
+            match.groups[3]?.range?.let { dateNumberRanges += it }
         }
         val amountInfo = parseAmounts(normalized, dateNumberRanges)
         val amount = amountInfo.share?.also {
