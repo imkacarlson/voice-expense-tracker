@@ -49,7 +49,7 @@ class HybridTransactionParser(
                 val prompt = promptBuilder.build(input, context, heuristicDraft)
                 try {
                     Log.d("AI.Debug", "Full prompt built, length=${prompt.length}")
-                    Log.d("AI.Prompt", prompt)
+                    logPrompt(prompt)
                 } catch (_: Throwable) {}
                 try { Log.d("AI.Debug", "Calling genai.structured()") } catch (_: Throwable) {}
                 val ai = genai.structured(prompt)
@@ -166,8 +166,8 @@ class HybridTransactionParser(
         val amountFromHeuristic = heuristic.amountUsd
         val preferHeuristicAmount = when {
             amountFromAi == null || amountFromHeuristic == null -> false
-            amountFromAi <= amountFromHeuristic -> false
             heuristic.confidence(FieldKey.AMOUNT_USD) < thresholds.thresholdFor(FieldKey.AMOUNT_USD) -> false
+            amountFromHeuristic < amountFromAi -> false
             else -> true
         }
 
@@ -225,6 +225,22 @@ class HybridTransactionParser(
             account = account,
             tags = tags
         )
+    }
+
+    private fun logPrompt(prompt: String) {
+        if (prompt.isEmpty()) return
+        val chunkSize = 3000
+        Log.d("AI.Debug", "Prompt contents start >>>")
+        var index = 0
+        var chunk = 1
+        while (index < prompt.length) {
+            val end = (index + chunkSize).coerceAtMost(prompt.length)
+            val segment = prompt.substring(index, end)
+            Log.d("AI.Debug", "Prompt chunk $chunk:\n$segment")
+            index = end
+            chunk += 1
+        }
+        Log.d("AI.Debug", "<<< Prompt contents end (${prompt.length} chars)")
     }
 
     private fun normalizeToken(value: String): String = value.trim().lowercase(Locale.US)

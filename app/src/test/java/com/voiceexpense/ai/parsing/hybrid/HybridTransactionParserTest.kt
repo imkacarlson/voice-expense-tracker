@@ -83,6 +83,22 @@ class HybridTransactionParserTest {
     }
 
     @Test
+    fun heuristic_smaller_amount_does_not_override_ai() = runBlocking {
+        val json = "{\"amountUsd\":425,\"merchant\":\"Vanguard Cash Plus\",\"type\":\"Income\"}"
+        val gw = FakeGateway(available = true, response = Result.success(json))
+        val parser = HybridTransactionParser(gw)
+        val context = ParsingContext(defaultDate = java.time.LocalDate.of(2025, 9, 13))
+
+        val res = parser.parse(
+            "On September 12th I got my paycheck deposit into my Vanguard Cash Plus account and it came out to 425 dollars",
+            context
+        )
+
+        assertThat(res.method).isEqualTo(ProcessingMethod.AI)
+        assertThat(res.result.amountUsd?.toPlainString()).isEqualTo("425.00")
+    }
+
+    @Test
     fun normalizes_to_allowed_options() = runBlocking {
         val json = "{" +
             "\"amountUsd\":11.12," +
