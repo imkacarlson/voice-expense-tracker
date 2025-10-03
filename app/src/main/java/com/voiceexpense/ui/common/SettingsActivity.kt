@@ -1,39 +1,40 @@
 package com.voiceexpense.ui.common
 
+import android.app.Activity
 import android.content.Context
+import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import android.widget.Button
 import android.widget.EditText
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
-import dagger.hilt.android.AndroidEntryPoint
-import javax.inject.Inject
 import androidx.lifecycle.lifecycleScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
-import com.voiceexpense.auth.AuthRepository
-import com.voiceexpense.auth.TokenProvider
+import com.google.android.gms.common.api.ApiException
+import com.voiceexpense.ai.model.ModelManager
+import com.google.android.material.appbar.MaterialToolbar
+import com.voiceexpense.data.config.ConfigOption
+import com.voiceexpense.data.config.ConfigImportResult
+import com.voiceexpense.data.config.ConfigImporter
+import com.voiceexpense.data.config.ConfigRepository
+import com.voiceexpense.data.config.ConfigType
+import com.voiceexpense.data.config.DefaultField
 import com.voiceexpense.R
 import com.google.android.gms.auth.api.signin.GoogleSignIn
 import com.google.android.gms.auth.api.signin.GoogleSignInAccount
 import com.google.android.gms.auth.api.signin.GoogleSignInClient
 import com.google.android.gms.auth.api.signin.GoogleSignInOptions
 import com.google.android.gms.common.api.Scope
-import android.content.Intent
-import androidx.activity.result.contract.ActivityResultContracts
-import android.app.Activity
-import android.util.Log
-import com.google.android.gms.common.api.ApiException
-import com.voiceexpense.ai.model.ModelManager
-import com.google.android.material.appbar.MaterialToolbar
-import com.voiceexpense.data.config.ConfigOption
-import com.voiceexpense.data.config.ConfigRepository
-import com.voiceexpense.data.config.ConfigType
-import com.voiceexpense.data.config.DefaultField
 import kotlinx.coroutines.flow.collect
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import java.util.UUID
+import javax.inject.Inject
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 object SettingsKeys {
     const val PREFS = "settings"
@@ -49,7 +50,12 @@ class SettingsActivity : AppCompatActivity() {
     @Inject lateinit var authRepository: AuthRepository
     @Inject lateinit var tokenProvider: TokenProvider
     @Inject lateinit var configRepository: ConfigRepository
+    @Inject lateinit var configImporter: ConfigImporter
     private val emailScope = Scope("https://www.googleapis.com/auth/userinfo.email")
+
+    companion object {
+        private const val REQUEST_CODE_IMPORT_CONFIG = 1001
+    }
 
     // No special request codes required; Google Sign-In handled via ActivityResult API.
     private lateinit var prefs: android.content.SharedPreferences
@@ -87,6 +93,7 @@ class SettingsActivity : AppCompatActivity() {
         val downBtn: Button = findViewById(R.id.btn_move_down)
         val defaultSpinner: android.widget.Spinner = findViewById(R.id.spinner_default_option)
         val setDefaultBtn: Button = findViewById(R.id.btn_set_default)
+        val importBtn: Button = findViewById(R.id.btn_import_config)
 
         fun updateAuthStatus(account: GoogleSignInAccount?) {
             if (account != null) {
@@ -309,6 +316,8 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
 
+        importBtn.setOnClickListener { launchImportPicker() }
+
         updateGatingMessage()
 
         // Initialize toggles from prefs
@@ -334,6 +343,80 @@ class SettingsActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun launchImportPicker() {
+        val intent = Intent(Intent.ACTION_OPEN_DOCUMENT).apply {
+            addCategory(Intent.CATEGORY_OPENABLE)
+            type = "application/json"
+        }
+        startActivityForResult(intent, REQUEST_CODE_IMPORT_CONFIG)
+    }
+
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        if (requestCode == REQUEST_CODE_IMPORT_CONFIG && resultCode == Activity.RESULT_OK) {
+            val uri = data?.data ?: return
+            showImportConfirmationDialog(uri)
+        }
+    }
+
+    private fun showImportConfirmationDialog(fileUri: Uri) {
+        AlertDialog.Builder(this)
+            .setTitle(R.string.import_confirm_title)
+            .setMessage(R.string.import_confirm_message)
+            .setPositiveButton(R.string.replace) { _, _ -> executeImport(fileUri) }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
+    private fun executeImport(fileUri: Uri) {
+        lifecycleScope.launch {
+            val result = withContext(Dispatchers.IO) {
+                configImporter.importConfiguration(fileUri, contentResolver)
+            }
+            when (result) {
+                is ConfigImportResult.Success -> {
+                    android.widget.Toast.makeText(
+                        this@SettingsActivity,
+                        getString(R.string.import_success, result.optionsImported),
+                        android.widget.Toast.LENGTH_SHORT
+                    ).show()
+                }
+                is ConfigImportResult.InvalidJson -> {
+                    android.widget.Toast.makeText(
+                        this@SettingsActivity,
+                        getString(R.string.import_error_invalid_json, detailMessage(result.message)),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                is ConfigImportResult.ValidationError -> {
+                    android.widget.Toast.makeText(
+                        this@SettingsActivity,
+                        getString(R.string.import_error_validation, detailMessage(result.message)),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                is ConfigImportResult.DatabaseError -> {
+                    Log.e("SettingsActivity", "Config import failed", result.throwable)
+                    android.widget.Toast.makeText(
+                        this@SettingsActivity,
+                        getString(R.string.import_error_database, detailMessage(result.throwable.message)),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+                is ConfigImportResult.FileReadError -> {
+                    Log.e("SettingsActivity", "Config file read failed", result.throwable)
+                    android.widget.Toast.makeText(
+                        this@SettingsActivity,
+                        getString(R.string.import_error_file_read, detailMessage(result.throwable.message)),
+                        android.widget.Toast.LENGTH_LONG
+                    ).show()
+                }
+            }
+        }
+    }
+
+    private fun detailMessage(detail: String?): String = detail?.takeIf { it.isNotBlank() } ?: "unknown"
 
     private fun updateGatingMessage() {
         // Compute gating message off main to avoid disk/account reads on UI thread

@@ -56,9 +56,20 @@
     <string name="hint_account">Account / Card</string>
     <string name="hint_date">Date (YYYY-MM-DD)</string>
     <string name="hint_note">Note (optional)</string>
-    
+
+    <!-- Config import -->
+    <string name="import_configuration">Import Configuration</string>
+    <string name="import_confirm_title">Replace all configurations?</string>
+    <string name="import_confirm_message">This will delete all existing dropdown options and defaults. Continue?</string>
+    <string name="replace">Replace</string>
+    <string name="import_success">Configuration imported successfully (%1$d options)</string>
+    <string name="import_error_invalid_json">Invalid JSON format: %1$s</string>
+    <string name="import_error_validation">Validation error: %1$s</string>
+    <string name="import_error_database">Import failed: %1$s</string>
+    <string name="import_error_file_read">Failed to read file: %1$s</string>
+
     <!-- Developer options -->
-    
+
     <string name="debug_logs_label">Enable debug logs (toasts + extra logging)</string>
     <string name="debug_logs_enabled">Debug logs enabled</string>
     <string name="debug_logs_disabled">Debug logs disabled</string>

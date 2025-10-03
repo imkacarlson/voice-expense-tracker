@@ -16,6 +16,9 @@ interface ConfigDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun upsertOptions(options: List<ConfigOption>)
 
+    @Query("DELETE FROM config_options")
+    suspend fun deleteAllOptions(): Int
+
     @Update
     suspend fun updateOption(option: ConfigOption): Int
 
@@ -37,5 +40,7 @@ interface ConfigDao {
 
     @Query("SELECT optionId FROM default_values WHERE field = :field LIMIT 1")
     fun observeDefault(field: DefaultField): Flow<String?>
-}
 
+    @Query("DELETE FROM default_values")
+    suspend fun clearAllDefaults(): Int
+}

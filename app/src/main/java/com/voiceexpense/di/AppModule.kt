@@ -14,6 +14,7 @@ import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.remote.AppsScriptClient
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.data.config.ConfigDao
+import com.voiceexpense.data.config.ConfigImporter
 import com.voiceexpense.data.config.ConfigRepository
 import dagger.Module
 import dagger.Provides
@@ -37,6 +38,7 @@ object AppModule {
 
     @Provides fun provideConfigDao(db: AppDatabase): ConfigDao = db.configDao()
     @Provides @Singleton fun provideConfigRepository(dao: ConfigDao): ConfigRepository = ConfigRepository(dao)
+    @Provides @Singleton fun provideConfigImporter(repo: ConfigRepository, moshi: Moshi): ConfigImporter = ConfigImporter(repo, moshi)
 
     @Provides @Singleton
     fun provideRepo(
