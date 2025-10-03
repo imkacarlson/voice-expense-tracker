@@ -143,20 +143,19 @@ class PromptBuilder {
 
         fun appendHint(name: String, rawValue: String?, confidence: Float) {
             if (rawValue == null) return
-            hints += buildString {
-                append('"')
-                append(name)
-                append("\":{")
-                append("\"value\":")
-                append(rawValue)
-                if (confidence > 0f) {
-                    append(","confidence":")
-                    append(String.format(Locale.US, "%.2f", confidence))
-                }
-                append('}')
+            val builder = StringBuilder()
+            builder.append('"')
+            builder.append(name)
+            builder.append("\":{")
+            builder.append("\"value\":")
+            builder.append(rawValue)
+            if (confidence > 0f) {
+                builder.append(",\"confidence\":")
+                builder.append(String.format(Locale.US, "%.2f", confidence))
             }
+            builder.append('}')
+            hints += builder.toString()
         }
-
         appendHint("amountUsd", draft.amountUsd?.let { formatDecimal(it) }, draft.confidence(FieldKey.AMOUNT_USD))
         appendHint("merchant", draft.merchant?.let { quote(it) }, draft.confidence(FieldKey.MERCHANT))
         appendHint("type", draft.type?.let { quote(it) }, draft.confidence(FieldKey.TYPE))
