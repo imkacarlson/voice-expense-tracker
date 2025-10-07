@@ -166,9 +166,8 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                         }
                     }
                     tagsView.setText(if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else "")
-                    // Date display as MM/dd for UX; keep ISO in model
-                    val mmdd = java.time.format.DateTimeFormatter.ofPattern("MM/dd").format(t.userLocalDate)
-                    dateView.text = mmdd
+                    // Date display as YYYY-MM-DD (ISO format)
+                    dateView.text = t.userLocalDate.toString()
                     noteView.setText(t.note ?: "")
 
                     // Simple highlighting for missing key fields
@@ -258,13 +257,9 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             val newAccount = (accountSpinner.selectedItem?.toString() ?: "").trim().ifEmpty { null }
             val newDateStr = (dateView.text?.toString() ?: "").trim()
             val newDate = runCatching {
-                if (newDateStr.contains('/')) {
-                    val fmt = java.time.format.DateTimeFormatter.ofPattern("MM/dd")
-                    val parsed = java.time.LocalDate.parse(newDateStr, fmt)
-                    parsed.withYear(java.time.LocalDate.now().year)
-                } else java.time.LocalDate.parse(newDateStr.ifEmpty { current.userLocalDate.toString() })
+                java.time.LocalDate.parse(newDateStr.ifEmpty { current.userLocalDate.toString() })
             }.getOrElse {
-                Toast.makeText(this, "Invalid date", Toast.LENGTH_SHORT).show()
+                Toast.makeText(this, "Invalid date format. Use YYYY-MM-DD", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
             val newNote = (noteView.text?.toString() ?: "").trim().ifEmpty { null }
@@ -298,8 +293,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             val today = viewModel.transaction.value?.userLocalDate ?: java.time.LocalDate.now()
             DatePickerDialog(this, { _, y, m, d ->
                 val chosen = java.time.LocalDate.of(y, m + 1, d)
-                val mmdd = java.time.format.DateTimeFormatter.ofPattern("MM/dd").format(chosen)
-                dateView.text = mmdd
+                dateView.text = chosen.toString()  // YYYY-MM-DD format
             }, today.year, today.monthValue - 1, today.dayOfMonth).show()
         }
 
