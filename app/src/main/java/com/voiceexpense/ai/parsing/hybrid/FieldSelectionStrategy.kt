@@ -87,7 +87,7 @@ object FieldSelectionStrategy {
     }
 
     private val candidateComparator = Comparator<FieldCandidate> { a, b ->
-        val priorityCompare = a.priority.compareTo(b.priority)
+        val priorityCompare = a.priority().compareTo(b.priority())
         if (priorityCompare != 0) {
             return@Comparator priorityCompare
         }
@@ -100,12 +100,11 @@ object FieldSelectionStrategy {
         val confidence: Float,
         val missingValue: Boolean
     ) {
-        val priority: Int
-            get() = when {
-                field in CRITICAL_FIELDS && missingValue -> 0
-                missingValue -> 1
-                else -> 2
-            }
+        fun priority(): Int = when {
+            field in CRITICAL_FIELDS && missingValue -> 0
+            missingValue -> 1
+            else -> 2
+        }
     }
 
     private val CRITICAL_FIELDS: Set<FieldKey> = setOf(
