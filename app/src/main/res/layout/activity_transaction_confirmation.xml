@@ -99,7 +99,7 @@
 
                     <ProgressBar
                         android:id="@+id/loading_merchant"
-                        style="?attr/progressBarStyleSmall"
+                        style="@style/Widget.AppCompat.ProgressBar.Small"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
@@ -133,7 +133,7 @@
 
                     <ProgressBar
                         android:id="@+id/loading_description"
-                        style="?attr/progressBarStyleSmall"
+                        style="@style/Widget.AppCompat.ProgressBar.Small"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
@@ -177,7 +177,7 @@
 
                     <ProgressBar
                         android:id="@+id/loading_category"
-                        style="?attr/progressBarStyleSmall"
+                        style="@style/Widget.AppCompat.ProgressBar.Small"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
@@ -213,7 +213,7 @@
 
                     <ProgressBar
                         android:id="@+id/loading_tags"
-                        style="?attr/progressBarStyleSmall"
+                        style="@style/Widget.AppCompat.ProgressBar.Small"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
