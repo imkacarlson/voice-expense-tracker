@@ -47,13 +47,18 @@ object FieldSelectionStrategy {
             .toList()
 
         if (Log.isLoggable(TAG, Log.DEBUG)) {
-            val missing = candidates
-                .filter { it.missingValue }
-                .joinToString { it.field.name }
-            Log.d(
-                TAG,
-                "Selected fields=${selected.joinToString { it.name }} missingValues=$missing"
-            )
+            val selectedNames = selected.joinToString(separator = ",") { it.name }
+            val missingNames = buildString {
+                var first = true
+                for (candidate in candidates) {
+                    if (candidate.missingValue) {
+                        if (!first) append(',')
+                        append(candidate.field.name)
+                        first = false
+                    }
+                }
+            }
+            Log.d(TAG, "Selected fields=$selectedNames missingValues=$missingNames")
         }
         return selected
     }
