@@ -99,11 +99,11 @@
 
                     <ProgressBar
                         android:id="@+id/loading_merchant"
-                        style="@style/Widget.AppCompat.ProgressBar.Small"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:contentDescription="@string/field_loading_indicator"
+                        android:indeterminate="true"
                         android:visibility="gone" />
                 </LinearLayout>
 
@@ -133,11 +133,11 @@
 
                     <ProgressBar
                         android:id="@+id/loading_description"
-                        style="@style/Widget.AppCompat.ProgressBar.Small"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:contentDescription="@string/field_loading_indicator"
+                        android:indeterminate="true"
                         android:visibility="gone" />
                 </LinearLayout>
 
@@ -177,11 +177,11 @@
 
                     <ProgressBar
                         android:id="@+id/loading_category"
-                        style="@style/Widget.AppCompat.ProgressBar.Small"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:contentDescription="@string/field_loading_indicator"
+                        android:indeterminate="true"
                         android:visibility="gone" />
                 </LinearLayout>
 
@@ -213,11 +213,11 @@
 
                     <ProgressBar
                         android:id="@+id/loading_tags"
-                        style="@style/Widget.AppCompat.ProgressBar.Small"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="8dp"
                         android:contentDescription="@string/field_loading_indicator"
+                        android:indeterminate="true"
                         android:visibility="gone" />
                 </LinearLayout>
 
