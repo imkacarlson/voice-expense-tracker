@@ -34,30 +34,19 @@ object FieldSelectionStrategy {
         heuristicDraft: HeuristicDraft,
         thresholds: FieldConfidenceThresholds = FieldConfidenceThresholds.DEFAULT
     ): List<FieldKey> {
-        val candidates = AI_REFINABLE_FIELDS
-            .mapNotNull { field ->
-                buildCandidate(field, heuristicDraft, thresholds)
-            }
+        val candidates: List<FieldCandidate> = AI_REFINABLE_FIELDS
+            .mapNotNull { field -> buildCandidate(field, heuristicDraft, thresholds) }
             .sortedWith(candidateComparator)
 
         val selected = candidates
-            .asSequence()
             .map(FieldCandidate::field)
             .take(MAX_REFINABLE_FIELDS)
-            .toList()
 
         if (Log.isLoggable(TAG, Log.DEBUG)) {
             val selectedNames = selected.joinToString(separator = ",") { it.name }
-            val missingNames = buildString {
-                var first = true
-                for (candidate in candidates) {
-                    if (candidate.missingValue) {
-                        if (!first) append(',')
-                        append(candidate.field.name)
-                        first = false
-                    }
-                }
-            }
+            val missingNames = candidates
+                .filter { it.missingValue }
+                .joinToString(separator = ",") { it.field.name }
             Log.d(TAG, "Selected fields=$selectedNames missingValues=$missingNames")
         }
         return selected
