@@ -1,0 +1,108 @@
+package com.voiceexpense.ai.parsing.hybrid
+
+import com.google.common.truth.Truth.assertThat
+import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
+import com.voiceexpense.ai.parsing.heuristic.FieldKey
+import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
+import org.junit.Test
+
+class FieldSelectionStrategyTest {
+
+    @Test
+    fun returns_empty_when_all_confident() {
+        val draft = HeuristicDraft(
+            merchant = "Starbucks",
+            description = "Coffee run",
+            expenseCategory = "Dining",
+            incomeCategory = null,
+            tags = listOf("personal"),
+            note = "",
+            confidences = mapOf(
+                FieldKey.MERCHANT to 0.8f,
+                FieldKey.DESCRIPTION to 0.85f,
+                FieldKey.EXPENSE_CATEGORY to 0.7f,
+                FieldKey.TAGS to 0.9f,
+                FieldKey.NOTE to 0.9f
+            )
+        )
+
+        val fields = FieldSelectionStrategy.selectFieldsForRefinement(draft)
+
+        assertThat(fields).isEmpty()
+    }
+
+    @Test
+    fun includes_fields_below_threshold_or_missing() {
+        val draft = HeuristicDraft(
+            merchant = null,
+            description = "",
+            expenseCategory = "Dining",
+            incomeCategory = "",
+            tags = emptyList(),
+            note = "Manual note",
+            confidences = mapOf(
+                FieldKey.MERCHANT to 0.2f,
+                FieldKey.DESCRIPTION to 0.4f,
+                FieldKey.EXPENSE_CATEGORY to 0.9f,
+                FieldKey.INCOME_CATEGORY to 0.1f,
+                FieldKey.TAGS to 0.05f,
+                FieldKey.NOTE to 0.95f
+            )
+        )
+
+        val fields = FieldSelectionStrategy.selectFieldsForRefinement(draft)
+
+        assertThat(fields[0]).isEqualTo(FieldKey.MERCHANT)
+        assertThat(fields[1]).isEqualTo(FieldKey.DESCRIPTION)
+        assertThat(fields).containsExactly(
+            FieldKey.MERCHANT,
+            FieldKey.DESCRIPTION,
+            FieldKey.INCOME_CATEGORY,
+            FieldKey.TAGS
+        )
+    }
+
+    @Test
+    fun limits_to_maximum_refinable_fields_prioritizing_missing_merchant_and_description() {
+        val draft = HeuristicDraft(
+            merchant = null,
+            description = null,
+            expenseCategory = null,
+            incomeCategory = null,
+            tags = emptyList(),
+            note = null,
+            confidences = FieldSelectionStrategy.AI_REFINABLE_FIELDS.associateWith { 0f }
+        )
+
+        val fields = FieldSelectionStrategy.selectFieldsForRefinement(draft)
+
+        assertThat(fields).hasSize(5)
+        assertThat(fields[0]).isEqualTo(FieldKey.MERCHANT)
+        assertThat(fields[1]).isEqualTo(FieldKey.DESCRIPTION)
+        assertThat(fields).doesNotContain(FieldKey.NOTE)
+    }
+
+    @Test
+    fun respects_custom_thresholds() {
+        val draft = HeuristicDraft(
+            merchant = "Coffee Shop",
+            description = "",
+            expenseCategory = "Dining",
+            confidences = mapOf(
+                FieldKey.MERCHANT to 0.55f,
+                FieldKey.DESCRIPTION to 0.4f
+            )
+        )
+
+        val thresholds = FieldConfidenceThresholds(
+            mandatoryThresholds = mapOf(
+                FieldKey.MERCHANT to 0.7f,
+                FieldKey.DESCRIPTION to 0.6f
+            )
+        )
+
+        val fields = FieldSelectionStrategy.selectFieldsForRefinement(draft, thresholds)
+
+        assertThat(fields).containsExactly(FieldKey.MERCHANT, FieldKey.DESCRIPTION).inOrder()
+    }
+}

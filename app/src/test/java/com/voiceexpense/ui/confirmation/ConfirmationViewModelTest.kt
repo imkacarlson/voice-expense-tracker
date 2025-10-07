@@ -7,13 +7,13 @@ import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
 import com.voiceexpense.ai.parsing.hybrid.PromptBuilder
 import io.mockk.mockk
 import io.mockk.every
+import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.data.local.TransactionDao
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.data.repository.TransactionRepository
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.CoroutineScope
 import org.junit.Test
 import org.junit.Rule
 import com.voiceexpense.testutil.MainDispatcherRule
@@ -34,7 +34,11 @@ class ConfirmationViewModelTest {
             override suspend fun structured(prompt: String): Result<String> =
                 Result.failure(Exception("unavailable"))
         }
-        val hybrid = HybridTransactionParser(dummyGateway, PromptBuilder())
+        val hybrid = HybridTransactionParser(
+            dummyGateway,
+            PromptBuilder(),
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
         val t = Transaction(
             userLocalDate = LocalDate.now(),
@@ -70,7 +74,11 @@ class ConfirmationViewModelTest {
             override fun isAvailable(): Boolean = false
             override suspend fun structured(prompt: String): Result<String> = Result.failure(Exception("unavailable"))
         }
-        val hybrid = HybridTransactionParser(dummyGateway, PromptBuilder())
+        val hybrid = HybridTransactionParser(
+            dummyGateway,
+            PromptBuilder(),
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
         val low = Transaction(
             userLocalDate = LocalDate.now(),
@@ -102,7 +110,11 @@ class ConfirmationViewModelTest {
             override fun isAvailable(): Boolean = false
             override suspend fun structured(prompt: String): Result<String> = Result.failure(Exception("unavailable"))
         }
-        val hybrid = HybridTransactionParser(dummyGateway, PromptBuilder())
+        val hybrid = HybridTransactionParser(
+            dummyGateway,
+            PromptBuilder(),
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
         val base = Transaction(
             userLocalDate = LocalDate.now(),
@@ -126,5 +138,123 @@ class ConfirmationViewModelTest {
         val state = vm.confidence.value
         assertThat(state.confidence).isEqualTo(0.5f)
         assertThat(state.isLowConfidence).isTrue()
+    }
+
+    @Test
+    fun setHeuristicDraft_updates_loading_states() = runBlocking {
+        val dao = com.voiceexpense.worker.FakeDao()
+        val repo = TransactionRepository(dao)
+        val mmDisabled = mockk<com.voiceexpense.ai.model.ModelManager>().apply { every { isModelReady() } returns false }
+        val dummyGateway = object : GenAiGateway {
+            override fun isAvailable(): Boolean = false
+            override suspend fun structured(prompt: String): Result<String> = Result.failure(Exception("unavailable"))
+        }
+        val hybrid = HybridTransactionParser(
+            dummyGateway,
+            PromptBuilder(),
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
+        val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
+        val base = Transaction(
+            userLocalDate = LocalDate.now(),
+            amountUsd = BigDecimal("8.00"),
+            merchant = "Cafe",
+            description = null,
+            type = TransactionType.Expense,
+            expenseCategory = "Other",
+            incomeCategory = null,
+            tags = emptyList(),
+            account = null,
+            splitOverallChargedUsd = null,
+            note = null,
+            confidence = 0.8f
+        )
+        vm.setHeuristicDraft(base, setOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION))
+        mainRule.runCurrent()
+        val loading = vm.fieldLoadingStates.value
+        assertThat(loading[FieldKey.MERCHANT]).isTrue()
+        assertThat(loading[FieldKey.DESCRIPTION]).isTrue()
+        assertThat(loading[FieldKey.EXPENSE_CATEGORY]).isFalse()
+    }
+
+    @Test
+    fun applyAiRefinement_updates_transaction_when_not_user_modified() = runBlocking {
+        val dao = com.voiceexpense.worker.FakeDao()
+        val repo = TransactionRepository(dao)
+        val mmDisabled = mockk<com.voiceexpense.ai.model.ModelManager>().apply { every { isModelReady() } returns false }
+        val dummyGateway = object : GenAiGateway {
+            override fun isAvailable(): Boolean = false
+            override suspend fun structured(prompt: String): Result<String> = Result.failure(Exception("unavailable"))
+        }
+        val hybrid = HybridTransactionParser(
+            dummyGateway,
+            PromptBuilder(),
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
+        val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
+        val draft = Transaction(
+            userLocalDate = LocalDate.now(),
+            amountUsd = BigDecimal("45.00"),
+            merchant = "Unknown",
+            description = null,
+            type = TransactionType.Expense,
+            expenseCategory = null,
+            incomeCategory = null,
+            tags = emptyList(),
+            account = null,
+            splitOverallChargedUsd = null,
+            note = null,
+            confidence = 0.6f
+        )
+        vm.setHeuristicDraft(draft, setOf(FieldKey.MERCHANT))
+        mainRule.runCurrent()
+
+        vm.applyAiRefinement(FieldKey.MERCHANT, "Trader Joe's")
+        mainRule.runCurrent()
+
+        val updated = vm.transaction.value!!
+        assertThat(updated.merchant).isEqualTo("Trader Joe's")
+        assertThat(vm.fieldLoadingStates.value[FieldKey.MERCHANT]).isFalse()
+    }
+
+    @Test
+    fun applyAiRefinement_skips_when_user_modified() = runBlocking {
+        val dao = com.voiceexpense.worker.FakeDao()
+        val repo = TransactionRepository(dao)
+        val mmDisabled = mockk<com.voiceexpense.ai.model.ModelManager>().apply { every { isModelReady() } returns false }
+        val dummyGateway = object : GenAiGateway {
+            override fun isAvailable(): Boolean = false
+            override suspend fun structured(prompt: String): Result<String> = Result.failure(Exception("unavailable"))
+        }
+        val hybrid = HybridTransactionParser(
+            dummyGateway,
+            PromptBuilder(),
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
+        val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
+        val draft = Transaction(
+            userLocalDate = LocalDate.now(),
+            amountUsd = BigDecimal("45.00"),
+            merchant = "Local Store",
+            description = null,
+            type = TransactionType.Expense,
+            expenseCategory = null,
+            incomeCategory = null,
+            tags = emptyList(),
+            account = null,
+            splitOverallChargedUsd = null,
+            note = null,
+            confidence = 0.6f
+        )
+        vm.setHeuristicDraft(draft, setOf(FieldKey.MERCHANT))
+        mainRule.runCurrent()
+
+        vm.markFieldUserModified(FieldKey.MERCHANT)
+        vm.applyAiRefinement(FieldKey.MERCHANT, "Trader Joe's")
+        mainRule.runCurrent()
+
+        val updated = vm.transaction.value!!
+        assertThat(updated.merchant).isEqualTo("Local Store")
+        assertThat(vm.fieldLoadingStates.value[FieldKey.MERCHANT]).isFalse()
     }
 }

@@ -1,0 +1,118 @@
+package com.voiceexpense.ai.parsing.hybrid
+
+import android.util.Log
+import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
+import com.voiceexpense.ai.parsing.heuristic.FieldKey
+import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
+
+/**
+ * Determines which fields should be refined by Stage 2 AI calls.
+ *
+ * The strategy looks at heuristic confidence scores, missing values, and applies
+ * a hard cap to keep focused prompts short. Amount/date/account fields are excluded
+ * by design because they are owned by the heuristic pipeline.
+ */
+object FieldSelectionStrategy {
+
+    private const val TAG = "FieldSelection"
+
+    private const val MAX_REFINABLE_FIELDS = 5
+
+    val AI_REFINABLE_FIELDS: Set<FieldKey> = setOf(
+        FieldKey.MERCHANT,
+        FieldKey.DESCRIPTION,
+        FieldKey.EXPENSE_CATEGORY,
+        FieldKey.INCOME_CATEGORY,
+        FieldKey.TAGS,
+        FieldKey.NOTE
+    )
+
+    /**
+     * Returns the ordered list of fields that should be refined by the AI stage.
+     */
+    fun selectFieldsForRefinement(
+        heuristicDraft: HeuristicDraft,
+        thresholds: FieldConfidenceThresholds = FieldConfidenceThresholds.DEFAULT
+    ): List<FieldKey> {
+        val candidates = AI_REFINABLE_FIELDS
+            .mapNotNull { field ->
+                buildCandidate(field, heuristicDraft, thresholds)
+            }
+            .sortedWith(candidateComparator)
+
+        val selected = candidates
+            .asSequence()
+            .map(FieldCandidate::field)
+            .take(MAX_REFINABLE_FIELDS)
+            .toList()
+
+        if (Log.isLoggable(TAG, Log.DEBUG)) {
+            Log.d(
+                TAG,
+                "Selected fields=${selected.joinToString()} missingValues=${candidates.filter { it.missingValue }.map { it.field }}"
+            )
+        }
+        return selected
+    }
+
+    private fun buildCandidate(
+        field: FieldKey,
+        draft: HeuristicDraft,
+        thresholds: FieldConfidenceThresholds
+    ): FieldCandidate? {
+        val confidence = draft.confidence(field)
+        val threshold = thresholds.thresholdFor(field)
+
+        val belowThreshold = confidence <= 0f || confidence < threshold
+        val missingValue = isMissing(field, draft)
+
+        if (!belowThreshold && !missingValue) {
+            return null
+        }
+
+        return FieldCandidate(
+            field = field,
+            confidence = confidence,
+            missingValue = missingValue
+        )
+    }
+
+    private fun isMissing(field: FieldKey, draft: HeuristicDraft): Boolean {
+        return when (field) {
+            FieldKey.MERCHANT -> draft.merchant.isNullOrBlank()
+            FieldKey.DESCRIPTION -> draft.description.isNullOrBlank()
+            FieldKey.EXPENSE_CATEGORY -> draft.expenseCategory.isNullOrBlank()
+            FieldKey.INCOME_CATEGORY -> draft.incomeCategory.isNullOrBlank()
+            FieldKey.TAGS -> draft.tags.isEmpty()
+            FieldKey.NOTE -> draft.note.isNullOrBlank()
+            else -> false
+        }
+    }
+
+    private val candidateComparator = Comparator<FieldCandidate> { a, b ->
+        val priorityCompare = a.priority.compareTo(b.priority)
+        if (priorityCompare != 0) {
+            return@Comparator priorityCompare
+        }
+
+        a.confidence.compareTo(b.confidence)
+    }
+
+    private data class FieldCandidate(
+        val field: FieldKey,
+        val confidence: Float,
+        val missingValue: Boolean
+    ) {
+        val priority: Int
+            get() = when {
+                field in CRITICAL_FIELDS && missingValue -> 0
+                missingValue -> 1
+                else -> 2
+            }
+    }
+
+    private val CRITICAL_FIELDS: Set<FieldKey> = setOf(
+        FieldKey.MERCHANT,
+        FieldKey.DESCRIPTION
+    )
+}

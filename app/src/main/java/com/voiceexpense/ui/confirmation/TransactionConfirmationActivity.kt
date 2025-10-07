@@ -1,18 +1,27 @@
 package com.voiceexpense.ui.confirmation
 
-import android.os.Bundle
-import android.widget.Toast
-import android.content.Intent
-import android.widget.Button
-import android.widget.TextView
-import android.widget.EditText
-import android.widget.Spinner
+import android.animation.Animator
+import android.animation.AnimatorListenerAdapter
+import android.animation.ValueAnimator
 import android.app.DatePickerDialog
+import android.content.Intent
+import android.graphics.Color
+import android.os.Bundle
+import android.view.View
+import android.widget.AdapterView
+import android.widget.Button
+import android.widget.EditText
+import android.widget.ProgressBar
+import android.widget.Spinner
+import android.widget.TextView
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
 import androidx.lifecycle.lifecycleScope
 import com.voiceexpense.R
 import com.voiceexpense.ai.parsing.TransactionParser
+import com.voiceexpense.ai.parsing.heuristic.FieldKey
+import com.voiceexpense.ai.parsing.hybrid.FieldRefinementStatus
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.data.config.ConfigRepository
 import com.voiceexpense.data.config.ConfigType
@@ -25,6 +34,8 @@ import javax.inject.Inject
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import androidx.core.view.isVisible
+import androidx.core.widget.doAfterTextChanged
 
 @AndroidEntryPoint
 class TransactionConfirmationActivity : AppCompatActivity() {
@@ -61,6 +72,66 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val accountSpinner: Spinner = findViewById(R.id.spinner_account)
         val dateView: TextView = findViewById(R.id.field_date)
         val noteView: EditText = findViewById(R.id.field_note)
+
+        val merchantContainer: View = findViewById(R.id.container_field_merchant)
+        val descriptionContainer: View = findViewById(R.id.container_field_description)
+        val categoryContainer: View = findViewById(R.id.container_field_category)
+        val tagsContainer: View = findViewById(R.id.container_field_tags)
+
+        val merchantProgress: ProgressBar = findViewById(R.id.loading_merchant)
+        val descriptionProgress: ProgressBar = findViewById(R.id.loading_description)
+        val categoryProgress: ProgressBar = findViewById(R.id.loading_category)
+        val tagsProgress: ProgressBar = findViewById(R.id.loading_tags)
+
+        val loadingIndicators = mapOf(
+            FieldKey.MERCHANT to merchantProgress,
+            FieldKey.DESCRIPTION to descriptionProgress,
+            FieldKey.EXPENSE_CATEGORY to categoryProgress,
+            FieldKey.INCOME_CATEGORY to categoryProgress,
+            FieldKey.TAGS to tagsProgress
+        )
+
+        val highlightTargets = mapOf(
+            FieldKey.MERCHANT to merchantContainer,
+            FieldKey.DESCRIPTION to descriptionContainer,
+            FieldKey.EXPENSE_CATEGORY to categoryContainer,
+            FieldKey.INCOME_CATEGORY to categoryContainer,
+            FieldKey.TAGS to tagsContainer
+        )
+
+        merchantView.doAfterTextChanged {
+            if (merchantView.hasFocus()) {
+                viewModel.markFieldUserModified(FieldKey.MERCHANT)
+            }
+        }
+        descView.doAfterTextChanged {
+            if (descView.hasFocus()) {
+                viewModel.markFieldUserModified(FieldKey.DESCRIPTION)
+            }
+        }
+
+        var categoryUserChange = false
+        categorySpinner.setOnTouchListener { _, _ ->
+            categoryUserChange = true
+            false
+        }
+        categorySpinner.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) categoryUserChange = true
+        }
+        categorySpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (categoryUserChange) {
+                    when (viewModel.transaction.value?.type) {
+                        com.voiceexpense.data.model.TransactionType.Expense -> viewModel.markFieldUserModified(FieldKey.EXPENSE_CATEGORY)
+                        com.voiceexpense.data.model.TransactionType.Income -> viewModel.markFieldUserModified(FieldKey.INCOME_CATEGORY)
+                        else -> {}
+                    }
+                    categoryUserChange = false
+                }
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
 
         title.text = getString(R.string.app_name)
         // Disable actions until draft loads
@@ -132,10 +203,11 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                                 val labels = opts.sortedBy { it.position }.map { it.label }
                                 val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
                                 adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                                categoryUserChange = false
                                 categorySpinner.adapter = adapter
                                 val idx = labels.indexOf(category ?: "")
                                 if (idx >= 0) {
-                                    categorySpinner.setSelection(idx)
+                                    categorySpinner.setSelection(idx, false)
                                 } else {
                                     // apply default if available
                                     val df = when (type) {
@@ -147,7 +219,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                                         val defId = configRepo.defaultFor(df).first()
                                         val sorted = opts.sortedBy { it.position }
                                         val defIdx = sorted.indexOfFirst { it.id == defId }
-                                        if (defIdx >= 0) categorySpinner.setSelection(defIdx)
+                                        if (defIdx >= 0) categorySpinner.setSelection(defIdx, false)
                                     }
                                 }
                             }
@@ -312,9 +384,32 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                     .setPositiveButton("OK") { _, _ ->
                         val selected = labels.filterIndexed { index, _ -> checked[index] }
                         tagsView.setText(selected.joinToString(", "))
+                        viewModel.markFieldUserModified(FieldKey.TAGS)
                     }
                     .setNegativeButton("Cancel", null)
                     .show()
+            }
+        }
+
+        lifecycleScope.launch {
+            viewModel.fieldLoadingStates.collect { states ->
+                loadingIndicators.forEach { (field, indicator) ->
+                    val loading = states[field] == true
+                    indicator.isVisible = loading
+                }
+            }
+        }
+
+        lifecycleScope.launch {
+            var previousStates: Map<FieldKey, FieldRefinementStatus> = emptyMap()
+            viewModel.refinementState.collect { currentStates ->
+                currentStates.forEach { (field, status) ->
+                    val previous = previousStates[field]
+                    if (status is FieldRefinementStatus.Completed && previous !is FieldRefinementStatus.Completed) {
+                        highlightTargets[field]?.let { animateFieldUpdate(it) }
+                    }
+                }
+                previousStates = currentStates
             }
         }
 
@@ -330,5 +425,22 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         startActivity(intent)
         finish()
+    }
+
+    private fun animateFieldUpdate(view: View) {
+        val highlightColor = Color.parseColor("#FFF9C4")
+        view.setBackgroundColor(highlightColor)
+        ValueAnimator.ofArgb(highlightColor, Color.TRANSPARENT).apply {
+            duration = 600
+            addUpdateListener { animator ->
+                view.setBackgroundColor(animator.animatedValue as Int)
+            }
+            addListener(object : AnimatorListenerAdapter() {
+                override fun onAnimationEnd(animation: Animator) {
+                    view.setBackgroundColor(Color.TRANSPARENT)
+                }
+            })
+            start()
+        }
     }
 }

@@ -3,6 +3,8 @@ package com.voiceexpense.ai.parsing.hybrid
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.ParsedResult
+import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
+import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
@@ -29,7 +31,10 @@ class HybridTransactionParserTest {
             "\"userLocalDate\":\"2025-01-01\"," +
             "\"confidence\":0.8}"
         val gw = FakeGateway(available = true, response = Result.success(json))
-        val parser = HybridTransactionParser(gw)
+        val parser = HybridTransactionParser(
+            gw,
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val res = parser.parse("spent 4.75 at starbucks", ParsingContext())
         assertThat(res.method).isEqualTo(ProcessingMethod.AI)
         assertThat(res.validated).isTrue()
@@ -42,7 +47,10 @@ class HybridTransactionParserTest {
     fun ai_invalid_falls_back_to_heuristic() = runBlocking {
         val invalid = "{\"tags\":\"coffee\"}" // invalid tags type
         val gw = FakeGateway(available = true, response = Result.success(invalid))
-        val parser = HybridTransactionParser(gw)
+        val parser = HybridTransactionParser(
+            gw,
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val res = parser.parse("transfer 100 from checking to savings", ParsingContext())
         assertThat(res.method).isEqualTo(ProcessingMethod.HEURISTIC)
         assertThat(res.validated).isFalse()
@@ -53,7 +61,10 @@ class HybridTransactionParserTest {
     @Test
     fun unavailable_gateway_uses_heuristic() = runBlocking {
         val gw = FakeGateway(available = false)
-        val parser = HybridTransactionParser(gw)
+        val parser = HybridTransactionParser(
+            gw,
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val res = parser.parse("coffee 3 at starbucks", ParsingContext())
         assertThat(res.method).isEqualTo(ProcessingMethod.HEURISTIC)
         assertThat(res.result.type).isEqualTo("Expense")
@@ -64,7 +75,10 @@ class HybridTransactionParserTest {
     @Test
     fun heuristic_coverage_skips_ai_call() = runBlocking {
         val gw = FakeGateway(available = true)
-        val parser = HybridTransactionParser(gw)
+        val parser = HybridTransactionParser(
+            gw,
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val context = ParsingContext(
             defaultDate = java.time.LocalDate.of(2025, 9, 13),
             allowedAccounts = listOf("Citi Double Cash Card")
@@ -86,7 +100,10 @@ class HybridTransactionParserTest {
     fun heuristic_smaller_amount_does_not_override_ai() = runBlocking {
         val json = "{\"amountUsd\":425,\"merchant\":\"Vanguard Cash Plus\",\"type\":\"Income\"}"
         val gw = FakeGateway(available = true, response = Result.success(json))
-        val parser = HybridTransactionParser(gw)
+        val parser = HybridTransactionParser(
+            gw,
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val context = ParsingContext(defaultDate = java.time.LocalDate.of(2025, 9, 13))
 
         val res = parser.parse(
@@ -102,7 +119,10 @@ class HybridTransactionParserTest {
     fun ai_outlier_amount_uses_heuristic_value() = runBlocking {
         val json = "{\"amountUsd\":1110000000000,\"merchant\":\"Domino's\"}"
         val gw = FakeGateway(available = true, response = Result.success(json))
-        val parser = HybridTransactionParser(gw)
+        val parser = HybridTransactionParser(
+            gw,
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val context = ParsingContext(
             defaultDate = java.time.LocalDate.of(2025, 9, 13),
             allowedAccounts = listOf("Citi Double Cash Card")
@@ -128,7 +148,10 @@ class HybridTransactionParserTest {
             "\"userLocalDate\":\"2025-09-11\"," +
             "\"confidence\":0.8}"
         val gw = FakeGateway(available = true, response = Result.success(json))
-        val parser = HybridTransactionParser(gw)
+        val parser = HybridTransactionParser(
+            gw,
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
         val context = ParsingContext(
             defaultDate = java.time.LocalDate.of(2025, 9, 13),
             allowedExpenseCategories = listOf("Utilities", "Groceries"),
@@ -145,5 +168,36 @@ class HybridTransactionParserTest {
         assertThat(res.result.expenseCategory).isEqualTo("Utilities")
         assertThat(res.result.account).isEqualTo("Vanguard Cash Plus (Savings)")
         assertThat(res.result.tags).containsExactly("Splitwise")
+    }
+
+    @Test
+    fun staged_parsing_refines_low_confidence_fields() = runBlocking {
+        val json = "{" +
+            "\"merchant\":\"Whole Foods\"," +
+            "\"description\":\"Weekly groceries\"," +
+            "\"expenseCategory\":\"Groceries\"}"
+        val gw = FakeGateway(available = true, response = Result.success(json))
+        val thresholds = FieldConfidenceThresholds(
+            mandatoryThresholds = mapOf(
+                FieldKey.MERCHANT to 0.95f,
+                FieldKey.DESCRIPTION to 0.95f,
+                FieldKey.EXPENSE_CATEGORY to 0.95f
+            ),
+            defaultThreshold = 0.9f
+        )
+        val parser = HybridTransactionParser(
+            gw,
+            thresholds = thresholds,
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = true)
+        )
+
+        val res = parser.parse("Bought groceries for 45 dollars", ParsingContext())
+
+        assertThat(gw.callCount).isEqualTo(1)
+        assertThat(res.method).isEqualTo(ProcessingMethod.AI)
+        assertThat(res.validated).isTrue()
+        assertThat(res.result.merchant).isEqualTo("Whole Foods")
+        assertThat(res.result.expenseCategory).isEqualTo("Groceries")
+        assertThat(res.errors).isEmpty()
     }
 }

@@ -81,13 +81,31 @@
                     android:textStyle="bold"
                     android:paddingTop="8dp" />
 
-                <EditText
-                    android:id="@+id/field_merchant"
+                <LinearLayout
+                    android:id="@+id/container_field_merchant"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/hint_merchant"
-                    android:inputType="textCapWords"
-                    android:textSize="14sp" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <EditText
+                        android:id="@+id/field_merchant"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="@string/hint_merchant"
+                        android:inputType="textCapWords"
+                        android:textSize="14sp" />
+
+                    <ProgressBar
+                        android:id="@+id/loading_merchant"
+                        style="?attr/progressBarStyleSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:contentDescription="@string/field_loading_indicator"
+                        android:visibility="gone" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/label_description"
@@ -97,13 +115,31 @@
                     android:textStyle="bold"
                     android:paddingTop="8dp" />
 
-                <EditText
-                    android:id="@+id/field_description"
+                <LinearLayout
+                    android:id="@+id/container_field_description"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/hint_description"
-                    android:inputType="textCapSentences"
-                    android:textSize="14sp" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <EditText
+                        android:id="@+id/field_description"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="@string/hint_description"
+                        android:inputType="textCapSentences"
+                        android:textSize="14sp" />
+
+                    <ProgressBar
+                        android:id="@+id/loading_description"
+                        style="?attr/progressBarStyleSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:contentDescription="@string/field_loading_indicator"
+                        android:visibility="gone" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/label_type"
@@ -126,10 +162,28 @@
                     android:textStyle="bold"
                     android:paddingTop="8dp" />
 
-                <Spinner
-                    android:id="@+id/spinner_category"
+                <LinearLayout
+                    android:id="@+id/container_field_category"
                     android:layout_width="match_parent"
-                    android:layout_height="wrap_content" />
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <Spinner
+                        android:id="@+id/spinner_category"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1" />
+
+                    <ProgressBar
+                        android:id="@+id/loading_category"
+                        style="?attr/progressBarStyleSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:contentDescription="@string/field_loading_indicator"
+                        android:visibility="gone" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/label_tags"
@@ -139,15 +193,33 @@
                     android:textStyle="bold"
                     android:paddingTop="8dp" />
 
-                <EditText
-                    android:id="@+id/field_tags"
+                <LinearLayout
+                    android:id="@+id/container_field_tags"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:hint="@string/hint_tags"
-                    android:focusable="false"
-                    android:clickable="true"
-                    android:inputType="none"
-                    android:textSize="14sp" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
+
+                    <EditText
+                        android:id="@+id/field_tags"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:hint="@string/hint_tags"
+                        android:focusable="false"
+                        android:clickable="true"
+                        android:inputType="none"
+                        android:textSize="14sp" />
+
+                    <ProgressBar
+                        android:id="@+id/loading_tags"
+                        style="?attr/progressBarStyleSmall"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="8dp"
+                        android:contentDescription="@string/field_loading_indicator"
+                        android:visibility="gone" />
+                </LinearLayout>
 
                 <TextView
                     android:id="@+id/label_account"

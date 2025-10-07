@@ -22,10 +22,23 @@ class HybridTransactionParser(
     private val genai: GenAiGateway,
     private val promptBuilder: PromptBuilder = PromptBuilder(),
     private val heuristicExtractor: HeuristicExtractor = HeuristicExtractor(),
-    private val thresholds: FieldConfidenceThresholds = FieldConfidenceThresholds.DEFAULT
+    private val thresholds: FieldConfidenceThresholds = FieldConfidenceThresholds.DEFAULT,
+    private val stagedConfig: StagedParsingConfig = StagedParsingConfig()
 ) {
+    private val stagedOrchestrator: StagedParsingOrchestrator by lazy {
+        StagedParsingOrchestrator(
+            heuristicExtractor = heuristicExtractor,
+            genAiGateway = genai,
+            focusedPromptBuilder = FocusedPromptBuilder(),
+            thresholds = thresholds
+        )
+    }
     suspend fun parse(input: String, context: ParsingContext = ParsingContext()): HybridParsingResult {
         Log.i(TAG, "HybridTransactionParser.parse() start text='${input.take(120)}'")
+        if (stagedConfig.enabled) {
+            return parseStaged(input, context)
+        }
+
         val heuristicDraft = heuristicExtractor.extract(input, context)
         try {
             Log.d("AI.Debug", "Heuristic draft coverage=${heuristicDraft.coverageScore}")
@@ -128,6 +141,23 @@ class HybridTransactionParser(
         try { Log.d("AI.Debug", "About to return result") } catch (_: Throwable) {}
         Log.i(TAG, "HybridTransactionParser.parse() end method=${method.name} confidence=${confidence}")
         return result
+    }
+
+    private fun parseStaged(input: String, context: ParsingContext): HybridParsingResult {
+        val staged = stagedOrchestrator.parseStaged(input, context)
+        val method = if (staged.fieldsRefined.isNotEmpty()) ProcessingMethod.AI else ProcessingMethod.HEURISTIC
+        val validated = staged.fieldsRefined.isNotEmpty() && staged.refinementErrors.isEmpty()
+        val confidence = ConfidenceScorer.score(method, validated, staged.mergedResult)
+        val stats = ProcessingStatistics(durationMs = staged.totalDurationMs)
+        return HybridParsingResult(
+            result = staged.mergedResult,
+            method = method,
+            validated = validated,
+            confidence = confidence,
+            stats = stats,
+            rawJson = null,
+            errors = staged.refinementErrors
+        )
     }
 
     private fun mapJsonToParsedResult(json: String, context: ParsingContext): ParsedResult {
@@ -261,6 +291,10 @@ class HybridTransactionParser(
     }
 
     private fun normalizeToken(value: String): String = value.trim().lowercase(Locale.US)
+
+    data class StagedParsingConfig(
+        val enabled: Boolean = true
+    )
 
     companion object {
         private const val TAG = "AI.Trace"
