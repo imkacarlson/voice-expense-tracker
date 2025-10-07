@@ -30,6 +30,7 @@ Rules:
 - Match amountUsd to the spoken spend/share; never invent implausibly large values.
 - When the utterance mentions a card or account, map it to the closest allowed account option (case-insensitive, tolerate small spelling differences).
 - For expenses, choose an expenseCategory from allowed options that best fits the merchant/description.
+- For description: keep concise (2-6 words); focus on WHAT was purchased or the PURPOSE (e.g., "Groceries", "Dinner", "Running shoes"), not the action of going/buying; omit if it would just repeat the merchant name.
 """
 
     data class ExamplePair(
@@ -42,6 +43,24 @@ Rules:
     enum class PromptCategory { EXPENSE, SPLIT, SUBSCRIPTION, INCOME, TRANSFER }
 
     val SAMPLE_MAPPINGS: List<ExamplePair> = listOf(
+        ExamplePair(
+            id = "groceries-simple",
+            input = "I just went to Trader Joe's to get some groceries and I spent 30 dollars",
+            outputJson = "{" +
+                "\"amountUsd\":30," +
+                "\"merchant\":\"Trader Joe's\"," +
+                "\"description\":\"Groceries\"," +
+                "\"type\":\"Expense\"," +
+                "\"expenseCategory\":\"Groceries\"," +
+                "\"incomeCategory\":null," +
+                "\"tags\":[]," +
+                "\"userLocalDate\":\"2025-10-07\"," +
+                "\"account\":null," +
+                "\"splitOverallChargedUsd\":null," +
+                "\"note\":null," +
+                "\"confidence\":0.85}",
+            tags = setOf(PromptCategory.EXPENSE)
+        ),
         ExamplePair(
             id = "splitwise-utilities",
             input = "On September 11th the gas bill was charged to my Vanguard Cash Plus account for 22.24 and after splitting with Emily I will only owe 11.12",
