@@ -36,7 +36,7 @@ class ConfirmationViewModel(
     private val lowConfidenceThreshold = 0.75f
 
     private var refinementTracker: FieldRefinementTracker = FieldRefinementTracker()
-    private val _fieldLoadingStates = MutableStateFlow(emptyLoadingMap())
+    private val _fieldLoadingStates = MutableStateFlow<Map<FieldKey, Boolean>>(emptyLoadingMap())
     val fieldLoadingStates: StateFlow<Map<FieldKey, Boolean>> = _fieldLoadingStates
     val refinementState get() = refinementTracker.refinementState
 
@@ -222,12 +222,12 @@ class ConfirmationViewModel(
 
     private fun setFieldLoading(field: FieldKey, isLoading: Boolean) {
         _fieldLoadingStates.update { current ->
-            val updated = if (current.isEmpty()) emptyLoadingMap() else current.toMutableMap()
+            val updated = current.toMutableMap()
             updated[field] = isLoading
             updated
         }
     }
 
-    private fun emptyLoadingMap(): MutableMap<FieldKey, Boolean> =
-        FieldSelectionStrategy.AI_REFINABLE_FIELDS.associateWith { false }.toMutableMap()
+    private fun emptyLoadingMap(): Map<FieldKey, Boolean> =
+        FieldSelectionStrategy.AI_REFINABLE_FIELDS.associateWith { false }
 }

@@ -143,12 +143,16 @@ class HybridTransactionParser(
         return result
     }
 
-    private fun parseStaged(input: String, context: ParsingContext): HybridParsingResult {
+    private suspend fun parseStaged(input: String, context: ParsingContext): HybridParsingResult {
         val staged = stagedOrchestrator.parseStaged(input, context)
         val method = if (staged.fieldsRefined.isNotEmpty()) ProcessingMethod.AI else ProcessingMethod.HEURISTIC
         val validated = staged.fieldsRefined.isNotEmpty() && staged.refinementErrors.isEmpty()
         val confidence = ConfidenceScorer.score(method, validated, staged.mergedResult)
         val stats = ProcessingStatistics(durationMs = staged.totalDurationMs)
+        Log.i(
+            TAG,
+            "Staged parsing result method=${method.name} refined=${staged.fieldsRefined.size} errors=${staged.refinementErrors.size}"
+        )
         return HybridParsingResult(
             result = staged.mergedResult,
             method = method,

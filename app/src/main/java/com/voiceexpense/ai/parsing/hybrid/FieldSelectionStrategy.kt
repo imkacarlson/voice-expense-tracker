@@ -47,9 +47,12 @@ object FieldSelectionStrategy {
             .toList()
 
         if (Log.isLoggable(TAG, Log.DEBUG)) {
+            val missing = candidates
+                .filter { it.missingValue }
+                .joinToString { it.field.name }
             Log.d(
                 TAG,
-                "Selected fields=${selected.joinToString()} missingValues=${candidates.filter { it.missingValue }.map { it.field }}"
+                "Selected fields=${selected.joinToString { it.name }} missingValues=$missing"
             )
         }
         return selected
