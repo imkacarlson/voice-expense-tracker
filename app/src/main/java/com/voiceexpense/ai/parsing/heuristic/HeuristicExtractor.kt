@@ -196,16 +196,50 @@ class HeuristicExtractor(
         val accounts = (context.allowedAccounts.takeIf { it.isNotEmpty() } ?: context.knownAccounts)
         if (accounts.isEmpty()) return null
 
+        // Strategy 1: Check for 4-digit account numbers (highest confidence)
         accounts.forEach { accountName ->
             val digits = FOUR_DIGIT_REGEX.find(accountName)?.value
             if (digits != null && lower.contains(digits)) {
                 return accountName to 0.9f
             }
+        }
+
+        // Strategy 2: Keyword-based fuzzy matching (handles "Chase Sapphire Preferred Card" → "Chase Sapphire Preferred (1234)")
+        accounts.forEach { accountName ->
+            val keywords = extractAccountKeywords(accountName)
+            val matchCount = keywords.count { keyword -> lower.contains(keyword) }
+
+            // If 2+ keywords match, it's probably this account
+            if (matchCount >= 2 && keywords.isNotEmpty()) {
+                val confidence = when {
+                    matchCount == keywords.size -> 0.85f  // All keywords match
+                    matchCount >= keywords.size / 2 -> 0.7f  // Half or more match
+                    else -> 0.5f
+                }
+                return accountName to confidence
+            }
+        }
+
+        // Strategy 3: Fallback to exact substring match
+        accounts.forEach { accountName ->
             if (lower.contains(accountName.lowercase(Locale.US))) {
                 return accountName to 0.7f
             }
         }
+
         return null
+    }
+
+    private fun extractAccountKeywords(accountName: String): List<String> {
+        // Remove parenthetical info and numbers, split into significant words
+        val cleaned = accountName
+            .replace(Regex("""\([^)]*\)"""), "")  // Remove (1234), (Savings), etc.
+            .lowercase(Locale.US)
+
+        return cleaned.split(Regex("""\s+"""))
+            .map { it.trim() }
+            .filter { it.length >= 3 }  // Ignore short words like "a", "of"
+            .filter { !it.matches(Regex("""\d+""")) }  // Ignore pure numbers
     }
 
     private fun String.windowAround(candidate: AmountCandidate, radius: Int = 18): String {
