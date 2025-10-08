@@ -124,7 +124,16 @@ class HybridTransactionParser(
         val stats = ProcessingStatistics(durationMs = elapsed)
         val confidence = ConfidenceScorer.score(method, validated, parsed)
         try { Log.d("AI.Debug", "About to create HybridParsingResult") } catch (_: Throwable) {}
-        val result = HybridParsingResult(parsed!!, method, validated, confidence, stats, rawJson, errors)
+        val result = HybridParsingResult(
+            parsed!!,
+            method,
+            validated,
+            confidence,
+            stats,
+            rawJson,
+            errors,
+            staged = null
+        )
         try { Log.d("AI.Debug", "HybridParsingResult created, calling ProcessingMonitor.record()") } catch (_: Throwable) {}
         ProcessingMonitor.record(result)
         try { Log.d("AI.Debug", "ProcessingMonitor.record() completed") } catch (_: Throwable) {}
@@ -153,15 +162,31 @@ class HybridTransactionParser(
             TAG,
             "Staged parsing result method=${method.name} refined=${staged.fieldsRefined.size} errors=${staged.refinementErrors.size}"
         )
-        return HybridParsingResult(
+        val result = HybridParsingResult(
             result = staged.mergedResult,
             method = method,
             validated = validated,
             confidence = confidence,
             stats = stats,
             rawJson = null,
-            errors = staged.refinementErrors
+            errors = staged.refinementErrors,
+            staged = staged
         )
+        try { Log.d("AI.Debug", "HybridParsingResult (staged) ready; recording metrics") } catch (_: Throwable) {}
+        ProcessingMonitor.record(result)
+        try {
+            Log.i(
+                "AI.Parse",
+                "method=${method.name} validated=$validated durationMs=${stats.durationMs} errors=${staged.refinementErrors.size} target=${staged.targetFields.size} refined=${staged.fieldsRefined.size}"
+            )
+            val err = staged.refinementErrors.firstOrNull() ?: ""
+            val refinedSummary = staged.fieldsRefined.joinToString()
+            Log.i(
+                "AI.Summary",
+                "method=${method.name} validated=$validated refined='${refinedSummary}' err='${err}' stage1=${staged.stage1DurationMs} stage2=${staged.stage2DurationMs}"
+            )
+        } catch (_: Throwable) { /* ignore logging issues */ }
+        return result
     }
 
     private fun mapJsonToParsedResult(json: String, context: ParsingContext): ParsedResult {

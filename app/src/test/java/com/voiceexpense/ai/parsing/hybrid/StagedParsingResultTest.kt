@@ -36,6 +36,7 @@ class StagedParsingResultTest {
             refinedFields = mapOf(FieldKey.MERCHANT to "Blue Bottle"),
             mergedResult = parsed,
             fieldsRefined = setOf(FieldKey.MERCHANT),
+            targetFields = setOf(FieldKey.MERCHANT),
             refinementErrors = emptyList(),
             stage1DurationMs = 20,
             stage2DurationMs = 200
@@ -69,6 +70,7 @@ class StagedParsingResultTest {
                 confidence = 0.5f
             ),
             fieldsRefined = emptySet(),
+            targetFields = emptySet(),
             refinementErrors = listOf("timeout"),
             stage1DurationMs = 10,
             stage2DurationMs = 0

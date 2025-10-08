@@ -15,6 +15,6 @@ data class HybridParsingResult(
     val confidence: Float,
     val stats: ProcessingStatistics,
     val rawJson: String? = null,
-    val errors: List<String> = emptyList()
+    val errors: List<String> = emptyList(),
+    val staged: StagedParsingResult? = null
 )
-

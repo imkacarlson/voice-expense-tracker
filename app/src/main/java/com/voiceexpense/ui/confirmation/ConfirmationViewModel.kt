@@ -52,8 +52,11 @@ class ConfirmationViewModel(
     private val _visibility = MutableStateFlow(UiVisibility(true, true, false, true, true))
     val visibility: StateFlow<UiVisibility> = _visibility
 
-    fun setDraft(draft: Transaction) {
+    fun setDraft(draft: Transaction, refinedFields: Set<FieldKey> = emptySet()) {
         setHeuristicDraft(draft, emptySet())
+        if (refinedFields.isNotEmpty()) {
+            markCompletedFields(draft, refinedFields)
+        }
     }
 
     fun setHeuristicDraft(draft: Transaction, loadingFields: Set<FieldKey>) {
@@ -230,4 +233,26 @@ class ConfirmationViewModel(
 
     private fun emptyLoadingMap(): Map<FieldKey, Boolean> =
         FieldSelectionStrategy.AI_REFINABLE_FIELDS.associateWith { false }
+
+    private fun markCompletedFields(transaction: Transaction, fields: Set<FieldKey>) {
+        fields.forEach { field ->
+            val value = valueForField(transaction, field)
+            refinementTracker.markCompleted(field, value)
+            setFieldLoading(field, false)
+        }
+    }
+
+    private fun valueForField(transaction: Transaction, field: FieldKey): Any? = when (field) {
+        FieldKey.AMOUNT_USD -> transaction.amountUsd
+        FieldKey.MERCHANT -> transaction.merchant
+        FieldKey.DESCRIPTION -> transaction.description
+        FieldKey.TYPE -> transaction.type
+        FieldKey.EXPENSE_CATEGORY -> transaction.expenseCategory
+        FieldKey.INCOME_CATEGORY -> transaction.incomeCategory
+        FieldKey.TAGS -> transaction.tags
+        FieldKey.USER_LOCAL_DATE -> transaction.userLocalDate
+        FieldKey.ACCOUNT -> transaction.account
+        FieldKey.SPLIT_OVERALL_CHARGED_USD -> transaction.splitOverallChargedUsd
+        FieldKey.NOTE -> transaction.note
+    }
 }

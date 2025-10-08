@@ -39,9 +39,10 @@ class StagedParsingOrchestrator(
         input: String,
         context: ParsingContext = ParsingContext()
     ): StagedParsingResult {
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Log.d(TAG, "parseStaged input='${input.take(80)}'")
-        }
+        try {
+            Log.d("AI.Debug", "Staged parse start input='${input.take(80)}'")
+        } catch (_: Throwable) {}
+        Log.d(TAG, "parseStaged input='${input.take(80)}'")
         val refinementErrors = mutableListOf<String>()
 
         var heuristicDraft: HeuristicDraft
@@ -50,23 +51,43 @@ class StagedParsingOrchestrator(
                 ?: heuristicExtractor.extract(input, context)
         }
 
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Log.d(TAG, "Stage1 duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}")
-        }
+        try {
+            Log.d(
+                "AI.Debug",
+                "Stage1 heuristics duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}"
+            )
+        } catch (_: Throwable) {}
+        Log.d(TAG, "Stage1 duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}")
 
         val targetFields = fieldSelector
             .selectFieldsForRefinement(heuristicDraft, thresholds)
             .toSet()
         val genAiAvailable = genAiGateway.isAvailable()
 
-        if (Log.isLoggable(TAG, Log.DEBUG)) {
-            Log.d(TAG, "Target fields=${targetFields.joinToString()} aiAvailable=$genAiAvailable")
-        }
+        try {
+            val summary = if (targetFields.isEmpty()) {
+                "none"
+            } else {
+                targetFields.joinToString { field ->
+                    val confidence = heuristicDraft.confidences[field]
+                    val formatted = confidence?.let { String.format(Locale.US, "%.2f", it) } ?: "n/a"
+                    "${field.name.lowercase(Locale.US)}=$formatted"
+                }
+            }
+            Log.i(
+                "AI.Fields",
+                "focused refinement target=${summary} aiAvailable=$genAiAvailable"
+            )
+        } catch (_: Throwable) {}
+        Log.d(TAG, "Target fields=${targetFields.joinToString()} aiAvailable=$genAiAvailable")
 
         if (targetFields.isEmpty() || !genAiAvailable) {
             if (!genAiAvailable && targetFields.isNotEmpty()) {
                 refinementErrors += "AI unavailable"
                 Log.w(TAG, "GenAI unavailable; skipping refinement")
+                try {
+                    Log.w("AI.Validate", "GenAI unavailable; skipping refinement for ${targetFields.joinToString()}")
+                } catch (_: Throwable) {}
             }
             val merged = heuristicDraft.toParsedResult(context)
             return StagedParsingResult(
@@ -74,6 +95,7 @@ class StagedParsingOrchestrator(
                 refinedFields = emptyMap(),
                 mergedResult = merged,
                 fieldsRefined = emptySet(),
+                targetFields = targetFields,
                 refinementErrors = refinementErrors,
                 stage1DurationMs = stage1DurationMs,
                 stage2DurationMs = 0L
@@ -92,6 +114,10 @@ class StagedParsingOrchestrator(
         var aiPayload: String? = null
 
         try {
+            Log.d("AI.Debug", "Stage2 focused prompt length=${prompt.length}")
+        } catch (_: Throwable) {}
+
+        try {
             stage2DurationMs = measureTimeMillis {
                 val result = withTimeout(AI_TIMEOUT_MS) {
                     genAiGateway.structured(prompt)
@@ -102,18 +128,28 @@ class StagedParsingOrchestrator(
                     null
                 }
             }
-            if (Log.isLoggable(TAG, Log.DEBUG)) {
-                Log.d(TAG, "Stage2 duration=${stage2DurationMs}ms payloadSize=${aiPayload?.length ?: 0}")
-            }
+            try {
+                Log.d(
+                    "AI.Debug",
+                    "Stage2 duration=${stage2DurationMs}ms payloadSize=${aiPayload?.length ?: 0}"
+                )
+            } catch (_: Throwable) {}
+            Log.d(TAG, "Stage2 duration=${stage2DurationMs}ms payloadSize=${aiPayload?.length ?: 0}")
         } catch (timeout: TimeoutCancellationException) {
             stage2DurationMs = AI_TIMEOUT_MS
             refinementErrors += "AI timeout after ${AI_TIMEOUT_MS}ms"
             Log.w(TAG, "GenAI refinement timed out", timeout)
+            try {
+                Log.w("AI.Validate", "GenAI refinement timed out after ${AI_TIMEOUT_MS}ms for ${targetFields.joinToString()}")
+            } catch (_: Throwable) {}
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
             refinementErrors += "AI invocation error: ${t.message ?: t::class.simpleName}".trim()
             Log.e(TAG, "Unexpected error during GenAI call", t)
+            try {
+                Log.e("AI.Validate", "Unexpected error during focused refinement: ${t.message}")
+            } catch (_: Throwable) {}
         }
 
         val fieldsRefined: Set<FieldKey>
@@ -123,6 +159,7 @@ class StagedParsingOrchestrator(
             mergedResult = heuristicDraft.toParsedResult(context)
             fieldsRefined = emptySet()
             Log.d(TAG, "No AI payload returned; using heuristic result")
+            try { Log.d("AI.Debug", "Focused refinement returned blank payload; using heuristic result") } catch (_: Throwable) {}
         } else {
             val validation = ValidationPipeline.validateRawResponse(aiPayload!!)
             if (!validation.valid || validation.normalizedJson.isNullOrBlank()) {
@@ -132,9 +169,20 @@ class StagedParsingOrchestrator(
                     refinementErrors += "AI validation failed"
                 }
                 Log.w(TAG, "Validation failed for AI output errors=${validation.errors}")
+                try {
+                    val snippet = aiPayload!!.replace("\n", " ").take(200)
+                    Log.w(
+                        "AI.Validate",
+                        "Focused refinement invalid: errors='${validation.errors.joinToString()}' snippet='$snippet'"
+                    )
+                } catch (_: Throwable) {}
                 mergedResult = heuristicDraft.toParsedResult(context)
                 fieldsRefined = emptySet()
             } else {
+                try {
+                    val snippet = aiPayload!!.replace("\n", " ").take(300)
+                    Log.i("AI.Output", snippet)
+                } catch (_: Throwable) {}
                 val normalized = validation.normalizedJson
                 refinedFields += extractFieldUpdates(normalized, targetFields)
                 fieldsRefined = refinedFields.keys.toSet()
@@ -143,9 +191,13 @@ class StagedParsingOrchestrator(
                     refinedFields = refinedFields,
                     context = context
                 )
-                if (Log.isLoggable(TAG, Log.DEBUG)) {
-                    Log.d(TAG, "Applied refinements=${fieldsRefined.joinToString()} errors=${refinementErrors.size}")
-                }
+                try {
+                    Log.d(
+                        "AI.Debug",
+                        "Applied refinements=${fieldsRefined.joinToString()} errors=${refinementErrors.size}"
+                    )
+                } catch (_: Throwable) {}
+                Log.d(TAG, "Applied refinements=${fieldsRefined.joinToString()} errors=${refinementErrors.size}")
             }
         }
 
@@ -158,6 +210,7 @@ class StagedParsingOrchestrator(
             refinedFields = refinedFields,
             mergedResult = mergedResult,
             fieldsRefined = fieldsRefined,
+            targetFields = targetFields,
             refinementErrors = refinementErrors,
             stage1DurationMs = stage1DurationMs,
             stage2DurationMs = stage2DurationMs

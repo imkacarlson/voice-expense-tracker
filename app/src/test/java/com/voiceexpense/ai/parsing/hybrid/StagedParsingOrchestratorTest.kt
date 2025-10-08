@@ -49,6 +49,7 @@ class StagedParsingOrchestratorTest {
 
         assertThat(gateway.calls).isEqualTo(0)
         assertThat(result.fieldsRefined).isEmpty()
+        assertThat(result.targetFields).isEmpty()
         assertThat(result.refinedFields).isEmpty()
         assertThat(result.refinementErrors).isEmpty()
         assertThat(result.mergedResult.merchant).isEqualTo("Starbucks")
@@ -86,6 +87,12 @@ class StagedParsingOrchestratorTest {
         val result = orchestrator.parseStaged("coffee at blue bottle", ParsingContext())
 
         assertThat(gateway.calls).isEqualTo(1)
+        assertThat(result.targetFields).containsAtLeast(
+            FieldKey.MERCHANT,
+            FieldKey.DESCRIPTION,
+            FieldKey.EXPENSE_CATEGORY,
+            FieldKey.TAGS
+        )
         assertThat(result.fieldsRefined).containsExactly(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,

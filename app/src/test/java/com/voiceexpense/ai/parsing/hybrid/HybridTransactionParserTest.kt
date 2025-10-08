@@ -198,6 +198,12 @@ class HybridTransactionParserTest {
         assertThat(res.validated).isTrue()
         assertThat(res.result.merchant).isEqualTo("Whole Foods")
         assertThat(res.result.expenseCategory).isEqualTo("Groceries")
+        assertThat(res.staged).isNotNull()
+        assertThat(res.staged!!.targetFields).containsAtLeast(
+            FieldKey.MERCHANT,
+            FieldKey.DESCRIPTION,
+            FieldKey.EXPENSE_CATEGORY
+        )
         assertThat(res.errors).isEmpty()
     }
 }

@@ -20,6 +20,7 @@ import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionParser
+import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.ui.confirmation.TransactionConfirmationActivity
 import com.voiceexpense.ai.parsing.hybrid.ProcessingMonitor
@@ -92,7 +93,8 @@ class MainActivity : AppCompatActivity() {
                         allowedAccounts = accounts,
                         knownAccounts = accounts
                     )
-                    val parsed = parser.parse(text, ctx)
+                    val detailed = parser.parseDetailed(text, ctx)
+                    val parsed = detailed.result
                     Log.i(TRACE_TAG, "MainActivity.submit() parse finished merchant='${parsed.merchant}' type=${parsed.type}")
                     val after = ProcessingMonitor.snapshot()
                     val usedAi = after.ai > before.ai
@@ -131,6 +133,11 @@ class MainActivity : AppCompatActivity() {
                         input.text?.clear()
                         val intent = Intent(this@MainActivity, TransactionConfirmationActivity::class.java)
                             .putExtra(TransactionConfirmationActivity.EXTRA_TRANSACTION_ID, txn.id)
+                        detailed.staged?.targetFields?.takeIf { it.isNotEmpty() }?.let { targets ->
+                            val extras = ArrayList<String>(targets.size)
+                            targets.forEach { field -> extras.add(field.name) }
+                            intent.putStringArrayListExtra(TransactionConfirmationActivity.EXTRA_REFINED_FIELDS, extras)
+                        }
                         startActivity(intent)
                     }
                 } catch (t: Throwable) {

@@ -15,6 +15,7 @@ data class StagedParsingResult(
     val refinedFields: Map<FieldKey, Any?>,
     val mergedResult: ParsedResult,
     val fieldsRefined: Set<FieldKey>,
+    val targetFields: Set<FieldKey>,
     val refinementErrors: List<String>,
     val stage1DurationMs: Long,
     val stage2DurationMs: Long
