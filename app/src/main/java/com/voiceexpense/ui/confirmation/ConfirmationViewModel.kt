@@ -197,6 +197,11 @@ class ConfirmationViewModel(
         val current = _transaction.value ?: return
         if (current.id != event.transactionId) return
 
+        Log.d(
+            "FieldRefinement",
+            "Applying staged update tx=${event.transactionId} refined=${event.refinedFields.keys.joinToString()} errors=${event.errors.size}"
+        )
+
         if (event.refinedFields.isNotEmpty()) {
             applyAiRefinements(event.refinedFields)
         }
@@ -229,6 +234,14 @@ class ConfirmationViewModel(
 
         if (event.errors.isNotEmpty()) {
             Log.w("FieldRefinement", "Staged parsing errors: ${event.errors.joinToString()}")
+        }
+
+        val latest = _transaction.value
+        if (latest != null) {
+            Log.d(
+                "FieldRefinement",
+                "Post-update txn merchant='${latest.merchant}' description='${latest.description}' category='${latest.expenseCategory}' tags=${latest.tags} note='${latest.note}' confidence=${latest.confidence}"
+            )
         }
     }
 

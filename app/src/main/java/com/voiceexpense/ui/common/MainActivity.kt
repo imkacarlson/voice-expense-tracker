@@ -135,6 +135,10 @@ class MainActivity : AppCompatActivity() {
                             val detailed = parser.runStagedRefinement(text, ctx, stage1Snapshot)
                             val staged = detailed.staged
                             if (staged != null) {
+                                Log.d(
+                                    TRACE_TAG,
+                                    "Staged refinement completed tx=$transactionId refined=${staged.fieldsRefined.joinToString()} target=${staged.targetFields.joinToString()}"
+                                )
                                 StagedRefinementDispatcher.emit(
                                     StagedRefinementDispatcher.RefinementEvent(
                                         transactionId = transactionId,

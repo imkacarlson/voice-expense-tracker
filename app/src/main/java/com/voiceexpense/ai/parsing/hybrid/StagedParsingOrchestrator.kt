@@ -87,6 +87,10 @@ class StagedParsingOrchestrator(
                     "AI.Debug",
                     "Stage1 heuristics precomputed duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}"
                 )
+                Log.d(
+                    "AI.Debug",
+                    "Stage1 heuristics merchant='${heuristicDraft.merchant}' description='${heuristicDraft.description}'"
+                )
             } catch (_: Throwable) {}
             Log.d(TAG, "Stage1 (precomputed) duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}")
         }
