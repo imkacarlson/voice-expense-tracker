@@ -15,20 +15,22 @@ import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.voiceexpense.R
+import com.voiceexpense.ai.parsing.ParsedResult
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionParser
-import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.ui.confirmation.TransactionConfirmationActivity
-import com.voiceexpense.ai.parsing.hybrid.ProcessingMonitor
+import com.voiceexpense.ai.parsing.hybrid.ProcessingMethod
+import com.voiceexpense.ai.parsing.hybrid.StagedRefinementDispatcher
 import com.voiceexpense.ui.common.SettingsKeys
 import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -79,7 +81,6 @@ class MainActivity : AppCompatActivity() {
 
             lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
                 try {
-                    val before = ProcessingMonitor.snapshot()
                     // Load allowed options from settings to guide the model
                     val expenseCats = configRepo.options(com.voiceexpense.data.config.ConfigType.ExpenseCategory).first().sortedBy { it.position }.map { it.label }
                     val incomeCats = configRepo.options(com.voiceexpense.data.config.ConfigType.IncomeCategory).first().sortedBy { it.position }.map { it.label }
@@ -93,52 +94,102 @@ class MainActivity : AppCompatActivity() {
                         allowedAccounts = accounts,
                         knownAccounts = accounts
                     )
-                    val detailed = parser.parseDetailed(text, ctx)
-                    val parsed = detailed.result
-                    Log.i(TRACE_TAG, "MainActivity.submit() parse finished merchant='${parsed.merchant}' type=${parsed.type}")
-                    val after = ProcessingMonitor.snapshot()
-                    val usedAi = after.ai > before.ai
+
+                    val stage1 = parser.prepareStage1(text, ctx)
+                    val parsed = stage1.parsedResult
+                    Log.i(TRACE_TAG, "MainActivity.submit() heuristics finished merchant='${parsed.merchant}' type=${parsed.type}")
+
+                    val txn = toDraftTransaction(parsed)
+                    repo.saveDraft(txn)
+
                     val prefs = getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
                     val debug = prefs.getBoolean(SettingsKeys.DEBUG_LOGS, false)
-                    val txn = com.voiceexpense.data.model.Transaction(
-                        userLocalDate = parsed.userLocalDate,
-                        amountUsd = parsed.amountUsd ?: BigDecimal("0.00"),
-                        merchant = parsed.merchant.ifBlank { "Unknown" },
-                        description = parsed.description,
-                        type = when (parsed.type) {
-                            "Income" -> TransactionType.Income
-                            "Transfer" -> TransactionType.Transfer
-                            else -> TransactionType.Expense
-                        },
-                        expenseCategory = parsed.expenseCategory,
-                        incomeCategory = parsed.incomeCategory,
-                        tags = parsed.tags,
-                        account = parsed.account,
-                        splitOverallChargedUsd = parsed.splitOverallChargedUsd,
-                        note = parsed.note,
-                        confidence = parsed.confidence,
-                        status = com.voiceexpense.data.model.TransactionStatus.DRAFT
-                    )
-                    repo.saveDraft(txn)
-                    with(kotlinx.coroutines.Dispatchers.Main) {
-                        // no-op
-                    }
+                    val loadingFields = stage1.targetFields
+
                     runOnUiThread {
-                        if (debug) {
-                            val method = if (usedAi) "AI" else "Heuristic"
-                            Toast.makeText(this@MainActivity, "Parsed with: $method", Toast.LENGTH_SHORT).show()
-                        }
                         create.isEnabled = true
                         create.text = getString(R.string.create_draft)
                         input.text?.clear()
                         val intent = Intent(this@MainActivity, TransactionConfirmationActivity::class.java)
                             .putExtra(TransactionConfirmationActivity.EXTRA_TRANSACTION_ID, txn.id)
-                        detailed.staged?.targetFields?.takeIf { it.isNotEmpty() }?.let { targets ->
-                            val extras = ArrayList<String>(targets.size)
-                            targets.forEach { field -> extras.add(field.name) }
-                            intent.putStringArrayListExtra(TransactionConfirmationActivity.EXTRA_REFINED_FIELDS, extras)
+                        if (loadingFields.isNotEmpty()) {
+                            val extras = ArrayList<String>(loadingFields.size)
+                            loadingFields.forEach { field -> extras.add(field.name) }
+                            intent.putStringArrayListExtra(TransactionConfirmationActivity.EXTRA_LOADING_FIELDS, extras)
                         }
                         startActivity(intent)
+                        if (debug && loadingFields.isEmpty()) {
+                            Toast.makeText(this@MainActivity, "Parsed with: Heuristic", Toast.LENGTH_SHORT).show()
+                        }
+                    }
+
+                    if (loadingFields.isEmpty()) {
+                        Log.i(TRACE_TAG, "MainActivity.submit() heuristics satisfied; no staged refinement needed")
+                        return@launch
+                    }
+
+                    val transactionId = txn.id
+                    val stage1Snapshot = stage1.snapshot
+                    launch(kotlinx.coroutines.Dispatchers.IO) {
+                        try {
+                            val detailed = parser.runStagedRefinement(text, ctx, stage1Snapshot)
+                            val staged = detailed.staged
+                            if (staged != null) {
+                                StagedRefinementDispatcher.emit(
+                                    StagedRefinementDispatcher.RefinementEvent(
+                                        transactionId = transactionId,
+                                        refinedFields = staged.refinedFields,
+                                        targetFields = staged.targetFields,
+                                        errors = staged.refinementErrors,
+                                        stage1DurationMs = staged.stage1DurationMs,
+                                        stage2DurationMs = staged.stage2DurationMs,
+                                        confidence = detailed.result.confidence
+                                    )
+                                )
+                                if (debug) {
+                                    val method = if (detailed.method == ProcessingMethod.AI) "AI" else "Heuristic"
+                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        Toast.makeText(this@MainActivity, "Parsed with: $method", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            } else {
+                                // Emit completion signal even if staged parsing disabled downstream
+                                StagedRefinementDispatcher.emit(
+                                    StagedRefinementDispatcher.RefinementEvent(
+                                        transactionId = transactionId,
+                                        refinedFields = emptyMap(),
+                                        targetFields = loadingFields,
+                                        errors = emptyList(),
+                                        stage1DurationMs = stage1Snapshot.stage1DurationMs,
+                                        stage2DurationMs = 0L,
+                                        confidence = detailed.result.confidence
+                                    )
+                                )
+                                if (debug) {
+                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                        Toast.makeText(this@MainActivity, "Parsed with: Heuristic", Toast.LENGTH_SHORT).show()
+                                    }
+                                }
+                            }
+                        } catch (t: Throwable) {
+                            Log.e(TRACE_TAG, "MainActivity.runStagedRefinement() failed: ${t.message}", t)
+                            StagedRefinementDispatcher.emit(
+                                StagedRefinementDispatcher.RefinementEvent(
+                                    transactionId = transactionId,
+                                    refinedFields = emptyMap(),
+                                    targetFields = loadingFields,
+                                    errors = listOfNotNull(t.message),
+                                    stage1DurationMs = stage1Snapshot.stage1DurationMs,
+                                    stage2DurationMs = 0L,
+                                    confidence = null
+                                )
+                            )
+                            if (debug) {
+                                withContext(kotlinx.coroutines.Dispatchers.Main) {
+                                    Toast.makeText(this@MainActivity, "Parsed with: Heuristic", Toast.LENGTH_SHORT).show()
+                                }
+                            }
+                        }
                     }
                 } catch (t: Throwable) {
                     Log.e(TRACE_TAG, "MainActivity.submit() failed: ${t.message}", t)
@@ -171,5 +222,28 @@ class MainActivity : AppCompatActivity() {
 
     companion object {
         private const val TRACE_TAG = "AI.Trace"
+    }
+
+    private fun toDraftTransaction(parsed: ParsedResult): Transaction {
+        val type = when (parsed.type) {
+            "Income" -> TransactionType.Income
+            "Transfer" -> TransactionType.Transfer
+            else -> TransactionType.Expense
+        }
+        return Transaction(
+            userLocalDate = parsed.userLocalDate,
+            amountUsd = parsed.amountUsd ?: BigDecimal("0.00"),
+            merchant = parsed.merchant.ifBlank { "Unknown" },
+            description = parsed.description,
+            type = type,
+            expenseCategory = parsed.expenseCategory,
+            incomeCategory = parsed.incomeCategory,
+            tags = parsed.tags,
+            account = parsed.account,
+            splitOverallChargedUsd = parsed.splitOverallChargedUsd,
+            note = parsed.note,
+            confidence = parsed.confidence,
+            status = TransactionStatus.DRAFT
+        )
     }
 }

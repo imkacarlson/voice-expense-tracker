@@ -41,11 +41,15 @@ class StagedParsingOrchestratorTest {
             heuristicExtractor = heuristicExtractor,
             genAiGateway = gateway,
             focusedPromptBuilder = focusedPromptBuilder,
-            thresholds = thresholds,
-            heuristicProvider = { _, _ -> draft }
+            thresholds = thresholds
+        )
+        val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
+            heuristicDraft = draft,
+            targetFields = emptySet(),
+            stage1DurationMs = 0L
         )
 
-        val result = orchestrator.parseStaged("coffee run", ParsingContext())
+        val result = orchestrator.parseStaged("coffee run", ParsingContext(), snapshot)
 
         assertThat(gateway.calls).isEqualTo(0)
         assertThat(result.fieldsRefined).isEmpty()
@@ -80,11 +84,21 @@ class StagedParsingOrchestratorTest {
             heuristicExtractor = heuristicExtractor,
             genAiGateway = gateway,
             focusedPromptBuilder = focusedPromptBuilder,
-            thresholds = thresholds,
-            heuristicProvider = { _, _ -> draft }
+            thresholds = thresholds
+        )
+        val target = setOf(
+            FieldKey.MERCHANT,
+            FieldKey.DESCRIPTION,
+            FieldKey.EXPENSE_CATEGORY,
+            FieldKey.TAGS
+        )
+        val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
+            heuristicDraft = draft,
+            targetFields = target,
+            stage1DurationMs = 0L
         )
 
-        val result = orchestrator.parseStaged("coffee at blue bottle", ParsingContext())
+        val result = orchestrator.parseStaged("coffee at blue bottle", ParsingContext(), snapshot)
 
         assertThat(gateway.calls).isEqualTo(1)
         assertThat(result.targetFields).containsAtLeast(
@@ -126,11 +140,15 @@ class StagedParsingOrchestratorTest {
             heuristicExtractor = heuristicExtractor,
             genAiGateway = gateway,
             focusedPromptBuilder = focusedPromptBuilder,
-            thresholds = thresholds,
-            heuristicProvider = { _, _ -> draft }
+            thresholds = thresholds
+        )
+        val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
+            heuristicDraft = draft,
+            targetFields = setOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY),
+            stage1DurationMs = 0L
         )
 
-        val result = orchestrator.parseStaged("something", ParsingContext())
+        val result = orchestrator.parseStaged("something", ParsingContext(), snapshot)
 
         assertThat(gateway.calls).isEqualTo(1)
         assertThat(result.fieldsRefined).isEmpty()

@@ -33,6 +33,26 @@ class HybridTransactionParser(
             thresholds = thresholds
         )
     }
+
+    suspend fun prepareStage1Snapshot(
+        input: String,
+        context: ParsingContext = ParsingContext()
+    ): StagedParsingOrchestrator.Stage1Snapshot {
+        val snapshot = stagedOrchestrator.prepareStage1(input, context)
+        return if (stagedConfig.enabled) snapshot else snapshot.copy(targetFields = emptySet())
+    }
+
+    suspend fun completeStagedParsing(
+        input: String,
+        context: ParsingContext,
+        stage1Snapshot: StagedParsingOrchestrator.Stage1Snapshot
+    ): HybridParsingResult {
+        return if (!stagedConfig.enabled) {
+            parse(input, context)
+        } else {
+            parseStaged(input, context, stage1Snapshot)
+        }
+    }
     suspend fun parse(input: String, context: ParsingContext = ParsingContext()): HybridParsingResult {
         Log.i(TAG, "HybridTransactionParser.parse() start text='${input.take(120)}'")
         if (stagedConfig.enabled) {
@@ -152,8 +172,12 @@ class HybridTransactionParser(
         return result
     }
 
-    private suspend fun parseStaged(input: String, context: ParsingContext): HybridParsingResult {
-        val staged = stagedOrchestrator.parseStaged(input, context)
+    private suspend fun parseStaged(
+        input: String,
+        context: ParsingContext,
+        stage1Snapshot: StagedParsingOrchestrator.Stage1Snapshot? = null
+    ): HybridParsingResult {
+        val staged = stagedOrchestrator.parseStaged(input, context, stage1Snapshot)
         val method = if (staged.fieldsRefined.isNotEmpty()) ProcessingMethod.AI else ProcessingMethod.HEURISTIC
         val validated = staged.fieldsRefined.isNotEmpty() && staged.refinementErrors.isEmpty()
         val confidence = ConfidenceScorer.score(method, validated, staged.mergedResult)

@@ -4,7 +4,6 @@ import androidx.test.ext.junit.runners.AndroidJUnit4
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
-import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
@@ -24,15 +23,11 @@ class StagedParsingPerformanceTest {
             heuristicExtractor = heuristicExtractor,
             genAiGateway = DelayGateway(delayMs = 0, responseJson = MINIMAL_JSON),
             focusedPromptBuilder = FocusedPromptBuilder(),
-            thresholds = FieldConfidenceThresholds.DEFAULT,
-            heuristicProvider = { _, _ -> highConfidenceDraft() }
+            thresholds = FieldConfidenceThresholds.DEFAULT
         )
+        val snapshot = orchestrator.prepareStage1("simple input", ParsingContext())
 
-        val result = orchestrator.parseStaged("simple input", ParsingContext())
-
-        assertThat(result.stage1DurationMs).isLessThan(100)
-        assertThat(result.stage2DurationMs).isEqualTo(0)
-        assertThat(result.fieldsRefined).isEmpty()
+        assertThat(snapshot.stage1DurationMs).isLessThan(100)
     }
 
     @Test
@@ -41,11 +36,16 @@ class StagedParsingPerformanceTest {
             heuristicExtractor = heuristicExtractor,
             genAiGateway = DelayGateway(delayMs = 1500, responseJson = FOCUSED_JSON),
             focusedPromptBuilder = FocusedPromptBuilder(),
-            thresholds = FieldConfidenceThresholds.DEFAULT,
-            heuristicProvider = { _, _ -> lowConfidenceDraft() }
+            thresholds = FieldConfidenceThresholds.DEFAULT
         )
 
-        val result = orchestrator.parseStaged("coffee purchase", ParsingContext())
+        val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
+            heuristicDraft = lowConfidenceDraft(),
+            targetFields = FieldSelectionStrategy.AI_REFINABLE_FIELDS,
+            stage1DurationMs = 5L
+        )
+
+        val result = orchestrator.parseStaged("coffee purchase", ParsingContext(), snapshot)
 
         assertThat(result.fieldsRefined).isNotEmpty()
         assertThat(result.stage2DurationMs).isAtMost(2000)
@@ -104,22 +104,6 @@ class StagedParsingPerformanceTest {
             return Result.success(MINIMAL_JSON)
         }
     }
-
-    private fun highConfidenceDraft(): HeuristicDraft = HeuristicDraft(
-        merchant = "Trader Joe's",
-        description = "Groceries",
-        expenseCategory = "Groceries",
-        incomeCategory = null,
-        tags = listOf("food"),
-        note = "",
-        confidences = mapOf(
-            FieldKey.MERCHANT to 0.95f,
-            FieldKey.DESCRIPTION to 0.95f,
-            FieldKey.EXPENSE_CATEGORY to 0.95f,
-            FieldKey.TAGS to 0.9f,
-            FieldKey.NOTE to 0.9f
-        )
-    )
 
     private fun lowConfidenceDraft(): HeuristicDraft = HeuristicDraft(
         merchant = null,

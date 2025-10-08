@@ -1,17 +1,21 @@
 package com.voiceexpense.ui.confirmation
 
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.hybrid.FieldRefinementTracker
 import com.voiceexpense.ai.parsing.hybrid.FieldSelectionStrategy
+import com.voiceexpense.ai.parsing.hybrid.StagedRefinementDispatcher
 import com.voiceexpense.data.model.Transaction
 import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.data.repository.TransactionRepository
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -39,6 +43,7 @@ class ConfirmationViewModel(
     private val _fieldLoadingStates = MutableStateFlow<Map<FieldKey, Boolean>>(emptyLoadingMap())
     val fieldLoadingStates: StateFlow<Map<FieldKey, Boolean>> = _fieldLoadingStates
     val refinementState get() = refinementTracker.refinementState
+    private var refinementJob: Job? = null
 
     data class UiVisibility(
         val showAmount: Boolean,
@@ -53,10 +58,7 @@ class ConfirmationViewModel(
     val visibility: StateFlow<UiVisibility> = _visibility
 
     fun setDraft(draft: Transaction, refinedFields: Set<FieldKey> = emptySet()) {
-        setHeuristicDraft(draft, emptySet())
-        if (refinedFields.isNotEmpty()) {
-            markCompletedFields(draft, refinedFields)
-        }
+        setHeuristicDraft(draft, refinedFields)
     }
 
     fun setHeuristicDraft(draft: Transaction, loadingFields: Set<FieldKey>) {
@@ -66,6 +68,7 @@ class ConfirmationViewModel(
         }
         updateLoadingStates(loadingFields)
         applyDraftState(draft)
+        observeRefinementUpdates(draft.id)
     }
 
     fun setSelectedType(type: TransactionType) {
@@ -113,6 +116,7 @@ class ConfirmationViewModel(
         _transaction.value = null
         _confidence.value = ConfidenceUiState(confidence = 1f, isLowConfidence = false)
         updateLoadingStates(emptySet())
+        refinementJob?.cancel()
     }
 
     // Apply manual edits from UI and persist as draft before confirmation
@@ -180,6 +184,54 @@ class ConfirmationViewModel(
         recomputeValidation()
     }
 
+    private fun observeRefinementUpdates(transactionId: String) {
+        refinementJob?.cancel()
+        refinementJob = viewModelScope.launch {
+            StagedRefinementDispatcher.updates
+                .filter { it.transactionId == transactionId }
+                .collect { event -> handleRefinementEvent(event) }
+        }
+    }
+
+    private fun handleRefinementEvent(event: StagedRefinementDispatcher.RefinementEvent) {
+        val current = _transaction.value ?: return
+        if (current.id != event.transactionId) return
+
+        if (event.refinedFields.isNotEmpty()) {
+            applyAiRefinements(event.refinedFields)
+        }
+
+        val afterFields = _transaction.value ?: current
+
+        val remaining = event.targetFields - event.refinedFields.keys
+        if (remaining.isNotEmpty()) {
+            remaining.forEach { field ->
+                if (!refinementTracker.isUserModified(field)) {
+                    refinementTracker.markCompleted(field, null)
+                }
+                setFieldLoading(field, false)
+            }
+        } else if (event.refinedFields.isEmpty()) {
+            event.targetFields.forEach { field -> setFieldLoading(field, false) }
+        }
+
+        event.confidence?.let { newConfidence ->
+            if (afterFields.confidence != newConfidence) {
+                val updatedTxn = afterFields.copy(confidence = newConfidence)
+                _transaction.value = updatedTxn
+                updateConfidence(newConfidence)
+                recomputeValidation()
+                viewModelScope.launch { repo.saveDraft(updatedTxn) }
+            } else {
+                updateConfidence(afterFields.confidence)
+            }
+        }
+
+        if (event.errors.isNotEmpty()) {
+            Log.w("FieldRefinement", "Staged parsing errors: ${event.errors.joinToString()}")
+        }
+    }
+
     private fun updateTransactionField(
         transaction: Transaction,
         field: FieldKey,
@@ -233,26 +285,4 @@ class ConfirmationViewModel(
 
     private fun emptyLoadingMap(): Map<FieldKey, Boolean> =
         FieldSelectionStrategy.AI_REFINABLE_FIELDS.associateWith { false }
-
-    private fun markCompletedFields(transaction: Transaction, fields: Set<FieldKey>) {
-        fields.forEach { field ->
-            val value = valueForField(transaction, field)
-            refinementTracker.markCompleted(field, value)
-            setFieldLoading(field, false)
-        }
-    }
-
-    private fun valueForField(transaction: Transaction, field: FieldKey): Any? = when (field) {
-        FieldKey.AMOUNT_USD -> transaction.amountUsd
-        FieldKey.MERCHANT -> transaction.merchant
-        FieldKey.DESCRIPTION -> transaction.description
-        FieldKey.TYPE -> transaction.type
-        FieldKey.EXPENSE_CATEGORY -> transaction.expenseCategory
-        FieldKey.INCOME_CATEGORY -> transaction.incomeCategory
-        FieldKey.TAGS -> transaction.tags
-        FieldKey.USER_LOCAL_DATE -> transaction.userLocalDate
-        FieldKey.ACCOUNT -> transaction.account
-        FieldKey.SPLIT_OVERALL_CHARGED_USD -> transaction.splitOverallChargedUsd
-        FieldKey.NOTE -> transaction.note
-    }
 }

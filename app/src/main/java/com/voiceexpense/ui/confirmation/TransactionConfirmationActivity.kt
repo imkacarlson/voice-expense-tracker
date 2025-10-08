@@ -41,7 +41,7 @@ import androidx.core.widget.doAfterTextChanged
 class TransactionConfirmationActivity : AppCompatActivity() {
     companion object {
         const val EXTRA_TRANSACTION_ID = "transaction_id"
-        const val EXTRA_REFINED_FIELDS = "refined_fields"
+        const val EXTRA_LOADING_FIELDS = "loading_fields"
     }
     @Inject lateinit var repo: TransactionRepository
     private lateinit var viewModel: ConfirmationViewModel
@@ -141,7 +141,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         // Load draft by id if provided
         val id = intent?.getStringExtra(EXTRA_TRANSACTION_ID)
         val refinedFromIntent: Set<FieldKey> = intent
-            ?.getStringArrayListExtra(EXTRA_REFINED_FIELDS)
+            ?.getStringArrayListExtra(EXTRA_LOADING_FIELDS)
             ?.mapNotNull { raw -> runCatching { FieldKey.valueOf(raw) }.getOrNull() }
             ?.toSet()
             ?: emptySet()
@@ -158,7 +158,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 finish()
                 return@launch
             }
-            viewModel.setDraft(draft, refinedFromIntent)
+            viewModel.setHeuristicDraft(draft, refinedFromIntent)
             if (draft.confidence < 0.7f) {
                 title.text = getString(R.string.app_name) + "  •  Verify highlighted fields"
                 Toast.makeText(this@TransactionConfirmationActivity, "Low confidence — please verify fields.", Toast.LENGTH_LONG).show()

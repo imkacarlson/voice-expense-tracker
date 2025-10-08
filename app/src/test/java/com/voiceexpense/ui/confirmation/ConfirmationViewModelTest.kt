@@ -5,6 +5,7 @@ import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
 import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
 import com.voiceexpense.ai.parsing.hybrid.PromptBuilder
+import com.voiceexpense.ai.parsing.hybrid.StagedRefinementDispatcher
 import io.mockk.mockk
 import io.mockk.every
 import com.voiceexpense.ai.parsing.heuristic.FieldKey
@@ -175,6 +176,58 @@ class ConfirmationViewModelTest {
         assertThat(loading[FieldKey.MERCHANT]).isTrue()
         assertThat(loading[FieldKey.DESCRIPTION]).isTrue()
         assertThat(loading[FieldKey.EXPENSE_CATEGORY]).isFalse()
+    }
+
+    @Test
+    fun staged_refinement_event_updates_fields_and_confidence() = runBlocking {
+        val dao = com.voiceexpense.worker.FakeDao()
+        val repo = TransactionRepository(dao)
+        val mmDisabled = mockk<com.voiceexpense.ai.model.ModelManager>().apply { every { isModelReady() } returns false }
+        val dummyGateway = object : GenAiGateway {
+            override fun isAvailable(): Boolean = false
+            override suspend fun structured(prompt: String): Result<String> = Result.failure(Exception("unavailable"))
+        }
+        val hybrid = HybridTransactionParser(
+            dummyGateway,
+            PromptBuilder(),
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
+        val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
+        val base = Transaction(
+            userLocalDate = LocalDate.now(),
+            amountUsd = BigDecimal("8.00"),
+            merchant = "Unknown",
+            description = null,
+            type = TransactionType.Expense,
+            expenseCategory = "Other",
+            incomeCategory = null,
+            tags = emptyList(),
+            account = null,
+            splitOverallChargedUsd = null,
+            note = null,
+            confidence = 0.5f
+        )
+        vm.setHeuristicDraft(base, setOf(FieldKey.MERCHANT))
+        mainRule.runCurrent()
+
+        StagedRefinementDispatcher.emit(
+            StagedRefinementDispatcher.RefinementEvent(
+                transactionId = base.id,
+                refinedFields = mapOf(FieldKey.MERCHANT to "Blue Bottle"),
+                targetFields = setOf(FieldKey.MERCHANT),
+                errors = emptyList(),
+                stage1DurationMs = 10,
+                stage2DurationMs = 100,
+                confidence = 0.9f
+            )
+        )
+
+        mainRule.runCurrent()
+
+        val updated = vm.transaction.value!!
+        assertThat(updated.merchant).isEqualTo("Blue Bottle")
+        assertThat(vm.fieldLoadingStates.value[FieldKey.MERCHANT]).isFalse()
+        assertThat(vm.confidence.value.confidence).isEqualTo(0.9f)
     }
 
     @Test

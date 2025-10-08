@@ -31,13 +31,44 @@ class StagedParsingOrchestrator(
     private val genAiGateway: GenAiGateway,
     private val focusedPromptBuilder: FocusedPromptBuilder,
     private val thresholds: FieldConfidenceThresholds = FieldConfidenceThresholds.DEFAULT,
-    private val fieldSelector: FieldSelectionStrategy = FieldSelectionStrategy,
-    private val heuristicProvider: ((String, ParsingContext) -> HeuristicDraft)? = null
+    private val fieldSelector: FieldSelectionStrategy = FieldSelectionStrategy
 ) {
+
+    data class Stage1Snapshot(
+        val heuristicDraft: HeuristicDraft,
+        val targetFields: Set<FieldKey>,
+        val stage1DurationMs: Long
+    )
+
+    suspend fun prepareStage1(
+        input: String,
+        context: ParsingContext = ParsingContext()
+    ): Stage1Snapshot {
+        val heuristicDraft: HeuristicDraft
+        val durationMs = measureTimeMillis {
+            heuristicDraft = heuristicExtractor.extract(input, context)
+        }
+        val targetFields = fieldSelector
+            .selectFieldsForRefinement(heuristicDraft, thresholds)
+            .toSet()
+        try {
+            Log.d(
+                "AI.Debug",
+                "Stage1 heuristics duration=${durationMs}ms confidences=${heuristicDraft.confidences}"
+            )
+        } catch (_: Throwable) {}
+        Log.d(TAG, "Stage1 duration=${durationMs}ms confidences=${heuristicDraft.confidences}")
+        return Stage1Snapshot(
+            heuristicDraft = heuristicDraft,
+            targetFields = targetFields,
+            stage1DurationMs = durationMs
+        )
+    }
 
     suspend fun parseStaged(
         input: String,
-        context: ParsingContext = ParsingContext()
+        context: ParsingContext = ParsingContext(),
+        stage1Snapshot: Stage1Snapshot? = null
     ): StagedParsingResult {
         try {
             Log.d("AI.Debug", "Staged parse start input='${input.take(80)}'")
@@ -45,23 +76,20 @@ class StagedParsingOrchestrator(
         Log.d(TAG, "parseStaged input='${input.take(80)}'")
         val refinementErrors = mutableListOf<String>()
 
-        var heuristicDraft: HeuristicDraft
-        val stage1DurationMs = measureTimeMillis {
-            heuristicDraft = heuristicProvider?.invoke(input, context)
-                ?: heuristicExtractor.extract(input, context)
+        val stage1 = stage1Snapshot ?: prepareStage1(input, context)
+        val heuristicDraft = stage1.heuristicDraft
+        val stage1DurationMs = stage1.stage1DurationMs
+        val targetFields = stage1.targetFields
+
+        if (stage1Snapshot != null) {
+            try {
+                Log.d(
+                    "AI.Debug",
+                    "Stage1 heuristics precomputed duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}"
+                )
+            } catch (_: Throwable) {}
+            Log.d(TAG, "Stage1 (precomputed) duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}")
         }
-
-        try {
-            Log.d(
-                "AI.Debug",
-                "Stage1 heuristics duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}"
-            )
-        } catch (_: Throwable) {}
-        Log.d(TAG, "Stage1 duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}")
-
-        val targetFields = fieldSelector
-            .selectFieldsForRefinement(heuristicDraft, thresholds)
-            .toSet()
         val genAiAvailable = genAiGateway.isAvailable()
 
         try {
