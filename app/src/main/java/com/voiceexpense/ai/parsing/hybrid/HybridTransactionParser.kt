@@ -90,6 +90,7 @@ class HybridTransactionParser(
                 try {
                     Log.d("AI.Debug", "AI response received, length=${ok?.length ?: 0}")
                     Log.d("AI.Debug", "Full AI response: '${ok}'")
+                    ok?.let { logFullResponse(it) }
                 } catch (_: Throwable) {}
                 if (!ok.isNullOrBlank()) {
                     Log.i(TAG, "LLM returned payload length=${ok.length}")
@@ -236,6 +237,26 @@ class HybridTransactionParser(
             confidence = o.optDouble("confidence", 0.75).toFloat()
         )
         return StructuredOutputValidator.sanitizeAmounts(result)
+    }
+
+    private fun logFullResponse(response: String) {
+        try {
+            val text = response.ifBlank { "<blank>" }
+            Log.d("AI.Debug", "Full AI response start >>>")
+            val chunkSize = 2000
+            var index = 0
+            var chunk = 1
+            while (index < text.length) {
+                val end = (index + chunkSize).coerceAtMost(text.length)
+                val segment = text.substring(index, end)
+                Log.d("AI.Debug", "Full AI response chunk $chunk:\n$segment")
+                index = end
+                chunk += 1
+            }
+            Log.d("AI.Debug", "<<< Full AI response end (${text.length} chars)")
+        } catch (_: Throwable) {
+            // ignore logging failures
+        }
     }
 
     private fun mergeResults(
