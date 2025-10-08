@@ -37,6 +37,7 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
                     Result.failure(IllegalStateException("Empty response"))
                 } else {
                     Log.d("AI.MP", "LLM respond ok, length=${out.length}")
+                    logFullModelResponse(out)
                     Result.success(out)
                 }
             } catch (t: Throwable) {
@@ -78,5 +79,25 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
     fun close() {
         try { llm?.close() } catch (_: Throwable) {}
         llm = null
+    }
+
+    private fun logFullModelResponse(response: String) {
+        try {
+            val text = response.ifBlank { "<blank>" }
+            Log.d("AI.Debug", "MediaPipe response start >>>")
+            val chunkSize = 2000
+            var index = 0
+            var chunk = 1
+            while (index < text.length) {
+                val end = (index + chunkSize).coerceAtMost(text.length)
+                val segment = text.substring(index, end)
+                Log.d("AI.Debug", "MediaPipe response chunk $chunk:\n$segment")
+                index = end
+                chunk += 1
+            }
+            Log.d("AI.Debug", "<<< MediaPipe response end (${text.length} chars)")
+        } catch (_: Throwable) {
+            // ignore logging failures
+        }
     }
 }
