@@ -4,6 +4,7 @@ import android.util.Log
 import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
 import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
+import java.util.Locale
 
 /**
  * Determines which fields should be refined by Stage 2 AI calls.
@@ -75,11 +76,18 @@ object FieldSelectionStrategy {
     }
 
     private fun isMissing(field: FieldKey, draft: HeuristicDraft): Boolean {
+        val type = draft.type?.lowercase(Locale.US)
         return when (field) {
             FieldKey.MERCHANT -> draft.merchant.isNullOrBlank()
             FieldKey.DESCRIPTION -> draft.description.isNullOrBlank()
-            FieldKey.EXPENSE_CATEGORY -> draft.expenseCategory.isNullOrBlank()
-            FieldKey.INCOME_CATEGORY -> draft.incomeCategory.isNullOrBlank()
+            FieldKey.EXPENSE_CATEGORY -> when (type) {
+                "income", "transfer" -> false
+                else -> draft.expenseCategory.isNullOrBlank()
+            }
+            FieldKey.INCOME_CATEGORY -> when (type) {
+                "income" -> draft.incomeCategory.isNullOrBlank()
+                else -> false
+            }
             FieldKey.TAGS -> draft.tags.isEmpty()
             FieldKey.NOTE -> draft.note.isNullOrBlank()
             else -> false

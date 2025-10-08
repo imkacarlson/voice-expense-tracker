@@ -64,7 +64,7 @@ class FocusedPromptBuilder {
             fields.forEach { field ->
                 appendLine("Field: ${fieldLabel(field)} (key \"${jsonKey(field)}\")")
                 appendLine("Heuristic: ${formatHeuristic(field, heuristicDraft)}")
-                val options = formatOptions(field, context)
+                val options = formatOptions(field, heuristicDraft, context, input)
                 if (options.isNotBlank()) {
                     appendLine("Options: $options")
                 }
@@ -85,7 +85,7 @@ class FocusedPromptBuilder {
         val heuristics = fields.joinToString(separator = "\n") { field ->
             "- ${jsonKey(field)}: ${formatHeuristic(field, heuristicDraft)}"
         }
-        val options = buildSharedOptions(fields, context)
+        val options = buildSharedOptions(fields, heuristicDraft, context, input)
 
         return buildString {
             appendLine(FOCUSED_SYSTEM)
@@ -122,8 +122,13 @@ class FocusedPromptBuilder {
         }
     }
 
-    private fun formatOptions(field: FieldKey, context: ParsingContext): String {
-        val options = when (field) {
+    private fun formatOptions(
+        field: FieldKey,
+        draft: HeuristicDraft,
+        context: ParsingContext,
+        input: String
+    ): String {
+        val raw = when (field) {
             FieldKey.MERCHANT -> context.recentMerchants
             FieldKey.DESCRIPTION -> emptyList()
             FieldKey.EXPENSE_CATEGORY -> context.allowedExpenseCategories.ifEmpty { context.recentCategories }
@@ -131,12 +136,24 @@ class FocusedPromptBuilder {
             FieldKey.TAGS -> context.allowedTags
             FieldKey.NOTE -> emptyList()
             else -> emptyList()
-        }.take(MAX_OPTIONS)
+        }
 
+        val filtered = if (field == FieldKey.TAGS) {
+            filterTagOptions(raw, draft, input)
+        } else {
+            raw
+        }
+
+        val options = filtered.take(MAX_OPTIONS)
         return if (options.isEmpty()) "" else options.joinToString()
     }
 
-    private fun buildSharedOptions(fields: Set<FieldKey>, context: ParsingContext): String {
+    private fun buildSharedOptions(
+        fields: Set<FieldKey>,
+        draft: HeuristicDraft,
+        context: ParsingContext,
+        input: String
+    ): String {
         val parts = mutableListOf<String>()
         if (fields.any { it == FieldKey.MERCHANT } && context.recentMerchants.isNotEmpty()) {
             parts += "recentMerchants=${context.recentMerchants.take(MAX_OPTIONS).joinToString()}"
@@ -148,18 +165,21 @@ class FocusedPromptBuilder {
             parts += "incomeCategories=${context.allowedIncomeCategories.take(MAX_OPTIONS).joinToString()}"
         }
         if (fields.any { it == FieldKey.TAGS } && context.allowedTags.isNotEmpty()) {
-            parts += "tags=${context.allowedTags.take(MAX_OPTIONS).joinToString()}"
+            val tags = filterTagOptions(context.allowedTags, draft, input).take(MAX_OPTIONS)
+            if (tags.isNotEmpty()) {
+                parts += "tags=${tags.joinToString()}"
+            }
         }
         return parts.joinToString("; ")
     }
 
     private fun instructionFor(field: FieldKey): String = when (field) {
-            FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., 'CVS', 'Trader Joe's')."
-            FieldKey.DESCRIPTION -> "Provide a 1-3 word noun phrase describing the purchase (examples: 'Prescription', 'Birthday card', 'Lunch'). Avoid verbs."
+            FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"CVS\", \"Trader Joe's\")."
+            FieldKey.DESCRIPTION -> "Provide a 1-3 word noun phrase describing the purchase (examples: \"Prescription\", \"Birthday card\", \"Lunch\"). Avoid verbs."
             FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category."
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
-            FieldKey.TAGS -> "Return an array of tags chosen from the allowed list. Only include 'Splitwise' when the input mentions multiple amounts or splitting."
-            FieldKey.NOTE -> "Return a brief note only when the input explicitly provides one, otherwise null."
+            FieldKey.TAGS -> "Return an array of tags chosen from the allowed list. Include \"Splitwise\" only when the input mentions splitting or multiple amounts."
+            FieldKey.NOTE -> "Return a brief note only when the input explicitly provides one; otherwise return null."
             else -> "" // Should not be requested here.
     }
 
@@ -193,12 +213,20 @@ class FocusedPromptBuilder {
 
     private fun StringBuilder.appendGuidelines() {
         appendLine("Respond with compact JSON containing only the listed keys.")
-        appendLine("Guidelines:")
-        appendLine("- Do not wrap the JSON in markdown or code fences.")
-        appendLine("- Description must be a short noun phrase (no verbs or sentences).")
-        appendLine("- Tags must be a JSON array; include only allowed tags. Use 'Splitwise' only when the user mentioned splitting or multiple amounts.")
-        appendLine("- Prefer provided options when selecting categories or merchants.")
-        append("If a value cannot be improved, return null or omit the field rather than guessing.")
+        append("Guidelines: no markdown; description must be a 1-3 word noun phrase; tags must be a JSON array; include \"Splitwise\" only when the input mentions splitting or multiple amounts; prefer provided options; if unsure, return null instead of guessing.")
+    }
+
+    private fun filterTagOptions(
+        options: List<String>,
+        draft: HeuristicDraft,
+        input: String
+    ): List<String> {
+        if (options.isEmpty()) return options
+        val allowSplitwise = draft.tags.any { it.equals("splitwise", ignoreCase = true) } ||
+            SPLIT_HINT_REGEX.containsMatchIn(input.lowercase(Locale.US))
+        return options.filterNot { tag ->
+            tag.equals("Splitwise", ignoreCase = true) && !allowSplitwise
+        }
     }
 
     companion object {
@@ -214,5 +242,7 @@ class FocusedPromptBuilder {
             FieldKey.TAGS,
             FieldKey.NOTE
         )
+
+        private val SPLIT_HINT_REGEX = Regex("""(?i)(splitwise|split|splitting|my share|owe|i owe|owed)""")
     }
 }
