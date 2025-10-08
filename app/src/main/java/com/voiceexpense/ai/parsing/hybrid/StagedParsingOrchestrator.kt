@@ -136,6 +136,7 @@ class StagedParsingOrchestrator(
             targetFields = targetFields,
             context = context
         )
+        logFocusedPrompt(prompt)
         val refinedFields = mutableMapOf<FieldKey, Any?>()
 
         var stage2DurationMs = 0L
@@ -163,6 +164,7 @@ class StagedParsingOrchestrator(
                 )
             } catch (_: Throwable) {}
             Log.d(TAG, "Stage2 duration=${stage2DurationMs}ms payloadSize=${aiPayload?.length ?: 0}")
+            aiPayload?.let { logFocusedResponse(it) }
         } catch (timeout: TimeoutCancellationException) {
             stage2DurationMs = AI_TIMEOUT_MS
             refinementErrors += "AI timeout after ${AI_TIMEOUT_MS}ms"
@@ -322,5 +324,45 @@ class StagedParsingOrchestrator(
         FieldKey.TAGS -> "tags"
         FieldKey.NOTE -> "note"
         else -> field.name.lowercase(Locale.US)
+    }
+
+    private fun logFocusedPrompt(prompt: String) {
+        if (prompt.isEmpty()) return
+        try {
+            Log.d("AI.Debug", "Focused prompt start >>>")
+            val chunkSize = 2000
+            var index = 0
+            var chunk = 1
+            while (index < prompt.length) {
+                val end = (index + chunkSize).coerceAtMost(prompt.length)
+                val segment = prompt.substring(index, end)
+                Log.d("AI.Debug", "Focused prompt chunk $chunk:\n$segment")
+                index = end
+                chunk += 1
+            }
+            Log.d("AI.Debug", "<<< Focused prompt end (${prompt.length} chars)")
+        } catch (_: Throwable) {
+            // ignore logging failures
+        }
+    }
+
+    private fun logFocusedResponse(response: String) {
+        try {
+            val text = response.ifBlank { "<blank>" }
+            Log.d("AI.Debug", "Focused response start >>>")
+            val chunkSize = 2000
+            var index = 0
+            var chunk = 1
+            while (index < text.length) {
+                val end = (index + chunkSize).coerceAtMost(text.length)
+                val segment = text.substring(index, end)
+                Log.d("AI.Debug", "Focused response chunk $chunk:\n$segment")
+                index = end
+                chunk += 1
+            }
+            Log.d("AI.Debug", "<<< Focused response end (${text.length} chars)")
+        } catch (_: Throwable) {
+            // ignore logging failures
+        }
     }
 }
