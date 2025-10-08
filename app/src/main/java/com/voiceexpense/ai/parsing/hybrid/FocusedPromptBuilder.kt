@@ -71,8 +71,7 @@ class FocusedPromptBuilder {
                 appendLine("Instruction: ${instructionFor(field)}")
                 appendLine()
             }
-            appendLine("Respond with compact JSON containing only the listed keys.")
-            append("Do not mention other fields or explanations.")
+            appendGuidelines()
         }
     }
 
@@ -99,7 +98,7 @@ class FocusedPromptBuilder {
             if (options.isNotBlank()) {
                 appendLine("Options: $options")
             }
-            append("Keep responses short. Do not include explanations or extra keys.")
+            appendGuidelines()
         }
     }
 
@@ -155,13 +154,13 @@ class FocusedPromptBuilder {
     }
 
     private fun instructionFor(field: FieldKey): String = when (field) {
-        FieldKey.MERCHANT -> "Return the merchant name users would expect to see."
-        FieldKey.DESCRIPTION -> "Provide a short human-friendly description."
-        FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category."
-        FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
-        FieldKey.TAGS -> "Return a concise list of tags (lowercase words)."
-        FieldKey.NOTE -> "Return a short note if helpful, otherwise null."
-        else -> "" // Should not be requested here.
+            FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., 'CVS', 'Trader Joe's')."
+            FieldKey.DESCRIPTION -> "Provide a 1-3 word noun phrase describing the purchase (examples: 'Prescription', 'Birthday card', 'Lunch'). Avoid verbs."
+            FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category."
+            FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
+            FieldKey.TAGS -> "Return an array of tags chosen from the allowed list. Only include 'Splitwise' when the input mentions multiple amounts or splitting."
+            FieldKey.NOTE -> "Return a brief note only when the input explicitly provides one, otherwise null."
+            else -> "" // Should not be requested here.
     }
 
     private fun fieldLabel(field: FieldKey): String = when (field) {
@@ -190,6 +189,16 @@ class FocusedPromptBuilder {
         append('"')
         append(this@quoteValue)
         append('"')
+    }
+
+    private fun StringBuilder.appendGuidelines() {
+        appendLine("Respond with compact JSON containing only the listed keys.")
+        appendLine("Guidelines:")
+        appendLine("- Do not wrap the JSON in markdown or code fences.")
+        appendLine("- Description must be a short noun phrase (no verbs or sentences).")
+        appendLine("- Tags must be a JSON array; include only allowed tags. Use 'Splitwise' only when the user mentioned splitting or multiple amounts.")
+        appendLine("- Prefer provided options when selecting categories or merchants.")
+        append("If a value cannot be improved, return null or omit the field rather than guessing.")
     }
 
     companion object {
