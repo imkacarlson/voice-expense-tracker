@@ -17,7 +17,7 @@ import java.util.Locale
 import kotlin.system.measureTimeMillis
 
 private const val TAG = "StagedOrchestrator"
-private const val AI_TIMEOUT_MS = 5_000L
+private const val AI_TIMEOUT_MS = 12_000L
 
 /**
  * Coordinates the staged parsing pipeline: heuristics → focused AI refinement → merge.
