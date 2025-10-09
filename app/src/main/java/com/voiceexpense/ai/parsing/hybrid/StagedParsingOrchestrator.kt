@@ -152,7 +152,8 @@ class StagedParsingOrchestrator(
                 refinementErrors = refinementErrors
             )
             stage2DurationMs += attempt.durationMs
-            attempt.refinedValue?.let { value ->
+            val normalizedValue = normalizeFieldValue(field, attempt.refinedValue, context)
+            normalizedValue?.let { value ->
                 cumulativeRefinements[field] = value
                 heuristicDraft = applyRefinementToDraft(heuristicDraft, field, value)
             }
@@ -160,7 +161,7 @@ class StagedParsingOrchestrator(
                 callback(
                     FieldRefinementUpdate(
                         field = field,
-                        value = attempt.refinedValue,
+                        value = normalizedValue,
                         durationMs = attempt.durationMs,
                         error = attempt.errorMessage
                     )
@@ -376,6 +377,26 @@ class StagedParsingOrchestrator(
             if (trimmed.isEmpty()) return@mapNotNull null
             normalizedAllowed[trimmed.lowercase(Locale.US)]
         }.distinct()
+    }
+
+    private fun normalizeFieldValue(
+        field: FieldKey,
+        value: Any?,
+        context: ParsingContext
+    ): Any? = when (field) {
+        FieldKey.MERCHANT,
+        FieldKey.DESCRIPTION,
+        FieldKey.EXPENSE_CATEGORY,
+        FieldKey.INCOME_CATEGORY,
+        FieldKey.NOTE -> (value as? String)?.trim()?.takeUnless { it.isEmpty() }
+
+        FieldKey.TAGS -> {
+            val raw = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() }
+                ?: emptyList()
+            if (context.allowedTags.isEmpty()) raw.distinct() else normalizeTags(raw, context.allowedTags)
+        }
+
+        else -> value
     }
 
     private fun jsonKey(field: FieldKey): String = when (field) {
