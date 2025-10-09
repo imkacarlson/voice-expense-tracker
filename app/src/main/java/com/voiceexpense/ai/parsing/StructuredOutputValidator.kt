@@ -50,6 +50,10 @@ object StructuredOutputValidator {
                                 }
                                 reader.endArray()
                             }
+                            JsonReader.Token.STRING -> {
+                                // Allow a single string; downstream will coerce into a list
+                                reader.nextString()
+                            }
                             else -> return ValidationResult(false, "tags must be array")
                         }
                     } else {
@@ -69,8 +73,8 @@ object StructuredOutputValidator {
 
         // Second attempt: strip trailing commas before } or ] and retry
         val noTrailingCommas = json
-            .replace(Regex(""",\s*]"""), "]")
-            .replace(Regex(""",\s*}"""), "}")
+            .replace(Regex(",\\s*\\]"), "]")
+            .replace(Regex(",\\s*\\}"), "}")
         val second = check(noTrailingCommas)
         return if (second.valid) second else first
     }
