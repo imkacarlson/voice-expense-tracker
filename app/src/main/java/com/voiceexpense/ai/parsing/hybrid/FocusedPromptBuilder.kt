@@ -71,7 +71,7 @@ class FocusedPromptBuilder {
                 appendLine("Instruction: ${instructionFor(field)}")
                 appendLine()
             }
-            appendGuidelines()
+            appendGuidelines(fields.toSet())
         }
     }
 
@@ -98,7 +98,7 @@ class FocusedPromptBuilder {
             if (options.isNotBlank()) {
                 appendLine("Options: $options")
             }
-            appendGuidelines()
+            appendGuidelines(fields)
         }
     }
 
@@ -211,9 +211,13 @@ class FocusedPromptBuilder {
         append('"')
     }
 
-    private fun StringBuilder.appendGuidelines() {
+    private fun StringBuilder.appendGuidelines(fields: Set<FieldKey>) {
         appendLine("Respond with compact JSON containing only the listed keys.")
-        append("Guidelines: no markdown; description must be a 1-3 word noun phrase; tags must be a JSON array; include \"Splitwise\" only when the input mentions splitting or multiple amounts; prefer provided options; if unsure, return null instead of guessing.")
+        fields.sortedBy { FIELD_ORDER.indexOf(it).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }.forEach { field ->
+            guidelineFor(field)?.let { rule ->
+                appendLine("Guideline for ${jsonKey(field)}: $rule")
+            }
+        }
     }
 
     private fun filterTagOptions(
@@ -244,5 +248,15 @@ class FocusedPromptBuilder {
         )
 
         private val SPLIT_HINT_REGEX = Regex("""(?i)(splitwise|split|splitting|my share|owe|i owe|owed)""")
+
+        private fun guidelineFor(field: FieldKey): String? = when (field) {
+            FieldKey.MERCHANT -> "Return only the merchant or vendor name—no verbs, adjectives, or trailing phrases."
+            FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input."
+            FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category from the allowed list; return null if none apply."
+            FieldKey.INCOME_CATEGORY -> "Choose exactly one income category from the allowed list; return null if none apply."
+            FieldKey.TAGS -> "Return an array of distinct tags chosen from the allowed list. Include \"Splitwise\" only when the input mentions splitting or multiple amounts."
+            FieldKey.NOTE -> "Return a brief note only when the input explicitly provides note-like text; otherwise return null."
+            else -> null
+        }
     }
 }
