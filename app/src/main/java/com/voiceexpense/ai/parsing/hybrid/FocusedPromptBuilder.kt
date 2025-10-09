@@ -175,7 +175,7 @@ class FocusedPromptBuilder {
 
     private fun instructionFor(field: FieldKey): String = when (field) {
             FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"CVS\", \"Trader Joe's\")."
-            FieldKey.DESCRIPTION -> "Provide a 1-3 word noun phrase describing the purchase (examples: \"Prescription\", \"Birthday card\", \"Lunch\"). Avoid verbs."
+            FieldKey.DESCRIPTION -> "Provide a concise noun phrase describing the purchase (examples: \"Prescription\", \"Birthday card\", \"Lunch\"). Preserve key numbers or modifiers from the input. Avoid verbs."
             FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category."
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
             FieldKey.TAGS -> "Return an array of tags chosen from the allowed list. Include \"Splitwise\" only when the input mentions splitting or multiple amounts."
