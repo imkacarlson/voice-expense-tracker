@@ -83,6 +83,42 @@ class FieldSelectionStrategyTest {
     }
 
     @Test
+    fun when_expense_type_skips_income_category() {
+        val draft = HeuristicDraft(
+            type = "Expense",
+            expenseCategory = null,
+            incomeCategory = null,
+            confidences = mapOf(
+                FieldKey.EXPENSE_CATEGORY to 0.1f,
+                FieldKey.INCOME_CATEGORY to 0.1f
+            )
+        )
+
+        val fields = FieldSelectionStrategy.selectFieldsForRefinement(draft)
+
+        assertThat(fields).contains(FieldKey.EXPENSE_CATEGORY)
+        assertThat(fields).doesNotContain(FieldKey.INCOME_CATEGORY)
+    }
+
+    @Test
+    fun when_income_type_skips_expense_category() {
+        val draft = HeuristicDraft(
+            type = "Income",
+            expenseCategory = null,
+            incomeCategory = null,
+            confidences = mapOf(
+                FieldKey.EXPENSE_CATEGORY to 0.1f,
+                FieldKey.INCOME_CATEGORY to 0.1f
+            )
+        )
+
+        val fields = FieldSelectionStrategy.selectFieldsForRefinement(draft)
+
+        assertThat(fields).contains(FieldKey.INCOME_CATEGORY)
+        assertThat(fields).doesNotContain(FieldKey.EXPENSE_CATEGORY)
+    }
+
+    @Test
     fun respects_custom_thresholds() {
         val draft = HeuristicDraft(
             merchant = "Coffee Shop",

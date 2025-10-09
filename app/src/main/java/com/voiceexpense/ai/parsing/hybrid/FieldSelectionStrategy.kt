@@ -35,7 +35,8 @@ object FieldSelectionStrategy {
         heuristicDraft: HeuristicDraft,
         thresholds: FieldConfidenceThresholds = FieldConfidenceThresholds.DEFAULT
     ): List<FieldKey> {
-        val candidates: List<FieldCandidate> = AI_REFINABLE_FIELDS
+        val allowedFields = filterFieldsForType(heuristicDraft)
+        val candidates: List<FieldCandidate> = allowedFields
             .mapNotNull { field -> buildCandidate(field, heuristicDraft, thresholds) }
             .sortedWith(candidateComparator)
 
@@ -73,6 +74,15 @@ object FieldSelectionStrategy {
             confidence = confidence,
             missingValue = missingValue
         )
+    }
+
+    private fun filterFieldsForType(draft: HeuristicDraft): Set<FieldKey> {
+        val type = draft.type?.lowercase(Locale.US)
+        return when (type) {
+            "income" -> AI_REFINABLE_FIELDS - FieldKey.EXPENSE_CATEGORY
+            "transfer" -> AI_REFINABLE_FIELDS - setOf(FieldKey.EXPENSE_CATEGORY, FieldKey.INCOME_CATEGORY)
+            else -> AI_REFINABLE_FIELDS - if (type == "expense") setOf(FieldKey.INCOME_CATEGORY) else emptySet()
+        }
     }
 
     private fun isMissing(field: FieldKey, draft: HeuristicDraft): Boolean {
