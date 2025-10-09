@@ -67,4 +67,15 @@ class HeuristicExtractorTest {
         assertThat(draft.tags).contains("subscription")
         assertFalse(draft.requiresAi())
     }
+
+    @Test
+    fun `verbose merchant falls back for ai refinement`() {
+        val context = ParsingContext(defaultDate = LocalDate.of(2025, 9, 13))
+        val input = "at Taco Bell I just got a couple of seven layer burritos for 6 dollars"
+
+        val draft = extractor.extract(input, context)
+
+        assertThat(draft.merchant).isEqualTo("Taco Bell I just got a couple of seven layer burritos")
+        assertThat(draft.confidence(FieldKey.MERCHANT)).isWithin(0.0001f).of(0f)
+    }
 }

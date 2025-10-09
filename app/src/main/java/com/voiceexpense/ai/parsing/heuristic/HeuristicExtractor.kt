@@ -184,12 +184,27 @@ class HeuristicExtractor(
         val merchant = atMatch?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }
         if (merchant != null) {
             val cleaned = stripAccountMentions(merchant)
-            if (cleaned.isNotBlank()) {
-                return cleaned to 0.65f
+            val normalized = cleaned.ifBlank { merchant }
+            val suspicious = looksLikeVerboseMerchant(normalized)
+            val confidence = if (suspicious) 0f else 0.65f
+            val value = normalized.takeIf { it.isNotBlank() } ?: merchant
+            if (value.isNotBlank()) {
+                return value to confidence
             }
-            return merchant to 0.65f
+            return merchant to confidence
         }
         return null
+    }
+
+    private fun looksLikeVerboseMerchant(value: String): Boolean {
+        if (value.length <= 3) return false
+        val trimmed = value.trim()
+        if (trimmed.length > 30) return true
+        val lower = trimmed.lowercase(Locale.US)
+        val verbHits = VERB_CUES.count { lower.contains(it) }
+        if (verbHits >= 2) return true
+        if (FILLER_PHRASES.any { lower.contains(it) }) return true
+        return false
     }
 
     private fun inferAccount(lower: String, context: ParsingContext): Pair<String, Float>? {
@@ -266,6 +281,27 @@ class HeuristicExtractor(
         private val OVERALL_HINT_REGEX = Regex("(?i)(overall|total|charged|to my card|overall charged)")
         private val MERCHANT_REGEX = Regex("""(?i)(?:at|from)\s+([A-Za-z0-9&' ]{2,40})""")
         private val FOUR_DIGIT_REGEX = Regex("""(\d{4})""")
+        private val VERB_CUES = listOf(
+            " got ",
+            " get ",
+            " went ",
+            " buy ",
+            " bought ",
+            " charged ",
+            " spent ",
+            " paying ",
+            " pay ",
+            " grabbing ",
+            " taking "
+        )
+        private val FILLER_PHRASES = listOf(
+            " i just ",
+            " i got ",
+            " couple of ",
+            " charged to my ",
+            " on my ",
+            " for $"
+        )
 
         private val DATE_REGEX = Regex(
             "(?i)(january|february|march|april|may|june|july|august|september|october|november|december)\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(\\d{4}))?"
