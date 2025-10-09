@@ -13,7 +13,6 @@ import org.json.JSONArray
 import org.json.JSONObject
 import java.util.LinkedHashSet
 import java.util.Locale
-import kotlin.collections.ArrayDeque
 import kotlin.system.measureTimeMillis
 
 private const val TAG = "StagedOrchestrator"
@@ -134,46 +133,19 @@ class StagedParsingOrchestrator(
         }
         val cumulativeRefinements = linkedMapOf<FieldKey, Any?>()
         var stage2DurationMs = 0L
-
-        suspend fun runAttempt(
-            targets: LinkedHashSet<FieldKey>
-        ): RefinementAttempt {
-            if (targets.isEmpty()) return RefinementAttempt.empty()
-            return refineTargets(
+        orderedTargetFields.forEach { field ->
+            val attempt = refineSingleField(
+                field = field,
                 input = input,
                 context = context,
                 draftForPrompt = heuristicDraft,
-                targets = targets,
                 refinementErrors = refinementErrors
-            ).also { attempt ->
-                stage2DurationMs += attempt.durationMs
-                cumulativeRefinements += attempt.refinedFields
-                if (attempt.refinedFields.isNotEmpty()) {
-                    heuristicDraft = applyRefinementsToDraft(heuristicDraft, attempt.refinedFields)
-                }
+            )
+            stage2DurationMs += attempt.durationMs
+            attempt.refinedValue?.let { value ->
+                cumulativeRefinements[field] = value
+                heuristicDraft = applyRefinementToDraft(heuristicDraft, field, value)
             }
-        }
-
-        val remainingTargets = ArrayDeque(orderedTargetFields)
-        val firstTargets = remainingTargets
-            .removeFirstOrNull()
-            ?.let { linkedSetOf(it) }
-            ?: linkedSetOf()
-
-        val firstAttempt = runAttempt(firstTargets)
-
-        var continueToSecondCall = remainingTargets.isNotEmpty()
-        if (continueToSecondCall) {
-            val stillNeeded = fieldSelector
-                .selectFieldsForRefinement(heuristicDraft, thresholds)
-                .toSet()
-            remainingTargets.removeIf { it !in stillNeeded }
-            continueToSecondCall = remainingTargets.isNotEmpty() && firstAttempt.mayProceed()
-        }
-
-        if (continueToSecondCall) {
-            val secondTargets = LinkedHashSet(remainingTargets)
-            runAttempt(secondTargets)
         }
 
         val mergedResult: ParsedResult = if (cumulativeRefinements.isEmpty()) {
@@ -203,17 +175,17 @@ class StagedParsingOrchestrator(
         )
     }
 
-    private suspend fun refineTargets(
+    private suspend fun refineSingleField(
+        field: FieldKey,
         input: String,
         context: ParsingContext,
         draftForPrompt: HeuristicDraft,
-        targets: LinkedHashSet<FieldKey>,
         refinementErrors: MutableList<String>
-    ): RefinementAttempt {
+    ): SingleFieldAttempt {
         val prompt = focusedPromptBuilder.buildFocusedPrompt(
             input = input,
             heuristicDraft = draftForPrompt,
-            targetFields = targets,
+            targetFields = linkedSetOf(field),
             context = context
         )
         logFocusedPrompt(prompt)
@@ -250,13 +222,15 @@ class StagedParsingOrchestrator(
             try {
                 Log.e("AI.Validate", "Unexpected error during focused refinement: ${t.message}")
             } catch (_: Throwable) {}
-            return RefinementAttempt.empty(durationMs = durationMs, failed = true)
+            refinementErrors += "AI invocation error: ${t.message ?: t::class.simpleName}".trim()
+            return SingleFieldAttempt(durationMs = durationMs)
         }
 
         if (aiPayload.isNullOrBlank()) {
             Log.d(TAG, "No AI payload returned; using heuristic result")
             try { Log.d("AI.Debug", "Focused refinement returned blank payload; using heuristic result") } catch (_: Throwable) {}
-            return RefinementAttempt.empty(durationMs = durationMs)
+            refinementErrors += "AI blank response"
+            return SingleFieldAttempt(durationMs = durationMs)
         }
 
         val validation = ValidationPipeline.validateRawResponse(aiPayload!!)
@@ -274,7 +248,7 @@ class StagedParsingOrchestrator(
                     "Focused refinement invalid: errors='${validation.errors.joinToString()}' snippet='$snippet'"
                 )
             } catch (_: Throwable) {}
-            return RefinementAttempt.empty(durationMs = durationMs, failed = true)
+            return SingleFieldAttempt(durationMs = durationMs)
         }
 
         try {
@@ -283,21 +257,18 @@ class StagedParsingOrchestrator(
         } catch (_: Throwable) {}
 
         val normalized = validation.normalizedJson
-        val updates = extractFieldUpdates(normalized, targets)
-        val refinedFields = updates.filterKeys { it in targets }
+        val updates = extractFieldUpdates(normalized, setOf(field))
+        val value = updates[field]
 
         try {
             Log.d(
                 "AI.Debug",
-                "Applied refinements=${refinedFields.keys.joinToString()} totalErrors=${refinementErrors.size}"
+                "Applied refinement for ${field.name.lowercase(Locale.US)} totalErrors=${refinementErrors.size}"
             )
         } catch (_: Throwable) {}
-        Log.d(TAG, "Applied refinements=${refinedFields.keys.joinToString()} errors=${refinementErrors.size}")
+        Log.d(TAG, "Applied refinements=${field.name} errors=${refinementErrors.size}")
 
-        return RefinementAttempt(
-            refinedFields = refinedFields,
-            durationMs = durationMs
-        )
+        return SingleFieldAttempt(refinedValue = value, durationMs = durationMs)
     }
 
     private fun extractFieldUpdates(
@@ -419,81 +390,51 @@ class StagedParsingOrchestrator(
         }
     }
 
-    private fun applyRefinementsToDraft(
+    private fun applyRefinementToDraft(
         draft: HeuristicDraft,
-        refinements: Map<FieldKey, Any?>
+        field: FieldKey,
+        value: Any?
     ): HeuristicDraft {
-        if (refinements.isEmpty()) return draft
         val confidences = draft.confidences.toMutableMap()
-
-        var merchant = draft.merchant
-        var description = draft.description
-        var expenseCategory = draft.expenseCategory
-        var incomeCategory = draft.incomeCategory
-        var tags = draft.tags
-        var note = draft.note
-
-        refinements.forEach { (field, value) ->
-            when (field) {
-                FieldKey.MERCHANT -> {
-                    val text = (value as? String)?.trim()
-                    merchant = text.takeUnless { it.isNullOrEmpty() } ?: merchant
-                    text?.let { confidences[field] = 0.95f }
-                }
-                FieldKey.DESCRIPTION -> {
-                    val text = (value as? String)?.trim().takeUnless { it.isNullOrEmpty() }
-                    description = text
-                    text?.let { confidences[field] = 0.95f }
-                }
-                FieldKey.EXPENSE_CATEGORY -> {
-                    val text = (value as? String)?.trim().takeUnless { it.isNullOrEmpty() }
-                    expenseCategory = text
-                    text?.let { confidences[field] = 0.9f }
-                }
-                FieldKey.INCOME_CATEGORY -> {
-                    val text = (value as? String)?.trim().takeUnless { it.isNullOrEmpty() }
-                    incomeCategory = text
-                    text?.let { confidences[field] = 0.9f }
-                }
-                FieldKey.TAGS -> {
-                    val list = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
-                    if (list.isNotEmpty()) {
-                        tags = list
-                        confidences[field] = 0.85f
-                    }
-                }
-                FieldKey.NOTE -> {
-                    val text = (value as? String)?.trim().takeUnless { it.isNullOrEmpty() }
-                    note = text
-                    text?.let { confidences[field] = 0.8f }
-                }
-                else -> {
-                    // Non-refinable fields are ignored here.
-                }
+        return when (field) {
+            FieldKey.MERCHANT -> {
+                val text = (value as? String)?.trim()
+                confidences[field] = if (!text.isNullOrEmpty()) 0.95f else draft.confidence(field)
+                draft.copy(merchant = text.takeUnless { it.isNullOrEmpty() } ?: draft.merchant, confidences = confidences.toMap())
             }
+            FieldKey.DESCRIPTION -> {
+                val text = (value as? String)?.trim()
+                confidences[field] = if (!text.isNullOrEmpty()) 0.95f else draft.confidence(field)
+                draft.copy(description = text.takeUnless { it.isNullOrEmpty() }, confidences = confidences.toMap())
+            }
+            FieldKey.EXPENSE_CATEGORY -> {
+                val text = (value as? String)?.trim()
+                confidences[field] = if (!text.isNullOrEmpty()) 0.9f else draft.confidence(field)
+                draft.copy(expenseCategory = text.takeUnless { it.isNullOrEmpty() }, confidences = confidences.toMap())
+            }
+            FieldKey.INCOME_CATEGORY -> {
+                val text = (value as? String)?.trim()
+                confidences[field] = if (!text.isNullOrEmpty()) 0.9f else draft.confidence(field)
+                draft.copy(incomeCategory = text.takeUnless { it.isNullOrEmpty() }, confidences = confidences.toMap())
+            }
+            FieldKey.TAGS -> {
+                val list = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+                if (list.isNotEmpty()) {
+                    confidences[field] = 0.85f
+                    draft.copy(tags = list, confidences = confidences.toMap())
+                } else draft
+            }
+            FieldKey.NOTE -> {
+                val text = (value as? String)?.trim()
+                confidences[field] = if (!text.isNullOrEmpty()) 0.8f else draft.confidence(field)
+                draft.copy(note = text.takeUnless { it.isNullOrEmpty() }, confidences = confidences.toMap())
+            }
+            else -> draft
         }
-
-        return draft.copy(
-            merchant = merchant,
-            description = description,
-            expenseCategory = expenseCategory,
-            incomeCategory = incomeCategory,
-            tags = tags,
-            note = note,
-            confidences = confidences.toMap()
-        )
     }
 
-    private data class RefinementAttempt(
-        val refinedFields: Map<FieldKey, Any?>,
-        val durationMs: Long,
-        val failed: Boolean = false
-    ) {
-        fun mayProceed(): Boolean = true
-
-        companion object {
-            fun empty(durationMs: Long = 0L, failed: Boolean = false): RefinementAttempt =
-                RefinementAttempt(emptyMap(), durationMs, failed = failed)
-        }
-    }
+    private data class SingleFieldAttempt(
+        val refinedValue: Any? = null,
+        val durationMs: Long = 0L
+    )
 }

@@ -76,9 +76,13 @@ class StagedParsingOrchestratorTest {
             )
         )
         val gateway = FakeGenAiGateway().apply {
-            result = Result.success(
-                """{"merchant":"Blue Bottle","description":"Coffee run","expenseCategory":"Dining","tags":["coffee"]}"""
+            val responses = listOf(
+                Result.success("""{"merchant":"Blue Bottle"}"""),
+                Result.success("""{"description":"Coffee run"}"""),
+                Result.success("""{"expenseCategory":"Dining"}"""),
+                Result.success("""{"tags":["coffee"]}"""),
             )
+            resultProvider = { attempt -> responses.getOrElse(attempt - 1) { Result.success("{}") } }
         }
         val orchestrator = StagedParsingOrchestrator(
             heuristicExtractor = heuristicExtractor,
@@ -100,8 +104,8 @@ class StagedParsingOrchestratorTest {
 
         val result = orchestrator.parseStaged("coffee at blue bottle", ParsingContext(), snapshot)
 
-        assertThat(gateway.calls).isEqualTo(2)
-        assertThat(result.targetFields).containsAtLeast(
+        assertThat(gateway.calls).isEqualTo(4)
+        assertThat(result.targetFields).containsExactly(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
@@ -150,7 +154,7 @@ class StagedParsingOrchestratorTest {
 
         val result = orchestrator.parseStaged("something", ParsingContext(), snapshot)
 
-        assertThat(gateway.calls).isEqualTo(2)
+        assertThat(gateway.calls).isEqualTo(3)
         assertThat(result.fieldsRefined).isEmpty()
         assertThat(result.refinedFields).isEmpty()
         assertThat(result.mergedResult.merchant).isEqualTo("Unknown")
@@ -170,13 +174,12 @@ class StagedParsingOrchestratorTest {
             )
         )
         val gateway = FakeGenAiGateway().apply {
-            resultProvider = { attempt ->
-                if (attempt == 1) {
-                    Result.success("""{"merchant":"REI"}""")
-                } else {
-                    Result.success("""{"description":"Tent","expenseCategory":"Outdoors"}""")
-                }
-            }
+            val responses = listOf(
+                Result.success("""{"merchant":"REI"}"""),
+                Result.success("""{"description":"Tent"}"""),
+                Result.success("""{"expenseCategory":"Outdoors"}"""),
+            )
+            resultProvider = { attempt -> responses.getOrElse(attempt - 1) { Result.success("{}") } }
         }
         val orchestrator = StagedParsingOrchestrator(
             heuristicExtractor = heuristicExtractor,
@@ -192,7 +195,7 @@ class StagedParsingOrchestratorTest {
 
         val result = orchestrator.parseStaged("bought a tent at rei", ParsingContext(), snapshot)
 
-        assertThat(gateway.calls).isEqualTo(2)
+        assertThat(gateway.calls).isEqualTo(3)
         assertThat(result.fieldsRefined).containsExactly(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
@@ -203,7 +206,7 @@ class StagedParsingOrchestratorTest {
         assertThat(result.mergedResult.expenseCategory).isEqualTo("Outdoors")
         assertThat(result.refinementErrors).isEmpty()
         assertThat(gateway.promptsTried.first()).contains("Field: Merchant")
-        assertThat(gateway.promptsTried.last()).contains("Field: Description")
+        assertThat(gateway.promptsTried[1]).contains("Field: Description")
     }
 
     private class FakeGenAiGateway : GenAiGateway {

@@ -35,7 +35,7 @@ class StagedParsingIntegrationTest {
 
         val result = parser.parse("Bought groceries for 45 dollars at Trader Joes", ParsingContext())
 
-        assertThat(gateway.calls).isEqualTo(1)
+        assertThat(gateway.calls).isEqualTo(3)
         assertThat(result.method).isEqualTo(ProcessingMethod.AI)
         assertThat(result.validated).isTrue()
         assertThat(result.result.merchant).isEqualTo("Trader Joe's")

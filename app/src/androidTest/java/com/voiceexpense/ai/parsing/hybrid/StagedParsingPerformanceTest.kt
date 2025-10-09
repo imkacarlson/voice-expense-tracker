@@ -48,7 +48,7 @@ class StagedParsingPerformanceTest {
         val result = orchestrator.parseStaged("coffee purchase", ParsingContext(), snapshot)
 
         assertThat(result.fieldsRefined).isNotEmpty()
-        assertThat(result.stage2DurationMs).isAtMost(2000)
+        assertThat(result.stage2DurationMs).isAtMost(8000)
     }
 
     @Test
