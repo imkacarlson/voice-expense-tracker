@@ -57,9 +57,9 @@ class FieldSelectionStrategyTest {
                 FieldKey.MERCHANT,
                 FieldKey.DESCRIPTION,
                 FieldKey.EXPENSE_CATEGORY,
-                FieldKey.ACCOUNT,
                 FieldKey.INCOME_CATEGORY,
-                FieldKey.TAGS
+                FieldKey.TAGS,
+                FieldKey.ACCOUNT
             )
         )
     }
@@ -83,6 +83,37 @@ class FieldSelectionStrategyTest {
         assertThat(fields[1]).isEqualTo(FieldKey.DESCRIPTION)
         assertThat(fields).contains(FieldKey.ACCOUNT)
         assertThat(fields).doesNotContain(FieldKey.NOTE)
+    }
+
+    @Test
+    fun account_is_selected_after_tags_when_both_need_refinement() {
+        val draft = HeuristicDraft(
+            merchant = "",
+            description = "",
+            type = "Expense",
+            expenseCategory = "",
+            tags = emptyList(),
+            account = null,
+            note = "Manual note",
+            confidences = mapOf(
+                FieldKey.MERCHANT to 0f,
+                FieldKey.DESCRIPTION to 0f,
+                FieldKey.EXPENSE_CATEGORY to 0f,
+                FieldKey.TAGS to 0f,
+                FieldKey.ACCOUNT to 0f,
+                FieldKey.NOTE to 1f
+            )
+        )
+
+        val fields = FieldSelectionStrategy.selectFieldsForRefinement(draft)
+
+        assertThat(fields).containsExactly(
+            FieldKey.MERCHANT,
+            FieldKey.DESCRIPTION,
+            FieldKey.EXPENSE_CATEGORY,
+            FieldKey.TAGS,
+            FieldKey.ACCOUNT
+        ).inOrder()
     }
 
     @Test

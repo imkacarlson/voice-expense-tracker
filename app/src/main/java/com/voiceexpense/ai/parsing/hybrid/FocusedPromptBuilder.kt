@@ -146,7 +146,7 @@ class FocusedPromptBuilder {
             raw
         }
 
-        val options = filtered.take(MAX_OPTIONS)
+        val options = if (field == FieldKey.ACCOUNT) filtered else filtered.take(MAX_OPTIONS)
         return if (options.isEmpty()) "" else options.joinToString()
     }
 
@@ -169,7 +169,7 @@ class FocusedPromptBuilder {
         if (fields.any { it == FieldKey.ACCOUNT }) {
             val accounts = context.allowedAccounts.ifEmpty { context.knownAccounts }
             if (accounts.isNotEmpty()) {
-                parts += "accounts=${accounts.take(MAX_OPTIONS).joinToString()}"
+                parts += "accounts=${accounts.joinToString()}"
             }
         }
         if (fields.any { it == FieldKey.TAGS } && context.allowedTags.isNotEmpty()) {
@@ -254,8 +254,8 @@ class FocusedPromptBuilder {
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
             FieldKey.INCOME_CATEGORY,
-            FieldKey.ACCOUNT,
             FieldKey.TAGS,
+            FieldKey.ACCOUNT,
             FieldKey.NOTE
         )
 

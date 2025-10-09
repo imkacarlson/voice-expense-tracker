@@ -19,13 +19,24 @@ object FieldSelectionStrategy {
 
     private const val MAX_REFINABLE_FIELDS = 6
 
+    private val FIELD_ORDER: List<FieldKey> = listOf(
+        FieldKey.MERCHANT,
+        FieldKey.DESCRIPTION,
+        FieldKey.EXPENSE_CATEGORY,
+        FieldKey.INCOME_CATEGORY,
+        FieldKey.TAGS,
+        FieldKey.ACCOUNT,
+        FieldKey.NOTE
+    )
+    private val FIELD_ORDER_INDEX: Map<FieldKey, Int> = FIELD_ORDER.withIndex().associate { it.value to it.index }
+
     val AI_REFINABLE_FIELDS: Set<FieldKey> = setOf(
         FieldKey.MERCHANT,
         FieldKey.DESCRIPTION,
         FieldKey.EXPENSE_CATEGORY,
         FieldKey.INCOME_CATEGORY,
-        FieldKey.ACCOUNT,
         FieldKey.TAGS,
+        FieldKey.ACCOUNT,
         FieldKey.NOTE
     )
 
@@ -112,6 +123,13 @@ object FieldSelectionStrategy {
             return@Comparator priorityCompare
         }
 
+        val orderCompare = FIELD_ORDER_INDEX
+            .getOrElse(a.field) { Int.MAX_VALUE }
+            .compareTo(FIELD_ORDER_INDEX.getOrElse(b.field) { Int.MAX_VALUE })
+        if (orderCompare != 0) {
+            return@Comparator orderCompare
+        }
+
         a.confidence.compareTo(b.confidence)
     }
 
@@ -129,7 +147,6 @@ object FieldSelectionStrategy {
 
     private val CRITICAL_FIELDS: Set<FieldKey> = setOf(
         FieldKey.MERCHANT,
-        FieldKey.DESCRIPTION,
-        FieldKey.ACCOUNT
+        FieldKey.DESCRIPTION
     )
 }

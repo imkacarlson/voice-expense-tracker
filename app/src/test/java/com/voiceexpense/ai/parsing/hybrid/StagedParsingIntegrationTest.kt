@@ -15,7 +15,7 @@ class StagedParsingIntegrationTest {
 
     @Test
     fun staged_enabled_refines_low_confidence_fields() = runBlocking {
-        val response = """{"merchant":"Trader Joe's","description":"Grocery run","expenseCategory":"Groceries"}"""
+        val response = """{"merchant":"Trader Joe's","description":"Grocery run","expenseCategory":"Groceries","account":"Bilt Card"}"""
         val gateway = IntegrationFakeGateway(Result.success(response))
         val thresholds = FieldConfidenceThresholds(
             mandatoryThresholds = mapOf(
@@ -33,13 +33,19 @@ class StagedParsingIntegrationTest {
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = true)
         )
 
-        val result = parser.parse("Bought groceries for 45 dollars at Trader Joes", ParsingContext())
+        val context = ParsingContext(
+            allowedExpenseCategories = listOf("Groceries"),
+            allowedAccounts = listOf("Bilt Card", "Checking")
+        )
+
+        val result = parser.parse("Bought groceries for 45 dollars at Trader Joes", context)
 
         assertThat(gateway.calls).isEqualTo(5)
         assertThat(result.method).isEqualTo(ProcessingMethod.AI)
         assertThat(result.validated).isTrue()
         assertThat(result.result.merchant).isEqualTo("Trader Joe's")
         assertThat(result.result.expenseCategory).isEqualTo("Groceries")
+        assertThat(result.result.account).isEqualTo("Bilt Card")
         assertThat(result.errors).isEmpty()
     }
 

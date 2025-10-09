@@ -98,8 +98,8 @@ class StagedParsingOrchestratorTest {
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
-            FieldKey.ACCOUNT,
-            FieldKey.TAGS
+            FieldKey.TAGS,
+            FieldKey.ACCOUNT
         )
         val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
             heuristicDraft = draft,
@@ -114,16 +114,16 @@ class StagedParsingOrchestratorTest {
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
-            FieldKey.ACCOUNT,
-            FieldKey.TAGS
-        )
+            FieldKey.TAGS,
+            FieldKey.ACCOUNT
+        ).inOrder()
         assertThat(result.fieldsRefined).containsExactly(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
-            FieldKey.ACCOUNT,
-            FieldKey.TAGS
-        )
+            FieldKey.TAGS,
+            FieldKey.ACCOUNT
+        ).inOrder()
         assertThat(result.mergedResult.merchant).isEqualTo("Blue Bottle")
         assertThat(result.mergedResult.description).isEqualTo("Coffee run")
         assertThat(result.mergedResult.expenseCategory).isEqualTo("Dining")
@@ -156,13 +156,13 @@ class StagedParsingOrchestratorTest {
         )
         val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
             heuristicDraft = draft,
-            targetFields = listOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY, FieldKey.ACCOUNT),
+            targetFields = listOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY, FieldKey.TAGS, FieldKey.ACCOUNT),
             stage1DurationMs = 0L
         )
 
         val result = orchestrator.parseStaged("something", ParsingContext(), snapshot)
 
-        assertThat(gateway.calls).isEqualTo(4)
+        assertThat(gateway.calls).isEqualTo(5)
         assertThat(result.fieldsRefined).isEmpty()
         assertThat(result.refinedFields).isEmpty()
         assertThat(result.mergedResult.merchant).isEqualTo("Unknown")

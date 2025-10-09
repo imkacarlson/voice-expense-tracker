@@ -83,4 +83,36 @@ class FocusedPromptBuilderTest {
 
         assertThat(prompt.length).isAtMost(1000)
     }
+
+    @Test
+    fun buildFocusedPrompt_includes_all_accounts_without_truncation() {
+        val draft = HeuristicDraft(
+            account = null,
+            confidences = mapOf(FieldKey.ACCOUNT to 0f)
+        )
+        val accounts = listOf(
+            "Checking",
+            "Savings",
+            "Corporate Card",
+            "Business Platinum",
+            "Travel Rewards",
+            "Bilt Card",
+            "Cashback Visa",
+            "Investment Account",
+            "Joint Checking"
+        )
+        val context = ParsingContext(
+            allowedAccounts = accounts
+        )
+
+        val prompt = builder.buildFocusedPrompt(
+            input = "Paid for dinner",
+            heuristicDraft = draft,
+            targetFields = setOf(FieldKey.ACCOUNT),
+            context = context
+        )
+
+        assertThat(prompt).contains("accounts=${accounts.joinToString()}")
+        assertThat(prompt).contains("Joint Checking")
+    }
 }
