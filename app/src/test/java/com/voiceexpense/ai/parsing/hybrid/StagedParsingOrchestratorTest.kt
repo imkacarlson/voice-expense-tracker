@@ -77,13 +77,16 @@ class StagedParsingOrchestratorTest {
             )
         )
         val gateway = FakeGenAiGateway().apply {
-            val responses = listOf(
-                Result.success("""{"merchant":"Blue Bottle"}"""),
-                Result.success("""{"description":"Coffee run"}"""),
-                Result.success("""{"expenseCategory":"Dining"}"""),
-                Result.success("""{"tags":["coffee"]}"""),
-            )
-            resultProvider = { attempt -> responses.getOrElse(attempt - 1) { Result.success("{}") } }
+            promptProvider = { prompt ->
+                when {
+                    prompt.contains("key \"merchant\"") -> Result.success("""{"merchant":"Blue Bottle"}""")
+                    prompt.contains("key \"description\"") -> Result.success("""{"description":"Coffee run"}""")
+                    prompt.contains("key \"expenseCategory\"") -> Result.success("""{"expenseCategory":"Dining"}""")
+                    prompt.contains("key \"account\"") -> Result.success("""{"account":"Checking"}""")
+                    prompt.contains("key \"tags\"") -> Result.success("""{"tags":["coffee"]}""")
+                    else -> Result.success("{}")
+                }
+            }
         }
         val orchestrator = StagedParsingOrchestrator(
             heuristicExtractor = heuristicExtractor,
@@ -95,6 +98,7 @@ class StagedParsingOrchestratorTest {
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
+            FieldKey.ACCOUNT,
             FieldKey.TAGS
         )
         val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
@@ -105,22 +109,25 @@ class StagedParsingOrchestratorTest {
 
         val result = orchestrator.parseStaged("coffee at blue bottle", ParsingContext(), snapshot)
 
-        assertThat(gateway.calls).isEqualTo(4)
+        assertThat(gateway.calls).isEqualTo(5)
         assertThat(result.targetFields).containsExactly(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
+            FieldKey.ACCOUNT,
             FieldKey.TAGS
         )
         assertThat(result.fieldsRefined).containsExactly(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
+            FieldKey.ACCOUNT,
             FieldKey.TAGS
         )
         assertThat(result.mergedResult.merchant).isEqualTo("Blue Bottle")
         assertThat(result.mergedResult.description).isEqualTo("Coffee run")
         assertThat(result.mergedResult.expenseCategory).isEqualTo("Dining")
+        assertThat(result.mergedResult.account).isEqualTo("Checking")
         assertThat(result.mergedResult.tags).containsExactly("coffee")
         assertThat(result.refinementErrors).isEmpty()
     }
@@ -149,13 +156,13 @@ class StagedParsingOrchestratorTest {
         )
         val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
             heuristicDraft = draft,
-            targetFields = listOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY),
+            targetFields = listOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY, FieldKey.ACCOUNT),
             stage1DurationMs = 0L
         )
 
         val result = orchestrator.parseStaged("something", ParsingContext(), snapshot)
 
-        assertThat(gateway.calls).isEqualTo(3)
+        assertThat(gateway.calls).isEqualTo(4)
         assertThat(result.fieldsRefined).isEmpty()
         assertThat(result.refinedFields).isEmpty()
         assertThat(result.mergedResult.merchant).isEqualTo("Unknown")
@@ -175,12 +182,15 @@ class StagedParsingOrchestratorTest {
             )
         )
         val gateway = FakeGenAiGateway().apply {
-            val responses = listOf(
-                Result.success("""{"merchant":"REI"}"""),
-                Result.success("""{"description":"Tent"}"""),
-                Result.success("""{"expenseCategory":"Outdoors"}"""),
-            )
-            resultProvider = { attempt -> responses.getOrElse(attempt - 1) { Result.success("{}") } }
+            promptProvider = { prompt ->
+                when {
+                    prompt.contains("key \"merchant\"") -> Result.success("""{"merchant":"REI"}""")
+                    prompt.contains("key \"description\"") -> Result.success("""{"description":"Tent"}""")
+                    prompt.contains("key \"expenseCategory\"") -> Result.success("""{"expenseCategory":"Outdoors"}""")
+                    prompt.contains("key \"account\"") -> Result.success("""{"account":"Gear Card"}""")
+                    else -> Result.success("{}")
+                }
+            }
         }
         val orchestrator = StagedParsingOrchestrator(
             heuristicExtractor = heuristicExtractor,
@@ -190,7 +200,7 @@ class StagedParsingOrchestratorTest {
         )
         val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
             heuristicDraft = draft,
-            targetFields = listOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY),
+            targetFields = listOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY, FieldKey.ACCOUNT),
             stage1DurationMs = 0L
         )
 
@@ -203,22 +213,25 @@ class StagedParsingOrchestratorTest {
             listener = { updates += it }
         )
 
-        assertThat(gateway.calls).isEqualTo(3)
+        assertThat(gateway.calls).isEqualTo(4)
         assertThat(result.fieldsRefined).containsExactly(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
-            FieldKey.EXPENSE_CATEGORY
+            FieldKey.EXPENSE_CATEGORY,
+            FieldKey.ACCOUNT
         )
         assertThat(result.mergedResult.merchant).isEqualTo("REI")
         assertThat(result.mergedResult.description).isEqualTo("Tent")
         assertThat(result.mergedResult.expenseCategory).isEqualTo("Outdoors")
+        assertThat(result.mergedResult.account).isEqualTo("Gear Card")
         assertThat(result.refinementErrors).isEmpty()
         assertThat(gateway.promptsTried.first()).contains("Field: Merchant")
         assertThat(gateway.promptsTried[1]).contains("Field: Description")
         assertThat(updates.map(FieldRefinementUpdate::field)).containsExactly(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
-            FieldKey.EXPENSE_CATEGORY
+            FieldKey.EXPENSE_CATEGORY,
+            FieldKey.ACCOUNT
         ).inOrder()
     }
 
@@ -226,6 +239,7 @@ class StagedParsingOrchestratorTest {
         var available: Boolean = true
         var result: Result<String> = Result.success("{}")
         var resultProvider: ((attempt: Int) -> Result<String>)? = null
+        var promptProvider: ((String) -> Result<String>)? = null
         var calls: Int = 0
         var lastPrompt: String? = null
         val promptsTried = mutableListOf<String>()
@@ -236,7 +250,9 @@ class StagedParsingOrchestratorTest {
             calls += 1
             lastPrompt = prompt
             promptsTried += prompt
-            return resultProvider?.invoke(calls) ?: result
+            return promptProvider?.invoke(prompt)
+                ?: resultProvider?.invoke(calls)
+                ?: result
         }
     }
 }

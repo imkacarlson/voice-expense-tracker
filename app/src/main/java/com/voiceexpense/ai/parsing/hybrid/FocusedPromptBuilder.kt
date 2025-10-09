@@ -108,6 +108,7 @@ class FocusedPromptBuilder {
             FieldKey.DESCRIPTION -> draft.description?.quoteOrMissing()
             FieldKey.EXPENSE_CATEGORY -> draft.expenseCategory?.quoteOrMissing()
             FieldKey.INCOME_CATEGORY -> draft.incomeCategory?.quoteOrMissing()
+            FieldKey.ACCOUNT -> draft.account?.quoteOrMissing()
             FieldKey.TAGS -> draft.tags.takeIf { it.isNotEmpty() }?.joinToString(prefix = "[", postfix = "]") { it.quoteValue() }
             FieldKey.NOTE -> draft.note?.quoteOrMissing()
             else -> null
@@ -133,6 +134,7 @@ class FocusedPromptBuilder {
             FieldKey.DESCRIPTION -> emptyList()
             FieldKey.EXPENSE_CATEGORY -> context.allowedExpenseCategories.ifEmpty { context.recentCategories }
             FieldKey.INCOME_CATEGORY -> context.allowedIncomeCategories
+            FieldKey.ACCOUNT -> context.allowedAccounts.ifEmpty { context.knownAccounts }
             FieldKey.TAGS -> context.allowedTags
             FieldKey.NOTE -> emptyList()
             else -> emptyList()
@@ -164,6 +166,12 @@ class FocusedPromptBuilder {
         if (fields.any { it == FieldKey.INCOME_CATEGORY } && context.allowedIncomeCategories.isNotEmpty()) {
             parts += "incomeCategories=${context.allowedIncomeCategories.take(MAX_OPTIONS).joinToString()}"
         }
+        if (fields.any { it == FieldKey.ACCOUNT }) {
+            val accounts = context.allowedAccounts.ifEmpty { context.knownAccounts }
+            if (accounts.isNotEmpty()) {
+                parts += "accounts=${accounts.take(MAX_OPTIONS).joinToString()}"
+            }
+        }
         if (fields.any { it == FieldKey.TAGS } && context.allowedTags.isNotEmpty()) {
             val tags = filterTagOptions(context.allowedTags, draft, input).take(MAX_OPTIONS)
             if (tags.isNotEmpty()) {
@@ -178,7 +186,8 @@ class FocusedPromptBuilder {
             FieldKey.DESCRIPTION -> "Provide a concise noun phrase describing the purchase (examples: \"Prescription\", \"Birthday card\", \"Lunch\"). Preserve key numbers or modifiers from the input. Avoid verbs."
             FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category."
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
-            FieldKey.TAGS -> "Return an array of tags chosen from the allowed list. Include \"Splitwise\" only when the input mentions splitting or multiple amounts."
+            FieldKey.ACCOUNT -> "Return the account or card name from the allowed list. Match obvious phonetic or casing variations; if none apply, return null."
+            FieldKey.TAGS -> "Return an array of tags chosen only from the allowed list. Include \"Splitwise\" only when the input mentions splitting or multiple amounts."
             FieldKey.NOTE -> "Return a brief note only when the input explicitly provides one; otherwise return null."
             else -> "" // Should not be requested here.
     }
@@ -188,6 +197,7 @@ class FocusedPromptBuilder {
         FieldKey.DESCRIPTION -> "Description"
         FieldKey.EXPENSE_CATEGORY -> "Expense category"
         FieldKey.INCOME_CATEGORY -> "Income category"
+        FieldKey.ACCOUNT -> "Account"
         FieldKey.TAGS -> "Tags"
         FieldKey.NOTE -> "Note"
         else -> field.name.lowercase(Locale.US)
@@ -198,6 +208,7 @@ class FocusedPromptBuilder {
         FieldKey.DESCRIPTION -> "description"
         FieldKey.EXPENSE_CATEGORY -> "expenseCategory"
         FieldKey.INCOME_CATEGORY -> "incomeCategory"
+        FieldKey.ACCOUNT -> "account"
         FieldKey.TAGS -> "tags"
         FieldKey.NOTE -> "note"
         else -> field.name.lowercase(Locale.US)
@@ -243,6 +254,7 @@ class FocusedPromptBuilder {
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
             FieldKey.INCOME_CATEGORY,
+            FieldKey.ACCOUNT,
             FieldKey.TAGS,
             FieldKey.NOTE
         )
@@ -254,6 +266,7 @@ class FocusedPromptBuilder {
             FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input."
             FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category from the allowed list; return null if none apply."
             FieldKey.INCOME_CATEGORY -> "Choose exactly one income category from the allowed list; return null if none apply."
+            FieldKey.ACCOUNT -> "Return the account/card name from the allowed list, matching obvious phonetic variations; return null if none apply."
             FieldKey.TAGS -> "Return an array of distinct tags chosen only from the allowed list. Include a tag when it (or a clear synonym) is explicitly mentioned; never invent new tags. If no allowed tag applies, return an empty array."
             FieldKey.NOTE -> "Return a brief note only when the input explicitly provides note-like text; otherwise return null."
             else -> null

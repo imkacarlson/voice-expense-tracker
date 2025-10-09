@@ -17,13 +17,14 @@ object FieldSelectionStrategy {
 
     private const val TAG = "FieldSelection"
 
-    private const val MAX_REFINABLE_FIELDS = 5
+    private const val MAX_REFINABLE_FIELDS = 6
 
     val AI_REFINABLE_FIELDS: Set<FieldKey> = setOf(
         FieldKey.MERCHANT,
         FieldKey.DESCRIPTION,
         FieldKey.EXPENSE_CATEGORY,
         FieldKey.INCOME_CATEGORY,
+        FieldKey.ACCOUNT,
         FieldKey.TAGS,
         FieldKey.NOTE
     )
@@ -98,6 +99,7 @@ object FieldSelectionStrategy {
                 "income" -> draft.incomeCategory.isNullOrBlank()
                 else -> false
             }
+            FieldKey.ACCOUNT -> draft.account.isNullOrBlank()
             FieldKey.TAGS -> draft.tags.isEmpty()
             FieldKey.NOTE -> draft.note.isNullOrBlank()
             else -> false
@@ -127,6 +129,7 @@ object FieldSelectionStrategy {
 
     private val CRITICAL_FIELDS: Set<FieldKey> = setOf(
         FieldKey.MERCHANT,
-        FieldKey.DESCRIPTION
+        FieldKey.DESCRIPTION,
+        FieldKey.ACCOUNT
     )
 }

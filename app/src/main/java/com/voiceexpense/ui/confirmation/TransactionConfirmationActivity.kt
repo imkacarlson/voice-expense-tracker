@@ -78,15 +78,18 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val descriptionContainer: View = findViewById(R.id.container_field_description)
         val categoryContainer: View = findViewById(R.id.container_field_category)
         val tagsContainer: View = findViewById(R.id.container_field_tags)
+        val accountContainer: View = findViewById(R.id.container_field_account)
 
         val merchantProgress: ProgressBar = findViewById(R.id.loading_merchant)
         val descriptionProgress: ProgressBar = findViewById(R.id.loading_description)
         val categoryProgress: ProgressBar = findViewById(R.id.loading_category)
         val tagsProgress: ProgressBar = findViewById(R.id.loading_tags)
+        val accountProgress: ProgressBar = findViewById(R.id.loading_account)
 
         val loadingIndicators = mapOf(
             FieldKey.MERCHANT to merchantProgress,
             FieldKey.DESCRIPTION to descriptionProgress,
+            FieldKey.ACCOUNT to accountProgress,
             FieldKey.TAGS to tagsProgress
         )
 
@@ -95,6 +98,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             FieldKey.DESCRIPTION to descriptionContainer,
             FieldKey.EXPENSE_CATEGORY to categoryContainer,
             FieldKey.INCOME_CATEGORY to categoryContainer,
+            FieldKey.ACCOUNT to accountContainer,
             FieldKey.TAGS to tagsContainer
         )
 
@@ -110,6 +114,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         }
 
         var categoryUserChange = false
+        var accountUserChange = false
         categorySpinner.setOnTouchListener { _, _ ->
             categoryUserChange = true
             false
@@ -126,6 +131,24 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                         else -> {}
                     }
                     categoryUserChange = false
+                }
+            }
+
+            override fun onNothingSelected(parent: AdapterView<*>?) {}
+        }
+
+        accountSpinner.setOnTouchListener { _, _ ->
+            accountUserChange = true
+            false
+        }
+        accountSpinner.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) accountUserChange = true
+        }
+        accountSpinner.onItemSelectedListener = object : AdapterView.OnItemSelectedListener {
+            override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
+                if (accountUserChange) {
+                    viewModel.markFieldUserModified(FieldKey.ACCOUNT)
+                    accountUserChange = false
                 }
             }
 
@@ -236,9 +259,10 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                             val labels = opts.sortedBy { it.position }.map { it.label }
                             val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
                             adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                            accountUserChange = false
                             accountSpinner.adapter = adapter
                             val accIdx = labels.indexOf(t.account ?: "")
-                            if (accIdx >= 0) accountSpinner.setSelection(accIdx)
+                            if (accIdx >= 0) accountSpinner.setSelection(accIdx, false)
                         }
                     }
                     tagsView.setText(if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else "")
@@ -296,11 +320,11 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 findViewById<android.view.View>(R.id.label_overall).visibility = vOverall
 
                 val vCat = if (vis.showExpenseCategory || vis.showIncomeCategory) android.view.View.VISIBLE else android.view.View.GONE
-                findViewById<android.view.View>(R.id.spinner_category).visibility = vCat
+                findViewById<android.view.View>(R.id.container_field_category).visibility = vCat
                 findViewById<android.view.View>(R.id.label_category).visibility = vCat
 
                 val vAcc = if (vis.showAccount) android.view.View.VISIBLE else android.view.View.GONE
-                findViewById<android.view.View>(R.id.spinner_account).visibility = vAcc
+                findViewById<android.view.View>(R.id.container_field_account).visibility = vAcc
                 findViewById<android.view.View>(R.id.label_account).visibility = vAcc
             }
         }

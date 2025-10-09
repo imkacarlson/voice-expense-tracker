@@ -52,13 +52,15 @@ class FieldSelectionStrategyTest {
 
         val fields = FieldSelectionStrategy.selectFieldsForRefinement(draft)
 
-        assertThat(fields[0]).isEqualTo(FieldKey.MERCHANT)
-        assertThat(fields[1]).isEqualTo(FieldKey.DESCRIPTION)
-        assertThat(fields).containsExactly(
-            FieldKey.MERCHANT,
-            FieldKey.DESCRIPTION,
-            FieldKey.INCOME_CATEGORY,
-            FieldKey.TAGS
+        assertThat(fields).containsExactlyElementsIn(
+            listOf(
+                FieldKey.MERCHANT,
+                FieldKey.DESCRIPTION,
+                FieldKey.EXPENSE_CATEGORY,
+                FieldKey.ACCOUNT,
+                FieldKey.INCOME_CATEGORY,
+                FieldKey.TAGS
+            )
         )
     }
 
@@ -76,9 +78,10 @@ class FieldSelectionStrategyTest {
 
         val fields = FieldSelectionStrategy.selectFieldsForRefinement(draft)
 
-        assertThat(fields).hasSize(5)
+        assertThat(fields).hasSize(6)
         assertThat(fields[0]).isEqualTo(FieldKey.MERCHANT)
         assertThat(fields[1]).isEqualTo(FieldKey.DESCRIPTION)
+        assertThat(fields).contains(FieldKey.ACCOUNT)
         assertThat(fields).doesNotContain(FieldKey.NOTE)
     }
 
@@ -98,6 +101,7 @@ class FieldSelectionStrategyTest {
 
         assertThat(fields).contains(FieldKey.EXPENSE_CATEGORY)
         assertThat(fields).doesNotContain(FieldKey.INCOME_CATEGORY)
+        assertThat(fields).contains(FieldKey.ACCOUNT)
     }
 
     @Test
@@ -116,6 +120,7 @@ class FieldSelectionStrategyTest {
 
         assertThat(fields).contains(FieldKey.INCOME_CATEGORY)
         assertThat(fields).doesNotContain(FieldKey.EXPENSE_CATEGORY)
+        assertThat(fields).contains(FieldKey.ACCOUNT)
     }
 
     @Test

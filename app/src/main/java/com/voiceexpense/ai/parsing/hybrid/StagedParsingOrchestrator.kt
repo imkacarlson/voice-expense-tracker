@@ -358,6 +358,7 @@ class StagedParsingOrchestrator(
                 FieldKey.DESCRIPTION -> merged.copy(description = (value as? String)?.trim())
                 FieldKey.EXPENSE_CATEGORY -> merged.copy(expenseCategory = (value as? String)?.trim())
                 FieldKey.INCOME_CATEGORY -> merged.copy(incomeCategory = (value as? String)?.trim())
+                FieldKey.ACCOUNT -> merged.copy(account = (value as? String)?.trim()?.takeUnless { it.isNullOrEmpty() } ?: merged.account)
                 FieldKey.TAGS -> merged.copy(tags = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() } ?: merged.tags)
                 FieldKey.NOTE -> merged.copy(note = (value as? String)?.trim())
                 else -> merged
@@ -365,6 +366,10 @@ class StagedParsingOrchestrator(
         }
         if (context.allowedTags.isNotEmpty()) {
             merged = merged.copy(tags = normalizeTags(merged.tags, context.allowedTags))
+        }
+        if (context.allowedAccounts.isNotEmpty() || context.knownAccounts.isNotEmpty()) {
+            val accounts = context.allowedAccounts.ifEmpty { context.knownAccounts }
+            merged = merged.copy(account = matchOption(merged.account, accounts))
         }
         return StructuredOutputValidator.sanitizeAmounts(merged)
     }
@@ -379,6 +384,13 @@ class StagedParsingOrchestrator(
         }.distinct()
     }
 
+    private fun matchOption(value: String?, options: List<String>): String? {
+        if (value.isNullOrBlank()) return null
+        if (options.isEmpty()) return value.trim()
+        val normalized = value.trim().lowercase(Locale.US)
+        return options.firstOrNull { it.trim().lowercase(Locale.US) == normalized }
+    }
+
     private fun normalizeFieldValue(
         field: FieldKey,
         value: Any?,
@@ -389,6 +401,13 @@ class StagedParsingOrchestrator(
         FieldKey.EXPENSE_CATEGORY,
         FieldKey.INCOME_CATEGORY,
         FieldKey.NOTE -> (value as? String)?.trim()?.takeUnless { it.isEmpty() }
+
+        FieldKey.ACCOUNT -> {
+            val accounts = context.allowedAccounts.ifEmpty { context.knownAccounts }
+            val text = (value as? String)?.trim()
+            matchOption(text, accounts)?.takeUnless { it.isNullOrEmpty() }
+                ?: text?.takeUnless { it.isNullOrEmpty() }
+        }
 
         FieldKey.TAGS -> {
             val raw = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() }
@@ -475,6 +494,11 @@ class StagedParsingOrchestrator(
                 val text = (value as? String)?.trim()
                 confidences[field] = if (!text.isNullOrEmpty()) 0.9f else draft.confidence(field)
                 draft.copy(incomeCategory = text.takeUnless { it.isNullOrEmpty() }, confidences = confidences.toMap())
+            }
+            FieldKey.ACCOUNT -> {
+                val text = (value as? String)?.trim()
+                confidences[field] = if (!text.isNullOrEmpty()) 0.9f else draft.confidence(field)
+                draft.copy(account = text.takeUnless { it.isNullOrEmpty() }, confidences = confidences.toMap())
             }
             FieldKey.TAGS -> {
                 val list = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() } ?: emptyList()

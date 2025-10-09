@@ -267,6 +267,10 @@ class ConfirmationViewModel(
                 val category = (value as? String)?.takeIf { it.isNotBlank() }
                 if (category == transaction.incomeCategory) transaction else transaction.copy(incomeCategory = category)
             }
+            FieldKey.ACCOUNT -> {
+                val account = (value as? String)?.takeIf { it.isNotBlank() }
+                if (account == transaction.account) transaction else transaction.copy(account = account)
+            }
             FieldKey.TAGS -> {
                 val tags = when (value) {
                     is List<*> -> value.filterIsInstance<String>().mapNotNull { it.trim().takeIf(String::isNotEmpty) }
