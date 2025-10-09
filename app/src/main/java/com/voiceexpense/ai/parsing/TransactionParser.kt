@@ -6,6 +6,7 @@ import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
 import com.voiceexpense.ai.parsing.heuristic.HeuristicExtractor
 import com.voiceexpense.ai.parsing.heuristic.toParsedResult
+import com.voiceexpense.ai.parsing.hybrid.FieldRefinementListener
 import com.voiceexpense.ai.parsing.hybrid.HybridParsingResult
 import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
 import com.voiceexpense.ai.parsing.hybrid.ProcessingMethod
@@ -42,9 +43,10 @@ class TransactionParser(
     suspend fun runStagedRefinement(
         text: String,
         context: ParsingContext,
-        stage1Snapshot: StagedParsingOrchestrator.Stage1Snapshot
+        stage1Snapshot: StagedParsingOrchestrator.Stage1Snapshot,
+        onFieldRefined: FieldRefinementListener? = null
     ): HybridParsingResult {
-        return hybrid.completeStagedParsing(text, context, stage1Snapshot)
+        return hybrid.completeStagedParsing(text, context, stage1Snapshot, onFieldRefined)
     }
 
     suspend fun parseDetailed(text: String, context: ParsingContext = ParsingContext()): HybridParsingResult {

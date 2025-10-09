@@ -132,7 +132,28 @@ class MainActivity : AppCompatActivity() {
                     val stage1Snapshot = stage1.snapshot
                     launch(kotlinx.coroutines.Dispatchers.IO) {
                         try {
-                            val detailed = parser.runStagedRefinement(text, ctx, stage1Snapshot)
+                            val detailed = parser.runStagedRefinement(
+                                text = text,
+                                context = ctx,
+                                stage1Snapshot = stage1Snapshot,
+                                onFieldRefined = { update ->
+                                    val refined = if (update.error == null) {
+                                        mapOf(update.field to update.value)
+                                    } else emptyMap()
+                                    val errors = update.error?.let { listOf(it) } ?: emptyList()
+                                    StagedRefinementDispatcher.emit(
+                                        StagedRefinementDispatcher.RefinementEvent(
+                                            transactionId = transactionId,
+                                            refinedFields = refined,
+                                            targetFields = setOf(update.field),
+                                            errors = errors,
+                                            stage1DurationMs = stage1Snapshot.stage1DurationMs,
+                                            stage2DurationMs = update.durationMs,
+                                            confidence = null
+                                        )
+                                    )
+                                }
+                            )
                             val staged = detailed.staged
                             if (staged != null) {
                                 Log.d(

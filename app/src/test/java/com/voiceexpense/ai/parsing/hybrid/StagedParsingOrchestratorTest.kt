@@ -4,6 +4,7 @@ import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
+import com.voiceexpense.ai.parsing.hybrid.FieldRefinementUpdate
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
 import com.voiceexpense.ai.parsing.heuristic.HeuristicExtractor
 import kotlinx.coroutines.runBlocking
@@ -193,7 +194,14 @@ class StagedParsingOrchestratorTest {
             stage1DurationMs = 0L
         )
 
-        val result = orchestrator.parseStaged("bought a tent at rei", ParsingContext(), snapshot)
+        val updates = mutableListOf<FieldRefinementUpdate>()
+
+        val result = orchestrator.parseStaged(
+            input = "bought a tent at rei",
+            context = ParsingContext(),
+            stage1Snapshot = snapshot,
+            listener = { updates += it }
+        )
 
         assertThat(gateway.calls).isEqualTo(3)
         assertThat(result.fieldsRefined).containsExactly(
@@ -207,6 +215,11 @@ class StagedParsingOrchestratorTest {
         assertThat(result.refinementErrors).isEmpty()
         assertThat(gateway.promptsTried.first()).contains("Field: Merchant")
         assertThat(gateway.promptsTried[1]).contains("Field: Description")
+        assertThat(updates.map(FieldRefinementUpdate::field)).containsExactly(
+            FieldKey.MERCHANT,
+            FieldKey.DESCRIPTION,
+            FieldKey.EXPENSE_CATEGORY
+        ).inOrder()
     }
 
     private class FakeGenAiGateway : GenAiGateway {

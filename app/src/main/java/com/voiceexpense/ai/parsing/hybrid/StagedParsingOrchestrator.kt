@@ -17,6 +17,15 @@ import kotlin.system.measureTimeMillis
 
 private const val TAG = "StagedOrchestrator"
 
+data class FieldRefinementUpdate(
+    val field: FieldKey,
+    val value: Any?,
+    val durationMs: Long,
+    val error: String? = null
+)
+
+typealias FieldRefinementListener = suspend (FieldRefinementUpdate) -> Unit
+
 /**
  * Coordinates the staged parsing pipeline: heuristics → focused AI refinement → merge.
  *
@@ -65,7 +74,8 @@ class StagedParsingOrchestrator(
     suspend fun parseStaged(
         input: String,
         context: ParsingContext = ParsingContext(),
-        stage1Snapshot: Stage1Snapshot? = null
+        stage1Snapshot: Stage1Snapshot? = null,
+        listener: FieldRefinementListener? = null
     ): StagedParsingResult {
         try {
             Log.d("AI.Debug", "Staged parse start input='${input.take(80)}'")
@@ -146,6 +156,16 @@ class StagedParsingOrchestrator(
                 cumulativeRefinements[field] = value
                 heuristicDraft = applyRefinementToDraft(heuristicDraft, field, value)
             }
+            listener?.let { callback ->
+                callback(
+                    FieldRefinementUpdate(
+                        field = field,
+                        value = attempt.refinedValue,
+                        durationMs = attempt.durationMs,
+                        error = attempt.errorMessage
+                    )
+                )
+            }
         }
 
         val mergedResult: ParsedResult = if (cumulativeRefinements.isEmpty()) {
@@ -201,7 +221,8 @@ class StagedParsingOrchestrator(
             durationMs = measureTimeMillis {
                 val result = genAiGateway.structured(prompt)
                 aiPayload = result.getOrElse { throwable ->
-                    refinementErrors += "AI failure: ${throwable.message ?: throwable::class.simpleName}".trim()
+                    val message = "AI failure: ${throwable.message ?: throwable::class.simpleName}".trim()
+                    refinementErrors += message
                     Log.w(TAG, "GenAI structured call failed", throwable)
                     null
                 }
@@ -217,28 +238,32 @@ class StagedParsingOrchestrator(
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
-            refinementErrors += "AI invocation error: ${t.message ?: t::class.simpleName}".trim()
+            val message = "AI invocation error: ${t.message ?: t::class.simpleName}".trim()
+            refinementErrors += message
             Log.e(TAG, "Unexpected error during GenAI call", t)
             try {
                 Log.e("AI.Validate", "Unexpected error during focused refinement: ${t.message}")
             } catch (_: Throwable) {}
-            refinementErrors += "AI invocation error: ${t.message ?: t::class.simpleName}".trim()
-            return SingleFieldAttempt(durationMs = durationMs)
+            return SingleFieldAttempt(durationMs = durationMs, errorMessage = message)
         }
 
         if (aiPayload.isNullOrBlank()) {
             Log.d(TAG, "No AI payload returned; using heuristic result")
             try { Log.d("AI.Debug", "Focused refinement returned blank payload; using heuristic result") } catch (_: Throwable) {}
-            refinementErrors += "AI blank response"
-            return SingleFieldAttempt(durationMs = durationMs)
+            val message = "AI blank response"
+            refinementErrors += message
+            return SingleFieldAttempt(durationMs = durationMs, errorMessage = message)
         }
 
         val validation = ValidationPipeline.validateRawResponse(aiPayload!!)
         if (!validation.valid || validation.normalizedJson.isNullOrBlank()) {
-            if (validation.errors.isNotEmpty()) {
+            val message = if (validation.errors.isNotEmpty()) {
                 refinementErrors += validation.errors
+                validation.errors.joinToString()
             } else {
-                refinementErrors += "AI validation failed"
+                val msg = "AI validation failed"
+                refinementErrors += msg
+                msg
             }
             Log.w(TAG, "Validation failed for AI output errors=${validation.errors}")
             try {
@@ -248,7 +273,7 @@ class StagedParsingOrchestrator(
                     "Focused refinement invalid: errors='${validation.errors.joinToString()}' snippet='$snippet'"
                 )
             } catch (_: Throwable) {}
-            return SingleFieldAttempt(durationMs = durationMs)
+            return SingleFieldAttempt(durationMs = durationMs, errorMessage = message.takeIf { it.isNotBlank() })
         }
 
         try {
@@ -435,6 +460,7 @@ class StagedParsingOrchestrator(
 
     private data class SingleFieldAttempt(
         val refinedValue: Any? = null,
-        val durationMs: Long = 0L
+        val durationMs: Long = 0L,
+        val errorMessage: String? = null
     )
 }
