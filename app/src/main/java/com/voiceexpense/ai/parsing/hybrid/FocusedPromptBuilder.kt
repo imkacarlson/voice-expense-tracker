@@ -66,7 +66,7 @@ class FocusedPromptBuilder {
                 appendLine("Heuristic: ${formatHeuristic(field, heuristicDraft)}")
                 val options = formatOptions(field, heuristicDraft, context, input)
                 if (options.isNotBlank()) {
-                    appendLine("Options: $options")
+                    appendLine("Allowed values: $options")
                 }
                 appendLine("Instruction: ${instructionFor(field)}")
                 appendLine()
@@ -96,7 +96,7 @@ class FocusedPromptBuilder {
             appendLine("Heuristic summary:")
             appendLine(heuristics)
             if (options.isNotBlank()) {
-                appendLine("Options: $options")
+                appendLine("Allowed values: $options")
             }
             appendGuidelines(fields)
         }
@@ -254,7 +254,7 @@ class FocusedPromptBuilder {
             FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input."
             FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category from the allowed list; return null if none apply."
             FieldKey.INCOME_CATEGORY -> "Choose exactly one income category from the allowed list; return null if none apply."
-            FieldKey.TAGS -> "Return an array of distinct tags chosen from the allowed list. Include \"Splitwise\" only when the input mentions splitting or multiple amounts."
+            FieldKey.TAGS -> "Return an array of distinct tags chosen only from the allowed list. Include a tag when it (or a clear synonym) is explicitly mentioned; never invent new tags."
             FieldKey.NOTE -> "Return a brief note only when the input explicitly provides note-like text; otherwise return null."
             else -> null
         }
