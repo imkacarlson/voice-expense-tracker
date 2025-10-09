@@ -9,8 +9,6 @@ import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
 import com.voiceexpense.ai.parsing.heuristic.HeuristicExtractor
 import com.voiceexpense.ai.parsing.heuristic.toParsedResult
-import kotlinx.coroutines.TimeoutCancellationException
-import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.LinkedHashSet
@@ -19,7 +17,6 @@ import kotlin.collections.ArrayDeque
 import kotlin.system.measureTimeMillis
 
 private const val TAG = "StagedOrchestrator"
-private const val AI_TIMEOUT_MS = 12_000L
 
 /**
  * Coordinates the staged parsing pipeline: heuristics → focused AI refinement → merge.
@@ -230,9 +227,7 @@ class StagedParsingOrchestrator(
 
         try {
             durationMs = measureTimeMillis {
-                val result = withTimeout(AI_TIMEOUT_MS) {
-                    genAiGateway.structured(prompt)
-                }
+                val result = genAiGateway.structured(prompt)
                 aiPayload = result.getOrElse { throwable ->
                     refinementErrors += "AI failure: ${throwable.message ?: throwable::class.simpleName}".trim()
                     Log.w(TAG, "GenAI structured call failed", throwable)
@@ -247,14 +242,6 @@ class StagedParsingOrchestrator(
             } catch (_: Throwable) {}
             Log.d(TAG, "Stage2 duration=${durationMs}ms payloadSize=${aiPayload?.length ?: 0}")
             aiPayload?.let { logFocusedResponse(it) }
-        } catch (timeout: TimeoutCancellationException) {
-            durationMs = AI_TIMEOUT_MS
-            refinementErrors += "AI timeout after ${AI_TIMEOUT_MS}ms"
-            Log.w(TAG, "GenAI refinement timed out", timeout)
-            try {
-                Log.w("AI.Validate", "GenAI refinement timed out after ${AI_TIMEOUT_MS}ms for ${targets.joinToString()}")
-            } catch (_: Throwable) {}
-            return RefinementAttempt.empty(durationMs = durationMs, timedOut = true)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
@@ -500,14 +487,13 @@ class StagedParsingOrchestrator(
     private data class RefinementAttempt(
         val refinedFields: Map<FieldKey, Any?>,
         val durationMs: Long,
-        val timedOut: Boolean = false,
         val failed: Boolean = false
     ) {
-        fun mayProceed(): Boolean = !timedOut
+        fun mayProceed(): Boolean = true
 
         companion object {
-            fun empty(durationMs: Long = 0L, timedOut: Boolean = false, failed: Boolean = false): RefinementAttempt =
-                RefinementAttempt(emptyMap(), durationMs, timedOut = timedOut, failed = failed)
+            fun empty(durationMs: Long = 0L, failed: Boolean = false): RefinementAttempt =
+                RefinementAttempt(emptyMap(), durationMs, failed = failed)
         }
     }
 }
