@@ -87,8 +87,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val loadingIndicators = mapOf(
             FieldKey.MERCHANT to merchantProgress,
             FieldKey.DESCRIPTION to descriptionProgress,
-            FieldKey.EXPENSE_CATEGORY to categoryProgress,
-            FieldKey.INCOME_CATEGORY to categoryProgress,
             FieldKey.TAGS to tagsProgress
         )
 
@@ -403,6 +401,9 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                     val loading = states[field] == true
                     indicator.isVisible = loading
                 }
+                val categoryLoading =
+                    states[FieldKey.EXPENSE_CATEGORY] == true || states[FieldKey.INCOME_CATEGORY] == true
+                categoryProgress.isVisible = categoryLoading
             }
         }
 
