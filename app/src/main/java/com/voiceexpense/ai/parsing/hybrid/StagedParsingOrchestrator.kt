@@ -362,7 +362,20 @@ class StagedParsingOrchestrator(
                 else -> merged
             }
         }
+        if (context.allowedTags.isNotEmpty()) {
+            merged = merged.copy(tags = normalizeTags(merged.tags, context.allowedTags))
+        }
         return StructuredOutputValidator.sanitizeAmounts(merged)
+    }
+
+    private fun normalizeTags(tags: List<String>, allowed: List<String>): List<String> {
+        if (allowed.isEmpty()) return tags
+        val normalizedAllowed = allowed.associateBy { it.trim().lowercase(Locale.US) }
+        return tags.mapNotNull { tag ->
+            val trimmed = tag.trim()
+            if (trimmed.isEmpty()) return@mapNotNull null
+            normalizedAllowed[trimmed.lowercase(Locale.US)]
+        }.distinct()
     }
 
     private fun jsonKey(field: FieldKey): String = when (field) {

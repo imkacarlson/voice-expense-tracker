@@ -337,7 +337,10 @@ class HybridTransactionParser(
         val account = matchOption(result.account, accountOptions)
 
         val tags = if (context.allowedTags.isNotEmpty()) {
-            result.tags.mapNotNull { matchOption(it, context.allowedTags) }.distinct()
+            result.tags.mapNotNull { tag ->
+                val normalized = matchOption(tag, context.allowedTags)
+                normalized ?: context.allowedTags.firstOrNull { normalizeToken(it) == normalizeToken(tag) }
+            }.distinct()
         } else {
             result.tags
         }
