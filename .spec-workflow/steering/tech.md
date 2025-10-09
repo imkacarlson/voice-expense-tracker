@@ -181,11 +181,12 @@ For highly structured inputs:
 4. **Form-First Confirmation**: Better UX than pure voice, allows precise editing
 5. **Configurable Dropdowns**: User-specific categories and accounts improve parsing accuracy
 6. **Field-by-Field Parsing Option**: Fallback strategy for smaller model limitations
+7. **Sequential Field Refinement**: Stage 2 now runs single-field prompts in priority order to keep prompts short, preserve modifiers, and eliminate cross-field drift.
 7. **Room Database**: Type-safe SQLite wrapper, excellent WorkManager integration for offline queue
 
 ### AI Processing Trade-offs
 - **Accuracy vs Speed**: 1B model trades some accuracy for faster inference
-- **Single vs Multi-Prompt**: Single-shot preferred for speed, multi-prompt for complex cases
+- **Sequential Single-Field Prompts**: We now favor one-field prompts in succession—latency stays acceptable while accuracy improves because instructions can be laser-focused per field.
 - **Examples vs Context**: Balance few-shot examples with user-specific context
 - **Validation Strictness**: Strict JSON validation prevents malformed outputs
 - **Text vs Voice Complexity**: Simplified text-only processing reduces complexity
