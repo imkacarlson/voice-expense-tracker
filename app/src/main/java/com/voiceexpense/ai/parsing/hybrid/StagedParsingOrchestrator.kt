@@ -13,7 +13,9 @@ import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.withTimeout
 import org.json.JSONArray
 import org.json.JSONObject
+import java.util.LinkedHashSet
 import java.util.Locale
+import kotlin.collections.ArrayDeque
 import kotlin.system.measureTimeMillis
 
 private const val TAG = "StagedOrchestrator"
@@ -36,7 +38,7 @@ class StagedParsingOrchestrator(
 
     data class Stage1Snapshot(
         val heuristicDraft: HeuristicDraft,
-        val targetFields: Set<FieldKey>,
+        val targetFields: List<FieldKey>,
         val stage1DurationMs: Long
     )
 
@@ -50,7 +52,6 @@ class StagedParsingOrchestrator(
         }
         val targetFields = fieldSelector
             .selectFieldsForRefinement(heuristicDraft, thresholds)
-            .toSet()
         try {
             Log.d(
                 "AI.Debug",
@@ -77,9 +78,10 @@ class StagedParsingOrchestrator(
         val refinementErrors = mutableListOf<String>()
 
         val stage1 = stage1Snapshot ?: prepareStage1(input, context)
-        val heuristicDraft = stage1.heuristicDraft
+        var heuristicDraft = stage1.heuristicDraft
         val stage1DurationMs = stage1.stage1DurationMs
-        val targetFields = stage1.targetFields
+        val orderedTargetFields = stage1.targetFields
+        val initialTargetSet = LinkedHashSet(orderedTargetFields)
 
         if (stage1Snapshot != null) {
             try {
@@ -97,10 +99,10 @@ class StagedParsingOrchestrator(
         val genAiAvailable = genAiGateway.isAvailable()
 
         try {
-            val summary = if (targetFields.isEmpty()) {
+            val summary = if (orderedTargetFields.isEmpty()) {
                 "none"
             } else {
-                targetFields.joinToString { field ->
+                orderedTargetFields.joinToString { field ->
                     val confidence = heuristicDraft.confidences[field]
                     val formatted = confidence?.let { String.format(Locale.US, "%.2f", it) } ?: "n/a"
                     "${field.name.lowercase(Locale.US)}=$formatted"
@@ -111,14 +113,14 @@ class StagedParsingOrchestrator(
                 "focused refinement target=${summary} aiAvailable=$genAiAvailable"
             )
         } catch (_: Throwable) {}
-        Log.d(TAG, "Target fields=${targetFields.joinToString()} aiAvailable=$genAiAvailable")
+        Log.d(TAG, "Target fields=${orderedTargetFields.joinToString()} aiAvailable=$genAiAvailable")
 
-        if (targetFields.isEmpty() || !genAiAvailable) {
-            if (!genAiAvailable && targetFields.isNotEmpty()) {
+        if (orderedTargetFields.isEmpty() || !genAiAvailable) {
+            if (!genAiAvailable && orderedTargetFields.isNotEmpty()) {
                 refinementErrors += "AI unavailable"
                 Log.w(TAG, "GenAI unavailable; skipping refinement")
                 try {
-                    Log.w("AI.Validate", "GenAI unavailable; skipping refinement for ${targetFields.joinToString()}")
+                    Log.w("AI.Validate", "GenAI unavailable; skipping refinement for ${orderedTargetFields.joinToString()}")
                 } catch (_: Throwable) {}
             }
             val merged = heuristicDraft.toParsedResult(context)
@@ -127,23 +129,99 @@ class StagedParsingOrchestrator(
                 refinedFields = emptyMap(),
                 mergedResult = merged,
                 fieldsRefined = emptySet(),
-                targetFields = targetFields,
+                targetFields = initialTargetSet,
                 refinementErrors = refinementErrors,
                 stage1DurationMs = stage1DurationMs,
                 stage2DurationMs = 0L
             )
         }
+        val cumulativeRefinements = linkedMapOf<FieldKey, Any?>()
+        var stage2DurationMs = 0L
 
+        suspend fun runAttempt(
+            targets: LinkedHashSet<FieldKey>
+        ): RefinementAttempt {
+            if (targets.isEmpty()) return RefinementAttempt.empty()
+            return refineTargets(
+                input = input,
+                context = context,
+                draftForPrompt = heuristicDraft,
+                targets = targets,
+                refinementErrors = refinementErrors
+            ).also { attempt ->
+                stage2DurationMs += attempt.durationMs
+                cumulativeRefinements += attempt.refinedFields
+                if (attempt.refinedFields.isNotEmpty()) {
+                    heuristicDraft = applyRefinementsToDraft(heuristicDraft, attempt.refinedFields)
+                }
+            }
+        }
+
+        val remainingTargets = ArrayDeque(orderedTargetFields)
+        val firstTargets = remainingTargets
+            .removeFirstOrNull()
+            ?.let { linkedSetOf(it) }
+            ?: linkedSetOf()
+
+        val firstAttempt = runAttempt(firstTargets)
+
+        var continueToSecondCall = remainingTargets.isNotEmpty()
+        if (continueToSecondCall) {
+            val stillNeeded = fieldSelector
+                .selectFieldsForRefinement(heuristicDraft, thresholds)
+                .toSet()
+            remainingTargets.removeIf { it !in stillNeeded }
+            continueToSecondCall = remainingTargets.isNotEmpty() && firstAttempt.mayProceed()
+        }
+
+        if (continueToSecondCall) {
+            val secondTargets = LinkedHashSet(remainingTargets)
+            runAttempt(secondTargets)
+        }
+
+        val mergedResult: ParsedResult = if (cumulativeRefinements.isEmpty()) {
+            heuristicDraft.toParsedResult(context)
+        } else {
+            mergeResults(
+                heuristicDraft = stage1.heuristicDraft,
+                refinedFields = cumulativeRefinements,
+                context = context
+            )
+        }
+        val fieldsRefined: Set<FieldKey> = cumulativeRefinements.keys.toSet()
+
+        Log.i(
+            TAG,
+            "Staged parsing finished stage1=${stage1DurationMs}ms stage2=${stage2DurationMs}ms refined=${fieldsRefined.size} errors=${refinementErrors.size}"
+        )
+        return StagedParsingResult(
+            heuristicDraft = stage1.heuristicDraft,
+            refinedFields = cumulativeRefinements,
+            mergedResult = mergedResult,
+            fieldsRefined = fieldsRefined,
+            targetFields = initialTargetSet,
+            refinementErrors = refinementErrors,
+            stage1DurationMs = stage1DurationMs,
+            stage2DurationMs = stage2DurationMs
+        )
+    }
+
+    private suspend fun refineTargets(
+        input: String,
+        context: ParsingContext,
+        draftForPrompt: HeuristicDraft,
+        targets: LinkedHashSet<FieldKey>,
+        refinementErrors: MutableList<String>
+    ): RefinementAttempt {
         val prompt = focusedPromptBuilder.buildFocusedPrompt(
             input = input,
-            heuristicDraft = heuristicDraft,
-            targetFields = targetFields,
+            heuristicDraft = draftForPrompt,
+            targetFields = targets,
             context = context
         )
         logFocusedPrompt(prompt)
-        val refinedFields = mutableMapOf<FieldKey, Any?>()
 
-        var stage2DurationMs = 0L
+        var durationMs = 0L
         var aiPayload: String? = null
 
         try {
@@ -151,7 +229,7 @@ class StagedParsingOrchestrator(
         } catch (_: Throwable) {}
 
         try {
-            stage2DurationMs = measureTimeMillis {
+            durationMs = measureTimeMillis {
                 val result = withTimeout(AI_TIMEOUT_MS) {
                     genAiGateway.structured(prompt)
                 }
@@ -164,18 +242,19 @@ class StagedParsingOrchestrator(
             try {
                 Log.d(
                     "AI.Debug",
-                    "Stage2 duration=${stage2DurationMs}ms payloadSize=${aiPayload?.length ?: 0}"
+                    "Stage2 duration=${durationMs}ms payloadSize=${aiPayload?.length ?: 0}"
                 )
             } catch (_: Throwable) {}
-            Log.d(TAG, "Stage2 duration=${stage2DurationMs}ms payloadSize=${aiPayload?.length ?: 0}")
+            Log.d(TAG, "Stage2 duration=${durationMs}ms payloadSize=${aiPayload?.length ?: 0}")
             aiPayload?.let { logFocusedResponse(it) }
         } catch (timeout: TimeoutCancellationException) {
-            stage2DurationMs = AI_TIMEOUT_MS
+            durationMs = AI_TIMEOUT_MS
             refinementErrors += "AI timeout after ${AI_TIMEOUT_MS}ms"
             Log.w(TAG, "GenAI refinement timed out", timeout)
             try {
-                Log.w("AI.Validate", "GenAI refinement timed out after ${AI_TIMEOUT_MS}ms for ${targetFields.joinToString()}")
+                Log.w("AI.Validate", "GenAI refinement timed out after ${AI_TIMEOUT_MS}ms for ${targets.joinToString()}")
             } catch (_: Throwable) {}
+            return RefinementAttempt.empty(durationMs = durationMs, timedOut = true)
         } catch (cancelled: kotlinx.coroutines.CancellationException) {
             throw cancelled
         } catch (t: Throwable) {
@@ -184,70 +263,53 @@ class StagedParsingOrchestrator(
             try {
                 Log.e("AI.Validate", "Unexpected error during focused refinement: ${t.message}")
             } catch (_: Throwable) {}
+            return RefinementAttempt.empty(durationMs = durationMs, failed = true)
         }
-
-        val fieldsRefined: Set<FieldKey>
-        val mergedResult: ParsedResult
 
         if (aiPayload.isNullOrBlank()) {
-            mergedResult = heuristicDraft.toParsedResult(context)
-            fieldsRefined = emptySet()
             Log.d(TAG, "No AI payload returned; using heuristic result")
             try { Log.d("AI.Debug", "Focused refinement returned blank payload; using heuristic result") } catch (_: Throwable) {}
-        } else {
-            val validation = ValidationPipeline.validateRawResponse(aiPayload!!)
-            if (!validation.valid || validation.normalizedJson.isNullOrBlank()) {
-                if (validation.errors.isNotEmpty()) {
-                    refinementErrors += validation.errors
-                } else {
-                    refinementErrors += "AI validation failed"
-                }
-                Log.w(TAG, "Validation failed for AI output errors=${validation.errors}")
-                try {
-                    val snippet = aiPayload!!.replace("\n", " ").take(200)
-                    Log.w(
-                        "AI.Validate",
-                        "Focused refinement invalid: errors='${validation.errors.joinToString()}' snippet='$snippet'"
-                    )
-                } catch (_: Throwable) {}
-                mergedResult = heuristicDraft.toParsedResult(context)
-                fieldsRefined = emptySet()
-            } else {
-                try {
-                    val snippet = aiPayload!!.replace("\n", " ").take(300)
-                    Log.i("AI.Output", snippet)
-                } catch (_: Throwable) {}
-                val normalized = validation.normalizedJson
-                refinedFields += extractFieldUpdates(normalized, targetFields)
-                fieldsRefined = refinedFields.keys.toSet()
-                mergedResult = mergeResults(
-                    heuristicDraft = heuristicDraft,
-                    refinedFields = refinedFields,
-                    context = context
-                )
-                try {
-                    Log.d(
-                        "AI.Debug",
-                        "Applied refinements=${fieldsRefined.joinToString()} errors=${refinementErrors.size}"
-                    )
-                } catch (_: Throwable) {}
-                Log.d(TAG, "Applied refinements=${fieldsRefined.joinToString()} errors=${refinementErrors.size}")
-            }
+            return RefinementAttempt.empty(durationMs = durationMs)
         }
 
-        Log.i(
-            TAG,
-            "Staged parsing finished stage1=${stage1DurationMs}ms stage2=${stage2DurationMs}ms refined=${fieldsRefined.size} errors=${refinementErrors.size}"
-        )
-        return StagedParsingResult(
-            heuristicDraft = heuristicDraft,
+        val validation = ValidationPipeline.validateRawResponse(aiPayload!!)
+        if (!validation.valid || validation.normalizedJson.isNullOrBlank()) {
+            if (validation.errors.isNotEmpty()) {
+                refinementErrors += validation.errors
+            } else {
+                refinementErrors += "AI validation failed"
+            }
+            Log.w(TAG, "Validation failed for AI output errors=${validation.errors}")
+            try {
+                val snippet = aiPayload!!.replace("\n", " ").take(200)
+                Log.w(
+                    "AI.Validate",
+                    "Focused refinement invalid: errors='${validation.errors.joinToString()}' snippet='$snippet'"
+                )
+            } catch (_: Throwable) {}
+            return RefinementAttempt.empty(durationMs = durationMs, failed = true)
+        }
+
+        try {
+            val snippet = aiPayload!!.replace("\n", " ").take(300)
+            Log.i("AI.Output", snippet)
+        } catch (_: Throwable) {}
+
+        val normalized = validation.normalizedJson
+        val updates = extractFieldUpdates(normalized, targets)
+        val refinedFields = updates.filterKeys { it in targets }
+
+        try {
+            Log.d(
+                "AI.Debug",
+                "Applied refinements=${refinedFields.keys.joinToString()} totalErrors=${refinementErrors.size}"
+            )
+        } catch (_: Throwable) {}
+        Log.d(TAG, "Applied refinements=${refinedFields.keys.joinToString()} errors=${refinementErrors.size}")
+
+        return RefinementAttempt(
             refinedFields = refinedFields,
-            mergedResult = mergedResult,
-            fieldsRefined = fieldsRefined,
-            targetFields = targetFields,
-            refinementErrors = refinementErrors,
-            stage1DurationMs = stage1DurationMs,
-            stage2DurationMs = stage2DurationMs
+            durationMs = durationMs
         )
     }
 
@@ -367,6 +429,85 @@ class StagedParsingOrchestrator(
             Log.d("AI.Debug", "<<< Focused response end (${text.length} chars)")
         } catch (_: Throwable) {
             // ignore logging failures
+        }
+    }
+
+    private fun applyRefinementsToDraft(
+        draft: HeuristicDraft,
+        refinements: Map<FieldKey, Any?>
+    ): HeuristicDraft {
+        if (refinements.isEmpty()) return draft
+        val confidences = draft.confidences.toMutableMap()
+
+        var merchant = draft.merchant
+        var description = draft.description
+        var expenseCategory = draft.expenseCategory
+        var incomeCategory = draft.incomeCategory
+        var tags = draft.tags
+        var note = draft.note
+
+        refinements.forEach { (field, value) ->
+            when (field) {
+                FieldKey.MERCHANT -> {
+                    val text = (value as? String)?.trim()
+                    merchant = text.takeUnless { it.isNullOrEmpty() } ?: merchant
+                    text?.let { confidences[field] = 0.95f }
+                }
+                FieldKey.DESCRIPTION -> {
+                    val text = (value as? String)?.trim().takeUnless { it.isNullOrEmpty() }
+                    description = text
+                    text?.let { confidences[field] = 0.95f }
+                }
+                FieldKey.EXPENSE_CATEGORY -> {
+                    val text = (value as? String)?.trim().takeUnless { it.isNullOrEmpty() }
+                    expenseCategory = text
+                    text?.let { confidences[field] = 0.9f }
+                }
+                FieldKey.INCOME_CATEGORY -> {
+                    val text = (value as? String)?.trim().takeUnless { it.isNullOrEmpty() }
+                    incomeCategory = text
+                    text?.let { confidences[field] = 0.9f }
+                }
+                FieldKey.TAGS -> {
+                    val list = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+                    if (list.isNotEmpty()) {
+                        tags = list
+                        confidences[field] = 0.85f
+                    }
+                }
+                FieldKey.NOTE -> {
+                    val text = (value as? String)?.trim().takeUnless { it.isNullOrEmpty() }
+                    note = text
+                    text?.let { confidences[field] = 0.8f }
+                }
+                else -> {
+                    // Non-refinable fields are ignored here.
+                }
+            }
+        }
+
+        return draft.copy(
+            merchant = merchant,
+            description = description,
+            expenseCategory = expenseCategory,
+            incomeCategory = incomeCategory,
+            tags = tags,
+            note = note,
+            confidences = confidences.toMap()
+        )
+    }
+
+    private data class RefinementAttempt(
+        val refinedFields: Map<FieldKey, Any?>,
+        val durationMs: Long,
+        val timedOut: Boolean = false,
+        val failed: Boolean = false
+    ) {
+        fun mayProceed(): Boolean = !timedOut
+
+        companion object {
+            fun empty(durationMs: Long = 0L, timedOut: Boolean = false, failed: Boolean = false): RefinementAttempt =
+                RefinementAttempt(emptyMap(), durationMs, timedOut = timedOut, failed = failed)
         }
     }
 }

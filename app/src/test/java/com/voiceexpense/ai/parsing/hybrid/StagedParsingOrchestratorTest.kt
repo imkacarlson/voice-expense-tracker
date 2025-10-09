@@ -45,7 +45,7 @@ class StagedParsingOrchestratorTest {
         )
         val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
             heuristicDraft = draft,
-            targetFields = emptySet(),
+            targetFields = emptyList(),
             stage1DurationMs = 0L
         )
 
@@ -86,7 +86,7 @@ class StagedParsingOrchestratorTest {
             focusedPromptBuilder = focusedPromptBuilder,
             thresholds = thresholds
         )
-        val target = setOf(
+        val target = listOf(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
@@ -100,7 +100,7 @@ class StagedParsingOrchestratorTest {
 
         val result = orchestrator.parseStaged("coffee at blue bottle", ParsingContext(), snapshot)
 
-        assertThat(gateway.calls).isEqualTo(1)
+        assertThat(gateway.calls).isEqualTo(2)
         assertThat(result.targetFields).containsAtLeast(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
@@ -144,31 +144,83 @@ class StagedParsingOrchestratorTest {
         )
         val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
             heuristicDraft = draft,
-            targetFields = setOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY),
+            targetFields = listOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY),
             stage1DurationMs = 0L
         )
 
         val result = orchestrator.parseStaged("something", ParsingContext(), snapshot)
 
-        assertThat(gateway.calls).isEqualTo(1)
+        assertThat(gateway.calls).isEqualTo(2)
         assertThat(result.fieldsRefined).isEmpty()
         assertThat(result.refinedFields).isEmpty()
         assertThat(result.mergedResult.merchant).isEqualTo("Unknown")
         assertThat(result.refinementErrors).isNotEmpty()
     }
 
+    @Test
+    fun prioritizes_single_field_first() = runBlocking {
+        val draft = HeuristicDraft(
+            merchant = null,
+            description = null,
+            expenseCategory = null,
+            confidences = mapOf(
+                FieldKey.MERCHANT to 0.1f,
+                FieldKey.DESCRIPTION to 0.2f,
+                FieldKey.EXPENSE_CATEGORY to 0.2f
+            )
+        )
+        val gateway = FakeGenAiGateway().apply {
+            resultProvider = { attempt ->
+                if (attempt == 1) {
+                    Result.success("""{"merchant":"REI"}""")
+                } else {
+                    Result.success("""{"description":"Tent","expenseCategory":"Outdoors"}""")
+                }
+            }
+        }
+        val orchestrator = StagedParsingOrchestrator(
+            heuristicExtractor = heuristicExtractor,
+            genAiGateway = gateway,
+            focusedPromptBuilder = focusedPromptBuilder,
+            thresholds = thresholds
+        )
+        val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
+            heuristicDraft = draft,
+            targetFields = listOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION, FieldKey.EXPENSE_CATEGORY),
+            stage1DurationMs = 0L
+        )
+
+        val result = orchestrator.parseStaged("bought a tent at rei", ParsingContext(), snapshot)
+
+        assertThat(gateway.calls).isEqualTo(2)
+        assertThat(result.fieldsRefined).containsExactly(
+            FieldKey.MERCHANT,
+            FieldKey.DESCRIPTION,
+            FieldKey.EXPENSE_CATEGORY
+        )
+        assertThat(result.mergedResult.merchant).isEqualTo("REI")
+        assertThat(result.mergedResult.description).isEqualTo("Tent")
+        assertThat(result.mergedResult.expenseCategory).isEqualTo("Outdoors")
+        assertThat(result.refinementErrors).isEmpty()
+        assertThat(gateway.promptsTried.first()).contains("Field: Merchant")
+        assertThat(gateway.promptsTried.last()).contains("Field: Description")
+    }
+
     private class FakeGenAiGateway : GenAiGateway {
         var available: Boolean = true
         var result: Result<String> = Result.success("{}")
+        var resultProvider: ((attempt: Int) -> Result<String>)? = null
         var calls: Int = 0
         var lastPrompt: String? = null
+        val promptsTried = mutableListOf<String>()
 
         override fun isAvailable(): Boolean = available
 
         override suspend fun structured(prompt: String): Result<String> {
             calls += 1
             lastPrompt = prompt
-            return result
+            promptsTried += prompt
+            return resultProvider?.invoke(calls) ?: result
         }
     }
 }

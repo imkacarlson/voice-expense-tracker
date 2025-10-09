@@ -41,14 +41,14 @@ class StagedParsingPerformanceTest {
 
         val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
             heuristicDraft = lowConfidenceDraft(),
-            targetFields = FieldSelectionStrategy.AI_REFINABLE_FIELDS,
+            targetFields = FieldSelectionStrategy.AI_REFINABLE_FIELDS.toList(),
             stage1DurationMs = 5L
         )
 
         val result = orchestrator.parseStaged("coffee purchase", ParsingContext(), snapshot)
 
         assertThat(result.fieldsRefined).isNotEmpty()
-        assertThat(result.stage2DurationMs).isAtMost(2000)
+        assertThat(result.stage2DurationMs).isAtMost(3200)
     }
 
     @Test

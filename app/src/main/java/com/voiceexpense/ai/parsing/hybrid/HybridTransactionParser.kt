@@ -39,7 +39,7 @@ class HybridTransactionParser(
         context: ParsingContext = ParsingContext()
     ): StagedParsingOrchestrator.Stage1Snapshot {
         val snapshot = stagedOrchestrator.prepareStage1(input, context)
-        return if (stagedConfig.enabled) snapshot else snapshot.copy(targetFields = emptySet())
+        return if (stagedConfig.enabled) snapshot else snapshot.copy(targetFields = emptyList())
     }
 
     suspend fun completeStagedParsing(

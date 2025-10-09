@@ -21,7 +21,7 @@ class TransactionParser(
         val snapshot: StagedParsingOrchestrator.Stage1Snapshot,
         val parsedResult: ParsedResult
     ) {
-        val targetFields: Set<FieldKey> get() = snapshot.targetFields
+        val targetFields: List<FieldKey> get() = snapshot.targetFields
         val heuristicDraft: HeuristicDraft get() = snapshot.heuristicDraft
     }
 
