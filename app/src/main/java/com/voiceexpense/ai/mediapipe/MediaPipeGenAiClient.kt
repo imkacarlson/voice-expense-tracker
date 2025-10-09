@@ -61,6 +61,7 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
             }
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
+                .setPreferredBackend(LlmInference.Backend.GPU)
                 .build()
             llm = LlmInference.createFromOptions(context, options)
             Log.i("AI.MP", "Model initialized: ${modelFile.absolutePath}")
