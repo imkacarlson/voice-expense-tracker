@@ -162,7 +162,7 @@ class MainActivity : AppCompatActivity() {
                                     StagedRefinementDispatcher.RefinementEvent(
                                         transactionId = transactionId,
                                         refinedFields = emptyMap(),
-                                        targetFields = loadingFields,
+                                        targetFields = loadingFields.toSet(),
                                         errors = emptyList(),
                                         stage1DurationMs = stage1Snapshot.stage1DurationMs,
                                         stage2DurationMs = 0L,
@@ -181,7 +181,7 @@ class MainActivity : AppCompatActivity() {
                                 StagedRefinementDispatcher.RefinementEvent(
                                     transactionId = transactionId,
                                     refinedFields = emptyMap(),
-                                    targetFields = loadingFields,
+                                    targetFields = loadingFields.toSet(),
                                     errors = listOfNotNull(t.message),
                                     stage1DurationMs = stage1Snapshot.stage1DurationMs,
                                     stage2DurationMs = 0L,

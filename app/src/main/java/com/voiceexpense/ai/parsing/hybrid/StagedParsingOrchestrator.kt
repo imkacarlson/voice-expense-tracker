@@ -338,7 +338,7 @@ class StagedParsingOrchestrator(
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
             FieldKey.INCOME_CATEGORY,
-            FieldKey.NOTE -> json.optString(key, null)?.takeUnless { it.isBlank() }
+            FieldKey.NOTE -> json.optString(key).takeUnless { it.isBlank() }?.trim()
             FieldKey.TAGS -> {
                 val arr = json.optJSONArray(key)
                 when {
