@@ -183,10 +183,18 @@ function verifyAuthentication(token, CONFIG) {
       const tokenInfo = JSON.parse(response.getContentText());
 
       // Validate audience if CLIENT_ID is configured
-      if (CONFIG.OAUTH_CLIENT_ID && tokenInfo.aud && tokenInfo.aud !== CONFIG.OAUTH_CLIENT_ID) {
-        const error = 'Token not issued for this application';
-        writeLog('ERROR', 'OAuth audience validation failed', `Expected: ${CONFIG.OAUTH_CLIENT_ID}, Got: ${tokenInfo.aud}`);
-        throw new Error(error);
+      if (CONFIG.OAUTH_CLIENT_ID) {
+        if (tokenInfo.aud) {
+          if (tokenInfo.aud !== CONFIG.OAUTH_CLIENT_ID) {
+            const error = 'Token not issued for this application';
+            writeLog('ERROR', 'OAuth audience validation failed', `Expected: ${CONFIG.OAUTH_CLIENT_ID}, Got: ${tokenInfo.aud}`);
+            throw new Error(error);
+          }
+          // Audience matches - log success
+          writeLog('INFO', 'OAuth audience validated', `Client ID matched: ${tokenInfo.aud.substring(0, 20)}...`);
+        } else {
+          writeLog('WARN', 'OAuth audience check skipped', 'Token has no aud field');
+        }
       }
 
       console.log(`Authenticated via access token: user ${hashEmail(tokenInfo.email)}`);
@@ -203,8 +211,18 @@ function verifyAuthentication(token, CONFIG) {
       const idTokenInfo = JSON.parse(idTokenResponse.getContentText());
 
       // Validate audience if CLIENT_ID is configured
-      if (CONFIG.OAUTH_CLIENT_ID && idTokenInfo.aud && idTokenInfo.aud !== CONFIG.OAUTH_CLIENT_ID) {
-        throw new Error('Token not issued for this application');
+      if (CONFIG.OAUTH_CLIENT_ID) {
+        if (idTokenInfo.aud) {
+          if (idTokenInfo.aud !== CONFIG.OAUTH_CLIENT_ID) {
+            const error = 'Token not issued for this application';
+            writeLog('ERROR', 'OAuth audience validation failed', `Expected: ${CONFIG.OAUTH_CLIENT_ID}, Got: ${idTokenInfo.aud}`);
+            throw new Error(error);
+          }
+          // Audience matches - log success
+          writeLog('INFO', 'OAuth audience validated', `Client ID matched: ${idTokenInfo.aud.substring(0, 20)}...`);
+        } else {
+          writeLog('WARN', 'OAuth audience check skipped', 'Token has no aud field');
+        }
       }
 
       console.log(`Authenticated via ID token: user ${hashEmail(idTokenInfo.email)}`);
