@@ -242,6 +242,11 @@ class SettingsActivity : AppCompatActivity() {
                 android.widget.Toast.makeText(this, R.string.error_missing_web_url, android.widget.Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
+            // Validate HTTPS
+            if (!url.startsWith("https://", ignoreCase = true)) {
+                android.widget.Toast.makeText(this, "Web App URL must use HTTPS for security", android.widget.Toast.LENGTH_LONG).show()
+                return@setOnClickListener
+            }
             prefsOrInit().edit()
                 .putString(SettingsKeys.WEB_APP_URL, url)
                 .putString(SettingsKeys.KNOWN_ACCOUNTS, accounts.text.toString())

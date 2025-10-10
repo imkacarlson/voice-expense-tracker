@@ -5,38 +5,60 @@
 
 function doPost(e) {
   try {
+    // Validate request size to prevent DoS attacks
+    const MAX_REQUEST_SIZE = 10000; // 10KB - sufficient for expense data
+    if (e.postData.contents.length > MAX_REQUEST_SIZE) {
+      console.log(`Request too large: ${e.postData.contents.length} bytes`);
+      return createResponse('error', 'Request too large');
+    }
+
     // Get all configuration from Script Properties
     const scriptProperties = PropertiesService.getScriptProperties();
     const CONFIG = {
       SPREADSHEET_ID: scriptProperties.getProperty('SPREADSHEET_ID'),
       SHEET_NAME: scriptProperties.getProperty('SHEET_NAME'),
-      ALLOWED_EMAIL: scriptProperties.getProperty('ALLOWED_EMAIL')
+      ALLOWED_EMAIL: scriptProperties.getProperty('ALLOWED_EMAIL'),
+      OAUTH_CLIENT_ID: scriptProperties.getProperty('OAUTH_CLIENT_ID')
     };
-    
+
     // Verify configuration exists
     if (!CONFIG.SPREADSHEET_ID || !CONFIG.SHEET_NAME || !CONFIG.ALLOWED_EMAIL) {
       console.error('Missing required Script Properties');
-      return createResponse('error', 'Server configuration error - missing properties');
+      return createResponse('error', 'Server configuration error');
     }
-    
+
     // Parse incoming data
     const data = JSON.parse(e.postData.contents);
     
     // Verify authentication
     const userEmail = verifyAuthentication(data.token, CONFIG);
-    
+
     // Check if it's your account
     if (userEmail !== CONFIG.ALLOWED_EMAIL) {
       console.log(`Unauthorized access attempt from: ${userEmail}`);
       return createResponse('error', 'Unauthorized: Only the owner can add expenses');
     }
+
+    // Rate limiting: 30 requests per 10 minutes
+    const cache = CacheService.getUserCache();
+    const rateLimitKey = `rate_${userEmail.replace(/[^a-zA-Z0-9]/g, '_')}`;
+    const requestCount = parseInt(cache.get(rateLimitKey) || '0');
+
+    if (requestCount >= 30) {
+      console.log(`Rate limit exceeded for user (${requestCount} requests in window)`);
+      return createResponse('error', 'Too many requests. Please wait a moment.');
+    }
+
+    // Increment request counter (10 minute expiration)
+    cache.put(rateLimitKey, (requestCount + 1).toString(), 600);
     
     // Get the specific sheet within the spreadsheet
     const spreadsheet = SpreadsheetApp.openById(CONFIG.SPREADSHEET_ID);
     const sheet = spreadsheet.getSheetByName(CONFIG.SHEET_NAME);
-    
+
     if (!sheet) {
-      return createResponse('error', `Sheet "${CONFIG.SHEET_NAME}" not found in spreadsheet`);
+      console.error(`Sheet "${CONFIG.SHEET_NAME}" not found in spreadsheet`);
+      return createResponse('error', 'Sheet not found');
     }
     
     // Get spreadsheet timezone and set the number format for column A
@@ -65,7 +87,7 @@ function doPost(e) {
     sheet.appendRow(newRow);
     
     // Log for debugging (visible in Apps Script editor logs)
-    console.log(`New expense added by ${userEmail} at ${new Date().toISOString()}`);
+    console.log(`New expense added by user ${hashEmail(userEmail)} at ${new Date().toISOString()}`);
     console.log(`Description: ${data.description}, Amount: ${data.amount}`);
     
     return createResponse('success', 'Expense added successfully', {
@@ -77,8 +99,17 @@ function doPost(e) {
     
   } catch(error) {
     console.error('Error in doPost:', error.toString());
-    return createResponse('error', error.toString());
+    return createResponse('error', 'An error occurred. Please try again.');
   }
+}
+
+/**
+ * Hash email for privacy in logs
+ */
+function hashEmail(email) {
+  return Utilities.base64Encode(
+    Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, email)
+  ).substring(0, 8);
 }
 
 /**
@@ -98,7 +129,13 @@ function verifyAuthentication(token, CONFIG) {
     
     if (response.getResponseCode() === 200) {
       const tokenInfo = JSON.parse(response.getContentText());
-      console.log(`Authenticated via access token: ${tokenInfo.email}`);
+
+      // Validate audience if CLIENT_ID is configured
+      if (CONFIG.OAUTH_CLIENT_ID && tokenInfo.aud && tokenInfo.aud !== CONFIG.OAUTH_CLIENT_ID) {
+        throw new Error('Token not issued for this application');
+      }
+
+      console.log(`Authenticated via access token: user ${hashEmail(tokenInfo.email)}`);
       return tokenInfo.email;
     }
     
@@ -110,7 +147,13 @@ function verifyAuthentication(token, CONFIG) {
     
     if (idTokenResponse.getResponseCode() === 200) {
       const idTokenInfo = JSON.parse(idTokenResponse.getContentText());
-      console.log(`Authenticated via ID token: ${idTokenInfo.email}`);
+
+      // Validate audience if CLIENT_ID is configured
+      if (CONFIG.OAUTH_CLIENT_ID && idTokenInfo.aud && idTokenInfo.aud !== CONFIG.OAUTH_CLIENT_ID) {
+        throw new Error('Token not issued for this application');
+      }
+
+      console.log(`Authenticated via ID token: user ${hashEmail(idTokenInfo.email)}`);
       return idTokenInfo.email;
     }
 
