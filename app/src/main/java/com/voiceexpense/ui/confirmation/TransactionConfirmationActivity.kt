@@ -226,44 +226,40 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                             com.voiceexpense.data.model.TransactionType.Transfer -> ConfigType.TransferCategory
                         }
                         lifecycleScope.launch {
-                            configRepo.options(cfgType).collect { opts ->
-                                val labels = opts.sortedBy { it.position }.map { it.label }
-                                val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
-                                adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                                categoryUserChange = false
-                                categorySpinner.adapter = adapter
-                                val idx = labels.indexOf(category ?: "")
-                                if (idx >= 0) {
-                                    categorySpinner.setSelection(idx, false)
-                                } else {
-                                    // apply default if available
-                                    val df = when (type) {
-                                        com.voiceexpense.data.model.TransactionType.Expense -> DefaultField.DefaultExpenseCategory
-                                        com.voiceexpense.data.model.TransactionType.Income -> DefaultField.DefaultIncomeCategory
-                                        com.voiceexpense.data.model.TransactionType.Transfer -> DefaultField.DefaultTransferCategory
-                                    }
-                                    lifecycleScope.launch {
-                                        val defId = configRepo.defaultFor(df).first()
-                                        val sorted = opts.sortedBy { it.position }
-                                        val defIdx = sorted.indexOfFirst { it.id == defId }
-                                        if (defIdx >= 0) categorySpinner.setSelection(defIdx, false)
-                                    }
+                            val opts = configRepo.options(cfgType).first()
+                            val labels = opts.sortedBy { it.position }.map { it.label }
+                            val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
+                            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                            categoryUserChange = false
+                            categorySpinner.adapter = adapter
+                            val idx = labels.indexOf(category ?: "")
+                            if (idx >= 0) {
+                                categorySpinner.setSelection(idx, false)
+                            } else {
+                                // apply default if available
+                                val df = when (type) {
+                                    com.voiceexpense.data.model.TransactionType.Expense -> DefaultField.DefaultExpenseCategory
+                                    com.voiceexpense.data.model.TransactionType.Income -> DefaultField.DefaultIncomeCategory
+                                    com.voiceexpense.data.model.TransactionType.Transfer -> DefaultField.DefaultTransferCategory
                                 }
+                                val defId = configRepo.defaultFor(df).first()
+                                val sorted = opts.sortedBy { it.position }
+                                val defIdx = sorted.indexOfFirst { it.id == defId }
+                                if (defIdx >= 0) categorySpinner.setSelection(defIdx, false)
                             }
                         }
                     }
                     bindCategoriesFor(t.type)
                     // Bind account options
                     lifecycleScope.launch {
-                        configRepo.options(ConfigType.Account).collect { opts ->
-                            val labels = opts.sortedBy { it.position }.map { it.label }
-                            val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
-                            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                            accountUserChange = false
-                            accountSpinner.adapter = adapter
-                            val accIdx = labels.indexOf(t.account ?: "")
-                            if (accIdx >= 0) accountSpinner.setSelection(accIdx, false)
-                        }
+                        val opts = configRepo.options(ConfigType.Account).first()
+                        val labels = opts.sortedBy { it.position }.map { it.label }
+                        val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
+                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                        accountUserChange = false
+                        accountSpinner.adapter = adapter
+                        val accIdx = labels.indexOf(t.account ?: "")
+                        if (accIdx >= 0) accountSpinner.setSelection(accIdx, false)
                     }
                     tagsView.setText(if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else "")
                     // Date display as YYYY-MM-DD (ISO format)
@@ -377,11 +373,12 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 userLocalDate = newDate,
                 note = newNote
             )
-            viewModel.applyManualEdits(updated)
-            viewModel.confirm()
-            enqueueSyncNow(this)
-            Toast.makeText(this, "Saved. Syncing in background.", Toast.LENGTH_SHORT).show()
-            navigateHome()
+            lifecycleScope.launch {
+                viewModel.applyManualEditsAndConfirm(updated)
+                enqueueSyncNow(this@TransactionConfirmationActivity)
+                Toast.makeText(this@TransactionConfirmationActivity, "Saved. Syncing in background.", Toast.LENGTH_SHORT).show()
+                navigateHome()
+            }
         }
         cancel.setOnClickListener {
             viewModel.cancel()

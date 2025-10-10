@@ -127,6 +127,20 @@ class ConfirmationViewModel(
         viewModelScope.launch { repo.saveDraft(updated) }
     }
 
+    // Apply manual edits and confirm in sequence to avoid race condition
+    suspend fun applyManualEditsAndConfirm(updated: Transaction) {
+        _transaction.value = updated
+        updateConfidence(updated.confidence)
+        recomputeValidation()
+        // Save edits first
+        repo.saveDraft(updated)
+        // Then confirm (reads from DB and sets status)
+        repo.confirm(updated.id)
+        // Then enqueue for sync (reads from DB and sets status)
+        repo.enqueueForSync(updated.id)
+        _transaction.value = updated.copy(status = TransactionStatus.CONFIRMED)
+    }
+
     fun applyAiRefinement(field: FieldKey, value: Any?) {
         applyAiRefinements(mapOf(field to value))
     }
