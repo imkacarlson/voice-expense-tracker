@@ -78,6 +78,6 @@
     <string name="export_diagnostics_note_hint">Add a short note (optional)</string>
     <string name="export_diagnostics_positive">Export</string>
     <string name="export_diagnostics_success">Diagnostics exported</string>
-    <string name="export_diagnostics_failure">Couldn't export diagnostics</string>
+    <string name="export_diagnostics_failure">Could not export diagnostics</string>
     <string name="export_diagnostics_missing">Diagnostics not available yet</string>
 </resources>
