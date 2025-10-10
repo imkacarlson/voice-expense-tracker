@@ -9,6 +9,7 @@ function doPost(e) {
     const MAX_REQUEST_SIZE = 10000; // 10KB - sufficient for expense data
     if (e.postData.contents.length > MAX_REQUEST_SIZE) {
       console.log(`Request too large: ${e.postData.contents.length} bytes`);
+      writeLog('WARN', 'Request too large', `Size: ${e.postData.contents.length} bytes`);
       return createResponse('error', 'Request too large');
     }
 
@@ -36,6 +37,7 @@ function doPost(e) {
     // Check if it's your account
     if (userEmail !== CONFIG.ALLOWED_EMAIL) {
       console.log(`Unauthorized access attempt from: ${userEmail}`);
+      writeLog('WARN', 'Unauthorized access attempt', `Email: ${userEmail}`);
       return createResponse('error', 'Unauthorized: Only the owner can add expenses');
     }
 
@@ -46,6 +48,7 @@ function doPost(e) {
 
     if (requestCount >= 30) {
       console.log(`Rate limit exceeded for user (${requestCount} requests in window)`);
+      writeLog('WARN', 'Rate limit exceeded', `User: ${hashEmail(userEmail)}, Count: ${requestCount}`);
       return createResponse('error', 'Too many requests. Please wait a moment.');
     }
 
@@ -87,8 +90,10 @@ function doPost(e) {
     sheet.appendRow(newRow);
     
     // Log for debugging (visible in Apps Script editor logs)
-    console.log(`New expense added by user ${hashEmail(userEmail)} at ${new Date().toISOString()}`);
+    const userHash = hashEmail(userEmail);
+    console.log(`New expense added by user ${userHash} at ${new Date().toISOString()}`);
     console.log(`Description: ${data.description}, Amount: ${data.amount}`);
+    writeLog('INFO', 'Expense added successfully', `User: ${userHash}, Amount: ${data.amount}, Desc: ${data.description}`);
     
     return createResponse('success', 'Expense added successfully', {
       timestamp: Utilities.formatDate(now, tz, "M/d/yyyy HH:mm:ss"),
@@ -99,6 +104,7 @@ function doPost(e) {
     
   } catch(error) {
     console.error('Error in doPost:', error.toString());
+    writeLog('ERROR', 'doPost failed', error.toString());
     return createResponse('error', 'An error occurred. Please try again.');
   }
 }
@@ -110,6 +116,52 @@ function hashEmail(email) {
   return Utilities.base64Encode(
     Utilities.computeDigest(Utilities.DigestAlgorithm.SHA_256, email)
   ).substring(0, 8);
+}
+
+/**
+ * Write log entry to sheet (safe - won't break on errors)
+ * @param {string} severity - INFO, WARN, ERROR
+ * @param {string} message - Log message
+ * @param {string} details - Optional additional details
+ */
+function writeLog(severity, message, details = '') {
+  try {
+    const scriptProperties = PropertiesService.getScriptProperties();
+    const spreadsheetId = scriptProperties.getProperty('SPREADSHEET_ID');
+    const logSheetName = scriptProperties.getProperty('LOG_SHEET_NAME') || 'API Logs';
+
+    if (!spreadsheetId) return; // No spreadsheet configured, skip silently
+
+    const spreadsheet = SpreadsheetApp.openById(spreadsheetId);
+    let logSheet = spreadsheet.getSheetByName(logSheetName);
+
+    // Create log sheet if it doesn't exist
+    if (!logSheet) {
+      logSheet = spreadsheet.insertSheet(logSheetName);
+      logSheet.appendRow(['Timestamp', 'Severity', 'Message', 'Details']);
+      logSheet.getRange('A1:D1').setFontWeight('bold').setBackground('#f3f3f3');
+      logSheet.setFrozenRows(1);
+    }
+
+    // Append log entry
+    logSheet.appendRow([
+      new Date(),
+      severity,
+      message,
+      details
+    ]);
+
+    // Keep only last 1000 log entries to prevent sheet bloat
+    const lastRow = logSheet.getLastRow();
+    if (lastRow > 1001) { // 1000 logs + 1 header
+      logSheet.deleteRows(2, lastRow - 1001);
+    }
+
+  } catch (error) {
+    // Logging failed - don't break the main function
+    // Still write to console for debugging
+    console.error('Failed to write log to sheet:', error.toString());
+  }
 }
 
 /**
@@ -132,7 +184,9 @@ function verifyAuthentication(token, CONFIG) {
 
       // Validate audience if CLIENT_ID is configured
       if (CONFIG.OAUTH_CLIENT_ID && tokenInfo.aud && tokenInfo.aud !== CONFIG.OAUTH_CLIENT_ID) {
-        throw new Error('Token not issued for this application');
+        const error = 'Token not issued for this application';
+        writeLog('ERROR', 'OAuth audience validation failed', `Expected: ${CONFIG.OAUTH_CLIENT_ID}, Got: ${tokenInfo.aud}`);
+        throw new Error(error);
       }
 
       console.log(`Authenticated via access token: user ${hashEmail(tokenInfo.email)}`);
