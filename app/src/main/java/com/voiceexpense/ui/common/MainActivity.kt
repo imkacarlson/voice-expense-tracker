@@ -21,6 +21,9 @@ import com.voiceexpense.data.model.TransactionStatus
 import com.voiceexpense.data.model.TransactionType
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionParser
+import com.voiceexpense.ai.parsing.logging.ParsingRunLogBuilder
+import com.voiceexpense.ai.parsing.logging.ParsingRunLogEntryType
+import com.voiceexpense.ai.parsing.logging.ParsingRunLogStore
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.ui.confirmation.TransactionConfirmationActivity
 import com.voiceexpense.ai.parsing.hybrid.ProcessingMethod
@@ -80,6 +83,7 @@ class MainActivity : AppCompatActivity() {
             imm.hideSoftInputFromWindow(input.windowToken, 0)
 
             lifecycleScope.launch(kotlinx.coroutines.Dispatchers.IO) {
+                var runLogBuilderRef: ParsingRunLogBuilder? = null
                 try {
                     // Load allowed options from settings to guide the model
                     val expenseCats = configRepo.options(com.voiceexpense.data.config.ConfigType.ExpenseCategory).first().sortedBy { it.position }.map { it.label }
@@ -102,9 +106,46 @@ class MainActivity : AppCompatActivity() {
                     val txn = toDraftTransaction(parsed)
                     repo.saveDraft(txn)
 
+                    val runLogBuilder = ParsingRunLogBuilder(transactionId = txn.id, capturedInput = text)
+                    runLogBuilderRef = runLogBuilder
+                    ParsingRunLogStore.put(runLogBuilder)
+                    val stage1Snapshot = stage1.snapshot
+                    val heuristicDraft = stage1Snapshot.heuristicDraft
+                    val heuristicsSummary = buildString {
+                        appendLine("duration=${stage1Snapshot.stage1DurationMs}ms")
+                        appendLine("merchant=${heuristicDraft.merchant ?: "null"}")
+                        appendLine("description=${heuristicDraft.description ?: "null"}")
+                        appendLine("expenseCategory=${heuristicDraft.expenseCategory ?: "null"}")
+                        appendLine("incomeCategory=${heuristicDraft.incomeCategory ?: "null"}")
+                        appendLine("account=${heuristicDraft.account ?: "null"}")
+                        appendLine("tags=${heuristicDraft.tags}")
+                        appendLine("note=${heuristicDraft.note ?: "null"}")
+                        appendLine("confidences=${heuristicDraft.confidences}")
+                        appendLine("coverageScore=${heuristicDraft.coverageScore}")
+                    }
+                    runLogBuilder.addEntry(
+                        type = ParsingRunLogEntryType.HEURISTIC,
+                        title = "Stage1 heuristics summary",
+                        detail = heuristicsSummary
+                    )
+
                     val prefs = getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
                     val debug = prefs.getBoolean(SettingsKeys.DEBUG_LOGS, false)
-                    val loadingFields = stage1.targetFields
+                    val loadingFields = stage1.targetFields.toSet()
+
+                    if (loadingFields.isNotEmpty()) {
+                        runLogBuilder.addEntry(
+                            type = ParsingRunLogEntryType.SUMMARY,
+                            title = "Fields queued for refinement",
+                            detail = loadingFields.joinToString()
+                        )
+                    } else {
+                        runLogBuilder.addEntry(
+                            type = ParsingRunLogEntryType.SUMMARY,
+                            title = "Draft ready from heuristics",
+                            detail = "method=HEURISTIC confidence=${parsed.confidence} coverage=${heuristicDraft.coverageScore}"
+                        )
+                    }
 
                     runOnUiThread {
                         create.isEnabled = true
@@ -129,12 +170,12 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     val transactionId = txn.id
-                    val stage1Snapshot = stage1.snapshot
+                    val ctxWithLogger = ctx.copy(runLogBuilder = runLogBuilder)
                     launch(kotlinx.coroutines.Dispatchers.IO) {
                         try {
                             val detailed = parser.runStagedRefinement(
                                 text = text,
-                                context = ctx,
+                                context = ctxWithLogger,
                                 stage1Snapshot = stage1Snapshot,
                                 onFieldRefined = { update ->
                                     val refined = if (update.error == null) {
@@ -159,6 +200,18 @@ class MainActivity : AppCompatActivity() {
                                 Log.d(
                                     TRACE_TAG,
                                     "Staged refinement completed tx=$transactionId refined=${staged.fieldsRefined.joinToString()} target=${staged.targetFields.joinToString()}"
+                                )
+                                runLogBuilder.addEntry(
+                                    type = ParsingRunLogEntryType.SUMMARY,
+                                    title = "Staged parsing completed",
+                                    detail = buildString {
+                                        appendLine("method=${detailed.method}")
+                                        appendLine("validated=${detailed.validated}")
+                                        appendLine("confidence=${detailed.result.confidence}")
+                                        appendLine("refined=${staged.fieldsRefined}")
+                                        appendLine("errors=${staged.refinementErrors}")
+                                        appendLine("stage1=${staged.stage1DurationMs}ms stage2=${staged.stage2DurationMs}ms")
+                                    }
                                 )
                                 StagedRefinementDispatcher.emit(
                                     StagedRefinementDispatcher.RefinementEvent(
@@ -195,9 +248,23 @@ class MainActivity : AppCompatActivity() {
                                         Toast.makeText(this@MainActivity, "Parsed with: Heuristic", Toast.LENGTH_SHORT).show()
                                     }
                                 }
+                                runLogBuilder.addEntry(
+                                    type = ParsingRunLogEntryType.SUMMARY,
+                                    title = "Staged parsing skipped",
+                                    detail = buildString {
+                                        appendLine("method=${detailed.method}")
+                                        appendLine("validated=${detailed.validated}")
+                                        appendLine("confidence=${detailed.result.confidence}")
+                                    }
+                                )
                             }
                         } catch (t: Throwable) {
                             Log.e(TRACE_TAG, "MainActivity.runStagedRefinement() failed: ${t.message}", t)
+                            runLogBuilder.addEntry(
+                                type = ParsingRunLogEntryType.ERROR,
+                                title = "Staged refinement failed",
+                                detail = t.stackTraceToString()
+                            )
                             StagedRefinementDispatcher.emit(
                                 StagedRefinementDispatcher.RefinementEvent(
                                     transactionId = transactionId,
@@ -218,6 +285,11 @@ class MainActivity : AppCompatActivity() {
                     }
                 } catch (t: Throwable) {
                     Log.e(TRACE_TAG, "MainActivity.submit() failed: ${t.message}", t)
+                    runLogBuilderRef?.addEntry(
+                        type = ParsingRunLogEntryType.ERROR,
+                        title = "Draft creation failed",
+                        detail = t.stackTraceToString()
+                    )
                     runOnUiThread {
                         create.isEnabled = true
                         create.text = getString(R.string.create_draft)

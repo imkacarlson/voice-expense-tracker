@@ -5,8 +5,10 @@ import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
 import android.app.DatePickerDialog
 import android.content.Intent
+import android.net.Uri
 import android.graphics.Color
 import android.os.Bundle
+import android.text.InputType
 import android.view.View
 import android.widget.AdapterView
 import android.widget.Button
@@ -15,6 +17,8 @@ import android.widget.ProgressBar
 import android.widget.Spinner
 import android.widget.TextView
 import android.widget.Toast
+import android.util.Log
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import com.google.android.material.appbar.MaterialToolbar
 import androidx.lifecycle.lifecycleScope
@@ -29,6 +33,10 @@ import kotlinx.coroutines.flow.first
 import com.voiceexpense.data.config.DefaultField
 import com.voiceexpense.worker.enqueueSyncNow
 import com.voiceexpense.ui.common.MainActivity
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
+import com.voiceexpense.ai.parsing.logging.ParsingRunLogStore
 import dagger.hilt.android.AndroidEntryPoint
 import javax.inject.Inject
 import kotlinx.coroutines.launch
@@ -36,6 +44,10 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import androidx.core.view.isVisible
 import androidx.core.widget.doAfterTextChanged
+import java.time.Instant
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter
+import kotlin.text.Charsets
 
 @AndroidEntryPoint
 class TransactionConfirmationActivity : AppCompatActivity() {
@@ -47,6 +59,18 @@ class TransactionConfirmationActivity : AppCompatActivity() {
     private lateinit var viewModel: ConfirmationViewModel
     @Inject lateinit var parser: TransactionParser
     @Inject lateinit var configRepo: ConfigRepository
+    private lateinit var exportButton: Button
+    private var currentTransactionId: String? = null
+    private var pendingExportNote: String? = null
+    private val diagnosticsDocumentLauncher = registerForActivityResult(
+        ActivityResultContracts.CreateDocument("text/markdown")
+    ) { uri: Uri? ->
+        if (uri != null) {
+            exportDiagnostics(uri)
+        } else {
+            pendingExportNote = null
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -63,6 +87,9 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val title: TextView = findViewById(R.id.txn_title)
         val confirm: Button = findViewById(R.id.btn_confirm)
         val cancel: Button = findViewById(R.id.btn_cancel)
+        exportButton = findViewById(R.id.btn_export_run_log)
+        exportButton.isEnabled = false
+        exportButton.setOnClickListener { promptDiagnosticsExport() }
         val amountView: EditText = findViewById(R.id.field_amount)
         val overallView: EditText = findViewById(R.id.field_overall)
         val merchantView: EditText = findViewById(R.id.field_merchant)
@@ -179,6 +206,8 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 finish()
                 return@launch
             }
+            currentTransactionId = draft.id
+            updateExportAvailability()
             viewModel.setHeuristicDraft(draft, refinedFromIntent)
             if (draft.confidence < 0.7f) {
                 title.text = getString(R.string.app_name) + "  •  Verify highlighted fields"
@@ -273,6 +302,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                     amountView.markMissing(t.amountUsd == null)
                     merchantView.markMissing(t.merchant.isBlank())
                     // Category highlighting skipped for Spinner control
+                    updateExportAvailability()
                 }
             }
 
@@ -445,6 +475,81 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         // Voice correction removed in text-first refactor
 
         // Removed typed correction row per UX change
+    }
+
+    private fun promptDiagnosticsExport() {
+        val txnId = currentTransactionId
+        if (txnId == null) {
+            Toast.makeText(this, R.string.export_diagnostics_missing, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val logExists = ParsingRunLogStore.snapshot(txnId) != null
+        if (!logExists) {
+            Toast.makeText(this, R.string.export_diagnostics_missing, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val padding = (16 * resources.displayMetrics.density).toInt()
+        val inputLayout = TextInputLayout(this)
+        inputLayout.setPadding(padding, padding, padding, 0)
+        inputLayout.hint = getString(R.string.export_diagnostics_note_hint)
+        val input = TextInputEditText(inputLayout.context)
+        input.inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_FLAG_CAP_SENTENCES or InputType.TYPE_TEXT_FLAG_MULTI_LINE
+        input.setLines(3)
+        inputLayout.addView(input)
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.export_diagnostics_dialog_title)
+            .setView(inputLayout)
+            .setPositiveButton(R.string.export_diagnostics_positive) { _, _ ->
+                pendingExportNote = input.text?.toString()?.trim()?.takeIf { it.isNotEmpty() }
+                diagnosticsDocumentLauncher.launch(defaultDiagnosticsFileName())
+            }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
+    }
+
+    private fun exportDiagnostics(uri: Uri) {
+        val txnId = currentTransactionId
+        if (txnId == null) {
+            Toast.makeText(this, R.string.export_diagnostics_missing, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val log = ParsingRunLogStore.snapshot(txnId)
+        if (log == null) {
+            Toast.makeText(this, R.string.export_diagnostics_missing, Toast.LENGTH_SHORT).show()
+            return
+        }
+        val note = pendingExportNote
+        pendingExportNote = null
+        val markdown = log.toMarkdown(note)
+        val outcome = runCatching {
+            contentResolver.openOutputStream(uri)?.use { stream ->
+                stream.write(markdown.toByteArray(Charsets.UTF_8))
+                stream.flush()
+            } ?: error("Output stream unavailable")
+        }
+        if (outcome.isSuccess) {
+            Toast.makeText(this, R.string.export_diagnostics_success, Toast.LENGTH_SHORT).show()
+        } else {
+            Log.e("DiagnosticsExport", "Failed to export diagnostics", outcome.exceptionOrNull())
+            Toast.makeText(this, R.string.export_diagnostics_failure, Toast.LENGTH_LONG).show()
+        }
+    }
+
+    private fun defaultDiagnosticsFileName(): String {
+        val formatter = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss").withZone(ZoneId.systemDefault())
+        return "voice-expense-run-${formatter.format(Instant.now())}.md"
+    }
+
+    private fun updateExportAvailability() {
+        val hasLog = currentTransactionId?.let { ParsingRunLogStore.snapshot(it) } != null
+        exportButton.isEnabled = hasLog
+    }
+
+    override fun onDestroy() {
+        if (isFinishing) {
+            currentTransactionId?.let { ParsingRunLogStore.remove(it) }
+        }
+        super.onDestroy()
     }
 
     private fun navigateHome() {

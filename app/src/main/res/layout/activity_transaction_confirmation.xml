@@ -292,6 +292,14 @@
         </LinearLayout>
     </ScrollView>
 
+    <Button
+        android:id="@+id/btn_export_run_log"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="16dp"
+        android:minHeight="48dp"
+        android:text="@string/export_diagnostics" />
+
     <!-- Primary confirm/cancel actions anchored at bottom -->
     <LinearLayout
         android:layout_width="match_parent"

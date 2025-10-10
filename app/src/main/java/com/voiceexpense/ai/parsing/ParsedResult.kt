@@ -1,5 +1,6 @@
 package com.voiceexpense.ai.parsing
 
+import com.voiceexpense.ai.parsing.logging.ParsingRunLogBuilder
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -27,5 +28,6 @@ data class ParsingContext(
     val allowedExpenseCategories: List<String> = emptyList(),
     val allowedIncomeCategories: List<String> = emptyList(),
     val allowedTags: List<String> = emptyList(),
-    val allowedAccounts: List<String> = emptyList()
+    val allowedAccounts: List<String> = emptyList(),
+    val runLogBuilder: ParsingRunLogBuilder? = null
 )

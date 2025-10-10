@@ -9,6 +9,7 @@ import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
 import com.voiceexpense.ai.parsing.heuristic.HeuristicExtractor
 import com.voiceexpense.ai.parsing.heuristic.toParsedResult
+import com.voiceexpense.ai.parsing.logging.ParsingRunLogEntryType
 import org.json.JSONArray
 import org.json.JSONObject
 import java.util.LinkedHashSet
@@ -82,6 +83,7 @@ class StagedParsingOrchestrator(
         } catch (_: Throwable) {}
         Log.d(TAG, "parseStaged input='${input.take(80)}'")
         val refinementErrors = mutableListOf<String>()
+        val logger = context.runLogBuilder
 
         val stage1 = stage1Snapshot ?: prepareStage1(input, context)
         var heuristicDraft = stage1.heuristicDraft
@@ -118,6 +120,11 @@ class StagedParsingOrchestrator(
                 "AI.Fields",
                 "focused refinement target=${summary} aiAvailable=$genAiAvailable"
             )
+            logger?.addEntry(
+                type = ParsingRunLogEntryType.SUMMARY,
+                title = "Stage2 target fields",
+                detail = "targets=${orderedTargetFields.joinToString()} aiAvailable=$genAiAvailable"
+            )
         } catch (_: Throwable) {}
         Log.d(TAG, "Target fields=${orderedTargetFields.joinToString()} aiAvailable=$genAiAvailable")
 
@@ -128,8 +135,18 @@ class StagedParsingOrchestrator(
                 try {
                     Log.w("AI.Validate", "GenAI unavailable; skipping refinement for ${orderedTargetFields.joinToString()}")
                 } catch (_: Throwable) {}
+                logger?.addEntry(
+                    type = ParsingRunLogEntryType.ERROR,
+                    title = "GenAI unavailable",
+                    detail = "targets=${orderedTargetFields.joinToString()}"
+                )
             }
             val merged = heuristicDraft.toParsedResult(context)
+            logger?.addEntry(
+                type = ParsingRunLogEntryType.SUMMARY,
+                title = "Stage2 skipped",
+                detail = "refined=0 errors=${refinementErrors}"
+            )
             return StagedParsingResult(
                 heuristicDraft = heuristicDraft,
                 refinedFields = emptyMap(),
@@ -156,6 +173,15 @@ class StagedParsingOrchestrator(
             normalizedValue?.let { value ->
                 cumulativeRefinements[field] = value
                 heuristicDraft = applyRefinementToDraft(heuristicDraft, field, value)
+                logger?.addEntry(
+                    type = ParsingRunLogEntryType.SUMMARY,
+                    title = "Refinement applied for ${field.name.lowercase(Locale.US)}",
+                    detail = buildString {
+                        appendLine("duration=${attempt.durationMs}ms")
+                        appendLine("value=$value")
+                    },
+                    field = field
+                )
             }
             listener?.let { callback ->
                 callback(
@@ -165,6 +191,14 @@ class StagedParsingOrchestrator(
                         durationMs = attempt.durationMs,
                         error = attempt.errorMessage
                     )
+                )
+            }
+            if (attempt.errorMessage != null) {
+                logger?.addEntry(
+                    type = ParsingRunLogEntryType.ERROR,
+                    title = "Refinement error for ${field.name.lowercase(Locale.US)}",
+                    detail = attempt.errorMessage,
+                    field = field
                 )
             }
         }
@@ -183,6 +217,15 @@ class StagedParsingOrchestrator(
         Log.i(
             TAG,
             "Staged parsing finished stage1=${stage1DurationMs}ms stage2=${stage2DurationMs}ms refined=${fieldsRefined.size} errors=${refinementErrors.size}"
+        )
+        logger?.addEntry(
+            type = ParsingRunLogEntryType.SUMMARY,
+            title = "Staged parsing summary",
+            detail = buildString {
+                appendLine("refined=${fieldsRefined}")
+                appendLine("errors=${refinementErrors}")
+                appendLine("stage1=${stage1DurationMs}ms stage2=${stage2DurationMs}ms")
+            }
         )
         return StagedParsingResult(
             heuristicDraft = stage1.heuristicDraft,
@@ -203,6 +246,7 @@ class StagedParsingOrchestrator(
         draftForPrompt: HeuristicDraft,
         refinementErrors: MutableList<String>
     ): SingleFieldAttempt {
+        val logger = context.runLogBuilder
         val prompt = focusedPromptBuilder.buildFocusedPrompt(
             input = input,
             heuristicDraft = draftForPrompt,
@@ -210,6 +254,12 @@ class StagedParsingOrchestrator(
             context = context
         )
         logFocusedPrompt(prompt)
+        logger?.addEntry(
+            type = ParsingRunLogEntryType.PROMPT,
+            title = "Focused prompt for ${field.name.lowercase(Locale.US)}",
+            detail = prompt,
+            field = field
+        )
 
         var durationMs = 0L
         var aiPayload: String? = null
@@ -225,6 +275,12 @@ class StagedParsingOrchestrator(
                     val message = "AI failure: ${throwable.message ?: throwable::class.simpleName}".trim()
                     refinementErrors += message
                     Log.w(TAG, "GenAI structured call failed", throwable)
+                    logger?.addEntry(
+                        type = ParsingRunLogEntryType.ERROR,
+                        title = "AI failure for ${field.name.lowercase(Locale.US)}",
+                        detail = throwable.stackTraceToString(),
+                        field = field
+                    )
                     null
                 }
             }
@@ -245,6 +301,12 @@ class StagedParsingOrchestrator(
             try {
                 Log.e("AI.Validate", "Unexpected error during focused refinement: ${t.message}")
             } catch (_: Throwable) {}
+            logger?.addEntry(
+                type = ParsingRunLogEntryType.ERROR,
+                title = "AI invocation error for ${field.name.lowercase(Locale.US)}",
+                detail = t.stackTraceToString(),
+                field = field
+            )
             return SingleFieldAttempt(durationMs = durationMs, errorMessage = message)
         }
 
@@ -253,10 +315,22 @@ class StagedParsingOrchestrator(
             try { Log.d("AI.Debug", "Focused refinement returned blank payload; using heuristic result") } catch (_: Throwable) {}
             val message = "AI blank response"
             refinementErrors += message
+            logger?.addEntry(
+                type = ParsingRunLogEntryType.ERROR,
+                title = "AI blank response for ${field.name.lowercase(Locale.US)}",
+                detail = "duration=${durationMs}ms",
+                field = field
+            )
             return SingleFieldAttempt(durationMs = durationMs, errorMessage = message)
         }
 
         val validation = ValidationPipeline.validateRawResponse(aiPayload!!)
+        logger?.addEntry(
+            type = ParsingRunLogEntryType.RESPONSE,
+            title = "Focused response for ${field.name.lowercase(Locale.US)}",
+            detail = aiPayload,
+            field = field
+        )
         if (!validation.valid || validation.normalizedJson.isNullOrBlank()) {
             val message = if (validation.errors.isNotEmpty()) {
                 refinementErrors += validation.errors
@@ -274,6 +348,16 @@ class StagedParsingOrchestrator(
                     "Focused refinement invalid: errors='${validation.errors.joinToString()}' snippet='$snippet'"
                 )
             } catch (_: Throwable) {}
+            logger?.addEntry(
+                type = ParsingRunLogEntryType.VALIDATION,
+                title = "Validation failed for ${field.name.lowercase(Locale.US)}",
+                detail = buildString {
+                    appendLine("errors=${validation.errors}")
+                    val snippet = aiPayload!!.replace("\n", " ").take(300)
+                    appendLine("responseSnippet=$snippet")
+                },
+                field = field
+            )
             return SingleFieldAttempt(durationMs = durationMs, errorMessage = message.takeIf { it.isNotBlank() })
         }
 
@@ -281,6 +365,15 @@ class StagedParsingOrchestrator(
             val snippet = aiPayload!!.replace("\n", " ").take(300)
             Log.i("AI.Output", snippet)
         } catch (_: Throwable) {}
+        logger?.addEntry(
+            type = ParsingRunLogEntryType.VALIDATION,
+            title = "Validation succeeded for ${field.name.lowercase(Locale.US)}",
+            detail = buildString {
+                appendLine("duration=${durationMs}ms")
+                appendLine("normalized=${validation.normalizedJson}")
+            },
+            field = field
+        )
 
         val normalized = validation.normalizedJson
         val updates = extractFieldUpdates(normalized, setOf(field))
