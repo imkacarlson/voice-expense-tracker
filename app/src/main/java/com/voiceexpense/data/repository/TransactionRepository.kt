@@ -43,7 +43,6 @@ class TransactionRepository(
 
     // Apps Script configuration (to be set by caller, e.g., Worker/Settings)
     var webAppUrl: String = ""
-    var backupAuthToken: String? = null
 
     // Process queued transactions: post via Apps Script with single 401-aware retry.
     suspend fun syncPending(): SyncResult {
@@ -110,7 +109,7 @@ class TransactionRepository(
         val account = t.account
 
         return AppsScriptRequest(
-            token = token.takeIf { it.isNotBlank() } ?: (backupAuthToken ?: ""),
+            token = token,
             date = date,
             amount = amount,
             description = desc,

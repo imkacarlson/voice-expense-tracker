@@ -58,14 +58,6 @@
             android:inputType="textUri" />
 
         <EditText
-            android:id="@+id/input_backup_token"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="@string/backup_auth_token"
-            android:contentDescription="@string/backup_auth_token"
-            android:inputType="textPassword" />
-
-        <EditText
             android:id="@+id/input_accounts"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"

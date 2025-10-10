@@ -42,7 +42,6 @@ import dagger.hilt.android.AndroidEntryPoint
 object SettingsKeys {
     const val PREFS = "settings"
     const val WEB_APP_URL = "web_app_url"
-    const val BACKUP_AUTH_TOKEN = "backup_auth_token"
     const val KNOWN_ACCOUNTS = "known_accounts" // comma-separated labels
     const val DEBUG_LOGS = "debug_logs" // developer toggle for verbose local logs
     // Removed: ASR_ONLINE_FALLBACK (voice features removed)
@@ -75,7 +74,6 @@ class SettingsActivity : AppCompatActivity() {
 
         // Views
         val webUrl: EditText = findViewById(R.id.input_web_url)
-        val backup: EditText = findViewById(R.id.input_backup_token)
         val accounts: EditText = findViewById(R.id.input_accounts)
         val save: Button = findViewById(R.id.btn_save)
         val signIn: Button = findViewById(R.id.btn_sign_in)
@@ -119,14 +117,12 @@ class SettingsActivity : AppCompatActivity() {
                     url = def
                 }
             }
-            val bt = p.getString(SettingsKeys.BACKUP_AUTH_TOKEN, "")
             val ka = p.getString(SettingsKeys.KNOWN_ACCOUNTS, "")
             
             val existing = GoogleSignIn.getLastSignedInAccount(this@SettingsActivity)
             val hasConfig = !url.isNullOrBlank()
             withContext(Dispatchers.Main) {
                 webUrl.setText(url)
-                backup.setText(bt)
                 accounts.setText(ka)
                 
                 // Populate type spinner and list/default adapters
@@ -248,7 +244,6 @@ class SettingsActivity : AppCompatActivity() {
             }
             prefsOrInit().edit()
                 .putString(SettingsKeys.WEB_APP_URL, url)
-                .putString(SettingsKeys.BACKUP_AUTH_TOKEN, backup.text.toString())
                 .putString(SettingsKeys.KNOWN_ACCOUNTS, accounts.text.toString())
                 .apply()
             android.widget.Toast.makeText(this, R.string.info_settings_saved, android.widget.Toast.LENGTH_SHORT).show()

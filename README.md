@@ -40,7 +40,7 @@ App Structure
   - `di/` (Hilt modules)
 
 Configuration
-- Settings screen: enter the Apps Script Web App URL, optional Backup Auth Token, and Known Accounts.
+- Settings screen: enter the Apps Script Web App URL and Known Accounts.
 - Google Sign-In: Required for posting (uses `userinfo.email` access token). Open Settings and tap Sign in.
 - OAuth storage: Access tokens and account info stored in EncryptedSharedPreferences.
 

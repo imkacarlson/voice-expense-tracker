@@ -10,8 +10,7 @@ function doPost(e) {
     const CONFIG = {
       SPREADSHEET_ID: scriptProperties.getProperty('SPREADSHEET_ID'),
       SHEET_NAME: scriptProperties.getProperty('SHEET_NAME'),
-      ALLOWED_EMAIL: scriptProperties.getProperty('ALLOWED_EMAIL'),
-      AUTH_TOKEN: scriptProperties.getProperty('AUTH_TOKEN')
+      ALLOWED_EMAIL: scriptProperties.getProperty('ALLOWED_EMAIL')
     };
     
     // Verify configuration exists
@@ -114,22 +113,10 @@ function verifyAuthentication(token, CONFIG) {
       console.log(`Authenticated via ID token: ${idTokenInfo.email}`);
       return idTokenInfo.email;
     }
-    
-    // If OAuth fails and backup token exists, try that
-    if (CONFIG.AUTH_TOKEN && token === CONFIG.AUTH_TOKEN) {
-      console.log('Authenticated via backup token');
-      return CONFIG.ALLOWED_EMAIL;
-    }
-    
+
     throw new Error('All authentication methods failed');
-    
+
   } catch(error) {
-    // Last resort: check backup token
-    if (CONFIG.AUTH_TOKEN && token === CONFIG.AUTH_TOKEN) {
-      console.log('Authenticated via backup token (after error)');
-      return CONFIG.ALLOWED_EMAIL;
-    }
-    
     throw new Error('Authentication failed: ' + error.toString());
   }
 }
@@ -175,11 +162,7 @@ function testConfiguration() {
   
   console.log('=== Current Script Properties ===');
   for (const key in properties) {
-    if (key === 'AUTH_TOKEN') {
-      console.log(`${key}: [HIDDEN FOR SECURITY]`);
-    } else {
-      console.log(`${key}: ${properties[key]}`);
-    }
+    console.log(`${key}: ${properties[key]}`);
   }
   
   // Try to access the spreadsheet and sheet
@@ -203,13 +186,14 @@ function testConfiguration() {
 /**
  * Test function to add a sample expense
  * Run this in the Apps Script editor to test without Android app
+ * Note: You must provide a valid OAuth token to use this function
  */
 function testAddExpense() {
   // Simulate a POST request
   const testRequest = {
     postData: {
       contents: JSON.stringify({
-        token: PropertiesService.getScriptProperties().getProperty('AUTH_TOKEN'),
+        token: 'YOUR_OAUTH_ACCESS_TOKEN_HERE', // Replace with a valid OAuth token
         date: '12/28/2024',
         amount: 45.99,
         description: 'Test expense from Apps Script',
@@ -220,7 +204,7 @@ function testAddExpense() {
       })
     }
   };
-  
+
   const response = doPost(testRequest);
   const responseText = response.getContent();
   console.log('Test response:', responseText);

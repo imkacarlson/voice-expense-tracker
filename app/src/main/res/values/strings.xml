@@ -5,7 +5,6 @@
     <string name="draft_transaction">Draft transaction</string>
     <string name="settings_title">Settings</string>
     <string name="web_app_url">Apps Script Web App URL</string>
-    <string name="backup_auth_token">Backup Auth Token (optional)</string>
     <string name="default_web_app_url">https://script.google.com/macros/s/AKfycbwGPDDjHKSUKQU6Iiq8em2QMaqvENNk61BsPpNmBkTT-hfMR_O3EAdGaHF6q4pUuUdRcg/exec</string>
     <string name="known_accounts">Known accounts (comma-separated)</string>
     <string name="save">Save</string>

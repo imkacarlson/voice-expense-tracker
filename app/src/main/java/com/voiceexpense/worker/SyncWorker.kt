@@ -41,10 +41,8 @@ class SyncWorker(
         return runCatching {
             val prefs = applicationContext.getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE)
             val webUrl = prefs.getString(SettingsKeys.WEB_APP_URL, "") ?: ""
-            val backupToken = prefs.getString(SettingsKeys.BACKUP_AUTH_TOKEN, null)
 
             repo.webAppUrl = webUrl
-            repo.backupAuthToken = backupToken
 
             repo.syncPending()
         }.fold(
