@@ -103,18 +103,25 @@ class FocusedPromptBuilder {
     }
 
     private fun formatHeuristic(field: FieldKey, draft: HeuristicDraft): String {
-        val valueDescription = when (field) {
-            FieldKey.MERCHANT -> draft.merchant?.quoteOrMissing()
-            FieldKey.DESCRIPTION -> draft.description?.quoteOrMissing()
-            FieldKey.EXPENSE_CATEGORY -> draft.expenseCategory?.quoteOrMissing()
-            FieldKey.INCOME_CATEGORY -> draft.incomeCategory?.quoteOrMissing()
-            FieldKey.ACCOUNT -> draft.account?.quoteOrMissing()
-            FieldKey.TAGS -> draft.tags.takeIf { it.isNotEmpty() }?.joinToString(prefix = "[", postfix = "]") { it.quoteValue() }
-            FieldKey.NOTE -> draft.note?.quoteOrMissing()
-            else -> null
-        } ?: "missing"
-
         val confidence = draft.confidence(field)
+
+        // Only include heuristic value if confidence is above threshold
+        // Low-confidence values can mislead the AI model
+        val valueDescription = if (confidence < HEURISTIC_INCLUSION_THRESHOLD) {
+            "missing"
+        } else {
+            when (field) {
+                FieldKey.MERCHANT -> draft.merchant?.quoteOrMissing()
+                FieldKey.DESCRIPTION -> draft.description?.quoteOrMissing()
+                FieldKey.EXPENSE_CATEGORY -> draft.expenseCategory?.quoteOrMissing()
+                FieldKey.INCOME_CATEGORY -> draft.incomeCategory?.quoteOrMissing()
+                FieldKey.ACCOUNT -> draft.account?.quoteOrMissing()
+                FieldKey.TAGS -> draft.tags.takeIf { it.isNotEmpty() }?.joinToString(prefix = "[", postfix = "]") { it.quoteValue() }
+                FieldKey.NOTE -> draft.note?.quoteOrMissing()
+                else -> null
+            } ?: "missing"
+        }
+
         return buildString {
             append(valueDescription)
             append(" (confidence ")
@@ -248,6 +255,12 @@ class FocusedPromptBuilder {
         private const val MAX_PROMPT_LENGTH = 1000
         private const val MAX_OPTIONS = 6
         private const val FOCUSED_SYSTEM = "Refine only the requested transaction fields and keep JSON minimal."
+
+        /**
+         * Minimum confidence threshold for including heuristic values in prompts.
+         * Values below this threshold are shown as "missing" to avoid misleading the AI.
+         */
+        private const val HEURISTIC_INCLUSION_THRESHOLD = 0.3f
 
         private val FIELD_ORDER = listOf(
             FieldKey.MERCHANT,
