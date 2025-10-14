@@ -269,7 +269,7 @@ class HeuristicExtractor(
             .filter { !it.matches(Regex("""\d+""")) }  // Ignore pure numbers
     }
 
-    private fun String.windowAround(candidate: AmountCandidate, radius: Int = 18): String {
+    private fun String.windowAround(candidate: AmountCandidate, radius: Int = HINT_WINDOW_RADIUS): String {
         val start = max(0, candidate.start - radius)
         val end = kotlin.math.min(this.length, candidate.end + radius)
         return this.substring(start, end)
@@ -288,6 +288,7 @@ class HeuristicExtractor(
         private val NUMBER_REGEX = Regex("""\d+(?:[.\,]\d+)?""")
         private val COMBINED_DECIMAL_REGEX = Regex("""(\d+)\s+(\d{2})(?!\d)""")
         private val SPOKEN_POINT_REGEX = Regex("""(\d+)\s+point\s+(\d+)""", RegexOption.IGNORE_CASE)
+        private const val HINT_WINDOW_RADIUS = 60
         private val SHARE_HINT_REGEX = Regex("(?i)(my share|owe|i owe|i will owe)")
         private val SPLIT_HINT_REGEX = Regex("(?i)(splitwise|my share|split|overall)")
         private val OVERALL_HINT_REGEX = Regex("(?i)(overall|total|charged|to my card|overall charged)")

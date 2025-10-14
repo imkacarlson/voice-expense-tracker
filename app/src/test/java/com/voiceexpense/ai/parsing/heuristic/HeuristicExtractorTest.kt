@@ -78,4 +78,24 @@ class HeuristicExtractorTest {
         assertThat(draft.merchant).isEqualTo("Taco Bell I just got a couple of seven layer burritos")
         assertThat(draft.confidence(FieldKey.MERCHANT)).isWithin(0.0001f).of(0f)
     }
+
+    @Test
+    fun `split expense with long hints captures share and overall`() {
+        val context = ParsingContext(defaultDate = LocalDate.of(2025, 10, 14))
+        val input = "on October 13th, I grabbed a ride home in a taxi. the total amount charged to my Preferred Travel Rewards Visa Signature card was $84.60 and the amount I owe after splitting with a friend is $42.30"
+
+        val draft = extractor.extract(input, context)
+
+        assertEquals("42.30", draft.amountUsd?.toPlainString())
+        assertEquals("84.60", draft.splitOverallChargedUsd?.toPlainString())
+        assertFalse(draft.requiresAi())
+    }
+
+    @Test
+    fun `heuristic parsed result capitalizes merchant`() {
+        val context = ParsingContext(defaultDate = LocalDate.of(2025, 10, 14))
+        val parsed = HeuristicDraft(merchant = "the airport").toParsedResult(context)
+
+        assertEquals("The airport", parsed.merchant)
+    }
 }

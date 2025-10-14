@@ -19,10 +19,13 @@ fun HeuristicDraft.toParsedResult(context: ParsingContext): ParsedResult {
         this.tags
     }
 
+    val merchant = capitalizeFirst(this.merchant?.trim()).takeUnless { it.isNullOrEmpty() } ?: "Unknown"
+    val description = this.description?.trim()?.let(::capitalizeFirst)
+
     val parsed = ParsedResult(
         amountUsd = amount,
-        merchant = this.merchant ?: "Unknown",
-        description = this.description,
+        merchant = merchant,
+        description = description,
         type = type,
         expenseCategory = expenseCategory,
         incomeCategory = incomeCategory,
@@ -44,4 +47,9 @@ private fun normalizeTags(tags: List<String>, allowed: List<String>): List<Strin
         if (trimmed.isEmpty()) return@mapNotNull null
         normalizedAllowed[trimmed.lowercase(Locale.US)]
     }.distinct()
+}
+
+private fun capitalizeFirst(text: String?): String? {
+    if (text.isNullOrEmpty()) return text
+    return text.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
 }
