@@ -140,10 +140,17 @@ class HeuristicExtractor(
             } ?: matches.maxByOrNull { it.value }
         } else null
 
-        val share = shareCandidate.value
+        var share = shareCandidate.value
         val shareConfidence = if (shareCandidate == matches.first()) 0.85f else 0.9f
-        val overall = overallCandidate?.value?.takeIf { it >= share }
+        var overall = overallCandidate?.value?.takeIf { it >= share }
         val overallConfidence = overallCandidate?.let { 0.8f } ?: 0f
+
+        // If split detected and we have 2 distinct amounts, ensure smaller = share, larger = overall
+        if (split && overall != null && share != overall && share > overall) {
+            val temp = share
+            share = overall
+            overall = temp
+        }
 
         return AmountParseResult(share, overall, shareConfidence, overallConfidence)
     }
