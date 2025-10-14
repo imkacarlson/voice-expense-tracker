@@ -152,6 +152,11 @@ class HeuristicExtractor(
             overall = temp
         }
 
+        // Don't populate overall if it equals share (only one distinct amount found)
+        if (overall != null && share == overall) {
+            overall = null
+        }
+
         return AmountParseResult(share, overall, shareConfidence, overallConfidence)
     }
 
