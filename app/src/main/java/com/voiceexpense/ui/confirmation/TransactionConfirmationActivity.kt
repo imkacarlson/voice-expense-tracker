@@ -282,13 +282,20 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                     // Bind account options
                     lifecycleScope.launch {
                         val opts = configRepo.options(ConfigType.Account).first()
-                        val labels = opts.sortedBy { it.position }.map { it.label }
+                        val configLabels = opts.sortedBy { it.position }.map { it.label }
+                        // Add "None" as the first option
+                        val labels = listOf("None") + configLabels
                         val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
                         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
                         accountUserChange = false
                         accountSpinner.adapter = adapter
-                        val accIdx = labels.indexOf(t.account ?: "")
-                        if (accIdx >= 0) accountSpinner.setSelection(accIdx, false)
+                        // If account is null, select "None" (index 0), otherwise find the account in the list
+                        val accIdx = if (t.account == null) {
+                            0  // Select "None"
+                        } else {
+                            labels.indexOf(t.account).takeIf { it >= 0 } ?: 0
+                        }
+                        accountSpinner.setSelection(accIdx, false)
                     }
                     tagsView.setText(if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else "")
                     // Date display as YYYY-MM-DD (ISO format)
@@ -380,7 +387,8 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             val newExpenseCategory = if (newType == com.voiceexpense.data.model.TransactionType.Expense) categoryText else null
             val newIncomeCategory = if (newType == com.voiceexpense.data.model.TransactionType.Income) categoryText else null
             val newTags = (tagsView.text?.toString() ?: "").split(',').map { it.trim() }.filter { it.isNotEmpty() }
-            val newAccount = (accountSpinner.selectedItem?.toString() ?: "").trim().ifEmpty { null }
+            val selectedAccount = (accountSpinner.selectedItem?.toString() ?: "").trim()
+            val newAccount = if (selectedAccount == "None" || selectedAccount.isEmpty()) null else selectedAccount
             val newDateStr = (dateView.text?.toString() ?: "").trim()
             val newDate = runCatching {
                 java.time.LocalDate.parse(newDateStr.ifEmpty { current.userLocalDate.toString() })
