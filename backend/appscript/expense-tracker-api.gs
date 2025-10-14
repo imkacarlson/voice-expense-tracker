@@ -102,9 +102,19 @@ function doPost(e) {
       rowNumber: sheet.getLastRow()
     });
     
-  } catch(error) {
-    console.error('Error in doPost:', error.toString());
-    writeLog('ERROR', 'doPost failed', error.toString());
+  } catch (error) {
+    const message = error && typeof error.toString === 'function' ? error.toString() : String(error);
+    console.error('Error in doPost:', message);
+
+    if (message.includes('Authentication failed')) {
+      writeLog('ERROR', 'Authentication failed', 'Invalid or expired OAuth token.');
+      return createResponse('error', 'invalid_token', {
+        errorCode: 'AUTH_INVALID_TOKEN',
+        detail: 'Invalid or expired OAuth token.'
+      });
+    }
+
+    writeLog('ERROR', 'doPost failed', message);
     return createResponse('error', 'An error occurred. Please try again.');
   }
 }
@@ -201,6 +211,11 @@ function verifyAuthentication(token, CONFIG) {
       return tokenInfo.email;
     }
     
+    const accessStatus = response.getResponseCode();
+    const accessBody = response.getContentText();
+    const accessSnippet = accessBody.length > 400 ? `${accessBody.substring(0, 400)}...` : accessBody;
+    writeLog('ERROR', 'Access token verification failed', `Status: ${accessStatus}, Body: ${accessSnippet}`);
+    
     // Try ID token verification if access token fails
     const idTokenResponse = UrlFetchApp.fetch(
       `https://oauth2.googleapis.com/tokeninfo?id_token=${token}`,
@@ -228,6 +243,11 @@ function verifyAuthentication(token, CONFIG) {
       console.log(`Authenticated via ID token: user ${hashEmail(idTokenInfo.email)}`);
       return idTokenInfo.email;
     }
+    
+    const idStatus = idTokenResponse.getResponseCode();
+    const idBody = idTokenResponse.getContentText();
+    const idSnippet = idBody.length > 400 ? `${idBody.substring(0, 400)}...` : idBody;
+    writeLog('ERROR', 'ID token verification failed', `Status: ${idStatus}, Body: ${idSnippet}`);
 
     throw new Error('All authentication methods failed');
 
