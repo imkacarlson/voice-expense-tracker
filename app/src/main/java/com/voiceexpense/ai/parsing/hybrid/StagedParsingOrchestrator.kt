@@ -484,13 +484,19 @@ class StagedParsingOrchestrator(
         return options.firstOrNull { it.trim().lowercase(Locale.US) == normalized }
     }
 
+    private fun capitalizeFirst(text: String?): String? {
+        if (text.isNullOrEmpty()) return text
+        return text.replaceFirstChar { if (it.isLowerCase()) it.titlecase(Locale.US) else it.toString() }
+    }
+
     private fun normalizeFieldValue(
         field: FieldKey,
         value: Any?,
         context: ParsingContext
     ): Any? = when (field) {
         FieldKey.MERCHANT,
-        FieldKey.DESCRIPTION,
+        FieldKey.DESCRIPTION -> capitalizeFirst((value as? String)?.trim()?.takeUnless { it.isEmpty() })
+
         FieldKey.EXPENSE_CATEGORY,
         FieldKey.INCOME_CATEGORY,
         FieldKey.NOTE -> (value as? String)?.trim()?.takeUnless { it.isEmpty() }
