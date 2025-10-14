@@ -22,14 +22,15 @@ class GoogleIdentityTokenProvider(
         // Build OAuth2 scope string expected by GoogleAuthUtil
         val oauth2Scope = if (scope.startsWith("oauth2:")) scope else "oauth2: $scope"
 
-        // If we already have a non-empty token cached, return it optimistically
-        val cached = authRepository.getAccessToken()
-        if (!cached.isNullOrEmpty()) return@withContext cached
-
-        // Acquire a fresh token for the specified Google account and scope
+        // GoogleAuthUtil handles caching and automatic token refresh internally.
+        // It uses refresh tokens (stored securely by Google Play Services) to
+        // get fresh access tokens when needed, without requiring re-authentication.
         require(accountEmail.isNotBlank()) { "Account email required for token acquisition" }
         val account = Account(accountEmail, "com.google")
         val token = GoogleAuthUtil.getToken(appContext, account, oauth2Scope)
+
+        // Store token in AuthRepository for potential debugging/local reference,
+        // but don't rely on this cache for subsequent requests
         authRepository.setAccessToken(token)
         token
     }
