@@ -5,6 +5,7 @@ import java.math.BigDecimal
 import java.time.LocalDate
 import java.time.Month
 import java.util.Locale
+import kotlin.math.abs
 import kotlin.math.max
 
 /**
@@ -128,10 +129,20 @@ class HeuristicExtractor(
             .toList()
         if (matches.isEmpty()) return AmountParseResult()
 
-        val shareCandidate = matches.firstOrNull { candidate ->
-            val window = text.windowAround(candidate)
-            SHARE_HINT_REGEX.containsMatchIn(window)
-        } ?: matches.first()
+        val shareCandidate = matches.mapNotNull { candidate ->
+            val windowStart = max(0, candidate.start - HINT_WINDOW_RADIUS)
+            val windowEnd = kotlin.math.min(text.length, candidate.end + HINT_WINDOW_RADIUS)
+            val window = text.substring(windowStart, windowEnd)
+            val bestScore = SHARE_HINT_REGEX.findAll(window)
+                .map { match ->
+                    val hintStart = windowStart + match.range.first
+                    val distance = abs(hintStart - candidate.start)
+                    val hintAfterValue = hintStart >= candidate.end
+                    distance + if (hintAfterValue) SHARE_HINT_AFTER_PENALTY else 0
+                }
+                .minOrNull()
+            bestScore?.let { candidate to it }
+        }.minByOrNull { it.second }?.first ?: matches.first()
 
         val split = SPLIT_HINT_REGEX.containsMatchIn(text.lowercase(Locale.US))
         val overallCandidate = if (split) {
@@ -321,5 +332,7 @@ class HeuristicExtractor(
         )
 
         private val MONTHS: Map<String, Month> = Month.values().associateBy { it.name.lowercase(Locale.US) }
+
+        private const val SHARE_HINT_AFTER_PENALTY = 200
     }
 }
