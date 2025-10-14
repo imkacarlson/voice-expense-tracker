@@ -182,12 +182,12 @@ class FocusedPromptBuilder {
     }
 
     private fun instructionFor(field: FieldKey): String = when (field) {
-            FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"CVS\", \"Trader Joe's\")."
+            FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"CVS\", \"Trader Joe's\"). If the input mentions payment methods (e.g., payment apps like Splitwise/Venmo/PayPal/Zelle, or payment cards), identify the actual merchant or service being paid for, not the payment method."
             FieldKey.DESCRIPTION -> "Provide a concise noun phrase describing the purchase (examples: \"Prescription\", \"Birthday card\", \"Lunch\"). Preserve key numbers or modifiers from the input. Avoid verbs."
-            FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category."
+            FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category. Examples: 'Eating Out' for restaurants/takeout, 'Personal' for entertainment/subscriptions/shopping, 'Groceries' for food/supermarkets, 'Health/medical' for healthcare, 'Utilities' for bills/internet, 'Transportation' for gas/transit."
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
             FieldKey.ACCOUNT -> "Return the account or card name from the allowed list. Match obvious phonetic or casing variations; if none apply, return null."
-            FieldKey.TAGS -> "Return an array of tags chosen only from the allowed list. Include \"Splitwise\" only when the input mentions splitting or multiple amounts."
+            FieldKey.TAGS -> "Return tags from the allowed list that match the transaction. Use both explicit mentions (with fuzzy/phonetic matching like 'autopaid' → 'Auto-Paid') and semantic inference (e.g., if 'paid automatically' or 'autopay' is mentioned, select 'Auto-Paid'; if it's a recurring service or subscription, consider 'Subscription')."
             FieldKey.NOTE -> "Return a brief note only when the input explicitly provides one; otherwise return null."
             else -> "" // Should not be requested here.
     }
@@ -262,12 +262,12 @@ class FocusedPromptBuilder {
         private val SPLIT_HINT_REGEX = Regex("""(?i)(splitwise|split|splitting|my share|owe|i owe|owed)""")
 
         private fun guidelineFor(field: FieldKey): String? = when (field) {
-            FieldKey.MERCHANT -> "Return only the merchant or vendor name—no verbs, adjectives, or trailing phrases."
+            FieldKey.MERCHANT -> "Return only the merchant or vendor name—no verbs, adjectives, or trailing phrases. Avoid payment methods."
             FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input."
             FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category from the allowed list; return null if none apply."
             FieldKey.INCOME_CATEGORY -> "Choose exactly one income category from the allowed list; return null if none apply."
             FieldKey.ACCOUNT -> "Return the account/card name from the allowed list, matching obvious phonetic variations; return null if none apply."
-            FieldKey.TAGS -> "Return an array of distinct tags chosen only from the allowed list. Include a tag when it (or a clear synonym) is explicitly mentioned; never invent new tags. If no allowed tag applies, return an empty array."
+            FieldKey.TAGS -> "Return an array of distinct tags chosen only from the allowed list. Match both explicit mentions and semantic meanings. If no allowed tag applies, return an empty array."
             FieldKey.NOTE -> "Return a brief note only when the input explicitly provides note-like text; otherwise return null."
             else -> null
         }
