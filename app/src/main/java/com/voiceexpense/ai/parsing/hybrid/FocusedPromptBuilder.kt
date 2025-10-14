@@ -182,7 +182,7 @@ class FocusedPromptBuilder {
     }
 
     private fun instructionFor(field: FieldKey): String = when (field) {
-            FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"CVS\", \"Trader Joe's\"). If the input mentions payment methods (e.g., payment apps like Splitwise/Venmo/PayPal/Zelle, or payment cards), identify the actual merchant or service being paid for, not the payment method."
+            FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"CVS\", \"Trader Joe's\"). If the input mentions payment methods (e.g., payment apps like Splitwise, Venmo, PayPal, Zelle, etc; or payment cards), identify the actual merchant or service being paid for, not the payment method."
             FieldKey.DESCRIPTION -> "Provide a concise noun phrase describing the purchase (examples: \"Prescription\", \"Birthday card\", \"Lunch\"). Preserve key numbers or modifiers from the input. Avoid verbs."
             FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category. Examples: 'Eating Out' for restaurants/takeout, 'Personal' for entertainment/subscriptions/shopping, 'Groceries' for food/supermarkets, 'Health/medical' for healthcare, 'Utilities' for bills/internet, 'Transportation' for gas/transit."
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
