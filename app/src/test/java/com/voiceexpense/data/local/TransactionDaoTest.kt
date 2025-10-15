@@ -47,7 +47,6 @@ class TransactionDaoTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 1f,
             status = TransactionStatus.QUEUED
         )

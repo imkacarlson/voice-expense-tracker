@@ -108,7 +108,6 @@ class StagedParsingPerformanceTest {
         expenseCategory = null,
         incomeCategory = null,
         tags = emptyList(),
-        note = null,
         confidences = FieldSelectionStrategy.AI_REFINABLE_FIELDS.associateWith { 0.1f }
     )
 

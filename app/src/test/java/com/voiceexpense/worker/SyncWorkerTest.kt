@@ -69,7 +69,6 @@ class SyncWorkerTest {
             tags = listOf("t"),
             account = "Card",
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 1.0f,
             status = TransactionStatus.QUEUED
         )

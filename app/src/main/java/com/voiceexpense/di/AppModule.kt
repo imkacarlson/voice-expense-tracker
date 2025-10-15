@@ -31,7 +31,11 @@ object AppModule {
     @Provides @Singleton
     fun provideDb(@ApplicationContext ctx: Context): AppDatabase =
         Room.databaseBuilder(ctx, AppDatabase::class.java, "voice_expense.db")
-            .addMigrations(AppDatabase.MIGRATION_1_2, AppDatabase.MIGRATION_2_3)
+            .addMigrations(
+                AppDatabase.MIGRATION_1_2,
+                AppDatabase.MIGRATION_2_3
+            )
+            .fallbackToDestructiveMigration()
             .build()
 
     @Provides fun provideDao(db: AppDatabase): TransactionDao = db.transactionDao()

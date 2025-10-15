@@ -15,8 +15,7 @@ enum class FieldKey {
     TAGS,
     USER_LOCAL_DATE,
     ACCOUNT,
-    SPLIT_OVERALL_CHARGED_USD,
-    NOTE
+    SPLIT_OVERALL_CHARGED_USD
 }
 
 /** Per-field confidence thresholds for deciding whether AI help is required. */
@@ -53,7 +52,6 @@ data class HeuristicDraft(
     val userLocalDate: LocalDate? = null,
     val account: String? = null,
     val splitOverallChargedUsd: BigDecimal? = null,
-    val note: String? = null,
     val confidences: Map<FieldKey, Float> = emptyMap()
 ) {
     val coverageScore: Float by lazy {

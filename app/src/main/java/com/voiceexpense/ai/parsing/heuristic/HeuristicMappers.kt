@@ -29,7 +29,6 @@ fun HeuristicDraft.toParsedResult(context: ParsingContext): ParsedResult {
         userLocalDate = this.userLocalDate ?: context.defaultDate,
         account = this.account,
         splitOverallChargedUsd = this.splitOverallChargedUsd,
-        note = this.note,
         confidence = this.coverageScore.coerceIn(0f, 1f)
     )
     return StructuredOutputValidator.sanitizeAmounts(parsed)

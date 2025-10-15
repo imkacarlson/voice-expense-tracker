@@ -28,7 +28,6 @@ class StagedParsingResultTest {
             userLocalDate = draft.userLocalDate!!,
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 0.9f
         )
         val result = StagedParsingResult(
@@ -66,7 +65,6 @@ class StagedParsingResultTest {
                 userLocalDate = LocalDate.now(),
                 account = null,
                 splitOverallChargedUsd = null,
-                note = null,
                 confidence = 0.5f
             ),
             fieldsRefined = emptySet(),

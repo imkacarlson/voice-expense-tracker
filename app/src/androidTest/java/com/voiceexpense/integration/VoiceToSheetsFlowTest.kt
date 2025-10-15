@@ -59,7 +59,6 @@ class VoiceToSheetsFlowTest {
             tags = parsed.tags,
             account = parsed.account,
             splitOverallChargedUsd = parsed.splitOverallChargedUsd,
-            note = parsed.note,
             confidence = parsed.confidence
         )
 

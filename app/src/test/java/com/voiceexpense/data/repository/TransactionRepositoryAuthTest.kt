@@ -57,7 +57,6 @@ class RepositoryAuthTests {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 1f,
             status = TransactionStatus.QUEUED
         )
@@ -93,7 +92,6 @@ class RepositoryAuthTests {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 1f,
             status = TransactionStatus.QUEUED
         )

@@ -15,7 +15,6 @@ data class ParsedResult(
     val userLocalDate: LocalDate,
     val account: String?,
     val splitOverallChargedUsd: BigDecimal?,
-    val note: String?,
     val confidence: Float
 )
 

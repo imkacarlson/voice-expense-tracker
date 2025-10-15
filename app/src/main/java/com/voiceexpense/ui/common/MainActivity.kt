@@ -118,7 +118,6 @@ class MainActivity : AppCompatActivity() {
                         appendLine("incomeCategory=${heuristicDraft.incomeCategory ?: "null"}")
                         appendLine("account=${heuristicDraft.account ?: "null"}")
                         appendLine("tags=${heuristicDraft.tags}")
-                        appendLine("note=${heuristicDraft.note ?: "null"}")
                         appendLine("confidences=${heuristicDraft.confidences}")
                         appendLine("coverageScore=${heuristicDraft.coverageScore}")
                     }
@@ -331,7 +330,6 @@ class MainActivity : AppCompatActivity() {
             tags = parsed.tags,
             account = parsed.account,
             splitOverallChargedUsd = parsed.splitOverallChargedUsd,
-            note = parsed.note,
             confidence = parsed.confidence,
             status = TransactionStatus.DRAFT
         )

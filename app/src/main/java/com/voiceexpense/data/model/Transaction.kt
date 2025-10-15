@@ -26,7 +26,6 @@ data class Transaction(
     val tags: List<String> = emptyList(),
     val account: String?,
     val splitOverallChargedUsd: BigDecimal?,
-    val note: String?,
     val confidence: Float,
     val correctionsCount: Int = 0,
     val source: String = "voice",

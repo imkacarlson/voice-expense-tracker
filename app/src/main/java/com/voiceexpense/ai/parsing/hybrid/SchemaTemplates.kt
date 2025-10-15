@@ -23,7 +23,6 @@ Fields:
 - userLocalDate: string (YYYY-MM-DD)
 - account: string | null
 - splitOverallChargedUsd: number | null
-- note: string | null
 - confidence: number (0..1)
 Rules:
 - USD only numbers (no currency symbols)
@@ -45,4 +44,3 @@ ${COMMON}
 If type = Transfer: amountUsd is the moved amount; expenseCategory = null; incomeCategory = null.
 """.trimIndent()
 }
-

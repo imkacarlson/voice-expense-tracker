@@ -25,8 +25,7 @@ object FieldSelectionStrategy {
         FieldKey.EXPENSE_CATEGORY,
         FieldKey.INCOME_CATEGORY,
         FieldKey.TAGS,
-        FieldKey.ACCOUNT,
-        FieldKey.NOTE
+        FieldKey.ACCOUNT
     )
     private val FIELD_ORDER_INDEX: Map<FieldKey, Int> = FIELD_ORDER.withIndex().associate { it.value to it.index }
 
@@ -36,8 +35,7 @@ object FieldSelectionStrategy {
         FieldKey.EXPENSE_CATEGORY,
         FieldKey.INCOME_CATEGORY,
         FieldKey.TAGS,
-        FieldKey.ACCOUNT,
-        FieldKey.NOTE
+        FieldKey.ACCOUNT
     )
 
     /**
@@ -112,7 +110,6 @@ object FieldSelectionStrategy {
             }
             FieldKey.ACCOUNT -> draft.account.isNullOrBlank()
             FieldKey.TAGS -> draft.tags.isEmpty()
-            FieldKey.NOTE -> draft.note.isNullOrBlank()
             else -> false
         }
     }

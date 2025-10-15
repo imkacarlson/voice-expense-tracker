@@ -77,7 +77,6 @@ class HeuristicExtractor(
             userLocalDate = date,
             account = account,
             splitOverallChargedUsd = overall,
-            note = null,
             confidences = confidences
         )
 

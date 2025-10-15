@@ -254,7 +254,7 @@ class ConfirmationViewModel(
         if (latest != null) {
             Log.d(
                 "FieldRefinement",
-                "Post-update txn merchant='${latest.merchant}' description='${latest.description}' category='${latest.expenseCategory}' tags=${latest.tags} note='${latest.note}' confidence=${latest.confidence}"
+                "Post-update txn merchant='${latest.merchant}' description='${latest.description}' category='${latest.expenseCategory}' tags=${latest.tags} confidence=${latest.confidence}"
             )
         }
     }
@@ -292,11 +292,6 @@ class ConfirmationViewModel(
                     else -> emptyList()
                 }
                 if (tags == transaction.tags) transaction else transaction.copy(tags = tags)
-            }
-            FieldKey.NOTE -> {
-                val note = (value as? String)?.trim()
-                val normalized = note.takeUnless { it.isNullOrEmpty() }
-                if (normalized == transaction.note) transaction else transaction.copy(note = normalized)
             }
             else -> transaction
         }

@@ -13,7 +13,7 @@ import com.voiceexpense.data.model.Transaction
 
 @Database(
     entities = [Transaction::class, ConfigOption::class, DefaultValue::class],
-    version = 3,
+    version = 4,
     exportSchema = false
 )
 @TypeConverters(Converters::class)
@@ -57,5 +57,6 @@ abstract class AppDatabase : RoomDatabase() {
                 )
             }
         }
+
     }
 }

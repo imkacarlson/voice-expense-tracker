@@ -54,7 +54,6 @@
     <string name="hint_tags">Tags (comma-separated)</string>
     <string name="hint_account">Account / Card</string>
     <string name="hint_date">Date (YYYY-MM-DD)</string>
-    <string name="hint_note">Note (optional)</string>
     <string name="field_loading_indicator">AI refining this field</string>
 
     <!-- Config import -->

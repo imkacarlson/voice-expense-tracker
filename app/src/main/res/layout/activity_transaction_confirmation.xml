@@ -271,21 +271,6 @@
                     android:clickable="true"
                     android:textSize="14sp" />
 
-                <TextView
-                    android:id="@+id/label_note"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="@string/hint_note"
-                    android:textStyle="bold"
-                    android:paddingTop="8dp" />
-
-                <EditText
-                    android:id="@+id/field_note"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:hint="@string/hint_note"
-                    android:inputType="textCapSentences"
-                    android:textSize="14sp" />
             </LinearLayout>
 
             <!-- Voice correction actions removed in text-first refactor -->

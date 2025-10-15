@@ -27,14 +27,12 @@ class StagedParsingOrchestratorTest {
             expenseCategory = "Dining",
             incomeCategory = "Salary",
             tags = listOf("morning"),
-            note = "routine",
             confidences = mapOf(
                 FieldKey.MERCHANT to 0.9f,
                 FieldKey.DESCRIPTION to 0.85f,
                 FieldKey.EXPENSE_CATEGORY to 0.9f,
                 FieldKey.INCOME_CATEGORY to 0.9f,
-                FieldKey.TAGS to 0.9f,
-                FieldKey.NOTE to 0.8f
+                FieldKey.TAGS to 0.9f
             )
         )
         val gateway = FakeGenAiGateway()
@@ -68,7 +66,6 @@ class StagedParsingOrchestratorTest {
             type = "Expense",
             expenseCategory = null,
             tags = emptyList(),
-            note = null,
             confidences = mapOf(
                 FieldKey.MERCHANT to 0.2f,
                 FieldKey.DESCRIPTION to 0.1f,

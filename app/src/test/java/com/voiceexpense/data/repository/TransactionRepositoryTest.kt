@@ -123,7 +123,6 @@ class TransactionRepositoryTest {
         tags = emptyList(),
         account = null,
         splitOverallChargedUsd = null,
-        note = null,
         confidence = 1f,
         status = TransactionStatus.DRAFT
     )

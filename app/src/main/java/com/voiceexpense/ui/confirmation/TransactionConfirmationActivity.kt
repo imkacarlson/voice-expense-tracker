@@ -106,7 +106,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val tagsView: EditText = findViewById(R.id.field_tags)
         val accountSpinner: Spinner = findViewById(R.id.spinner_account)
         val dateView: TextView = findViewById(R.id.field_date)
-        val noteView: EditText = findViewById(R.id.field_note)
 
         val types = arrayOf("Expense", "Income", "Transfer")
         val typeAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, types)
@@ -147,8 +146,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             FieldKey.EXPENSE_CATEGORY to categorySpinner,
             FieldKey.INCOME_CATEGORY to categorySpinner,
             FieldKey.ACCOUNT to accountSpinner,
-            FieldKey.TAGS to tagsView,
-            FieldKey.NOTE to noteView
+            FieldKey.TAGS to tagsView
         )
 
         fun EditText.updateTextPreservingFocus(newValue: String) {
@@ -177,12 +175,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 viewModel.markFieldUserModified(FieldKey.DESCRIPTION)
             }
         }
-        noteView.doAfterTextChanged {
-            if (noteView.hasFocus()) {
-                viewModel.markFieldUserModified(FieldKey.NOTE)
-            }
-        }
-
         var categoryUserChange = false
         var accountUserChange = false
         categorySpinner.setOnTouchListener { _, _ ->
@@ -351,7 +343,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                     tagsView.updateTextPreservingFocus(tagsText)
                     // Date display as YYYY-MM-DD (ISO format)
                     dateView.updateTextIfChanged(t.userLocalDate.toString())
-                    noteView.updateTextPreservingFocus(t.note ?: "")
 
                     amountView.markMissing(t.amountUsd == null)
                     merchantView.markMissing(t.merchant.isBlank())
@@ -443,8 +434,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 Toast.makeText(this, "Invalid date format. Use YYYY-MM-DD", Toast.LENGTH_SHORT).show()
                 return@setOnClickListener
             }
-            val newNote = (noteView.text?.toString() ?: "").trim().ifEmpty { null }
-
             val updated = current.copy(
                 amountUsd = newAmount,
                 splitOverallChargedUsd = newOverall,
@@ -455,8 +444,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 incomeCategory = newIncomeCategory,
                 tags = newTags,
                 account = newAccount,
-                userLocalDate = newDate,
-                note = newNote
+                userLocalDate = newDate
             )
             lifecycleScope.launch {
                 viewModel.applyManualEditsAndConfirm(updated)
@@ -513,7 +501,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                     states[FieldKey.EXPENSE_CATEGORY] == true || states[FieldKey.INCOME_CATEGORY] == true
                 val accountLoading = states[FieldKey.ACCOUNT] == true
                 val tagsLoading = states[FieldKey.TAGS] == true
-                val noteLoading = states[FieldKey.NOTE] == true
 
                 fun applyLoading(field: FieldKey, isLoading: Boolean) {
                     highlightTargets[field]?.alpha = if (isLoading) loadingDisabledAlpha else 1f
@@ -531,7 +518,6 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                 applyLoading(FieldKey.INCOME_CATEGORY, categoryLoading)
                 applyLoading(FieldKey.ACCOUNT, accountLoading)
                 applyLoading(FieldKey.TAGS, tagsLoading)
-                applyLoading(FieldKey.NOTE, noteLoading)
 
                 categoryProgress.isVisible = categoryLoading
             }

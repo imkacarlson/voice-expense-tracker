@@ -50,7 +50,6 @@ class ConfirmationViewModelTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 1f,
             status = TransactionStatus.DRAFT
         )
@@ -89,7 +88,6 @@ class ConfirmationViewModelTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 0.4f
         )
         vm.setDraft(low)
@@ -124,7 +122,6 @@ class ConfirmationViewModelTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 0.8f
         )
         vm.setDraft(base)
@@ -162,7 +159,6 @@ class ConfirmationViewModelTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 0.8f
         )
         vm.setHeuristicDraft(base, setOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION))
@@ -198,7 +194,6 @@ class ConfirmationViewModelTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 0.5f
         )
         vm.setHeuristicDraft(base, setOf(FieldKey.MERCHANT))
@@ -249,7 +244,6 @@ class ConfirmationViewModelTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 0.6f
         )
         vm.setHeuristicDraft(draft, setOf(FieldKey.MERCHANT))
@@ -288,7 +282,6 @@ class ConfirmationViewModelTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 0.6f
         )
         vm.setHeuristicDraft(draft, setOf(FieldKey.MERCHANT))

@@ -11,7 +11,7 @@ object StructuredOutputValidator {
         val typeOk = result.type in setOf("Expense", "Income", "Transfer")
         if (!typeOk) return ValidationResult(false, "invalid type")
 
-        // USD-only: Reject currency symbols in note/description (basic heuristic)
+        // USD-only: Reject currency symbols in description (basic heuristic)
         if ((result.description ?: "").contains('$')) return ValidationResult(false, "currency symbol not allowed")
 
         // Split constraint: amount <= overall when both present
@@ -174,8 +174,7 @@ object StructuredOutputValidator {
             splitOverallChargedUsd = adjustedOverall,
             // merchant is non-nullable in ParsedResult; keep trimmed value
             merchant = parsed.merchant.trim(),
-            description = parsed.description?.trim().takeUnless { it.isNullOrEmpty() },
-            note = parsed.note?.trim().takeUnless { it.isNullOrEmpty() }
+            description = parsed.description?.trim().takeUnless { it.isNullOrEmpty() }
         )
     }
 }

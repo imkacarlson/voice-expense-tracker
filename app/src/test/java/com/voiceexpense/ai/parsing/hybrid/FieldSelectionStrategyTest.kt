@@ -16,13 +16,11 @@ class FieldSelectionStrategyTest {
             expenseCategory = "Dining",
             incomeCategory = null,
             tags = listOf("personal"),
-            note = "",
             confidences = mapOf(
                 FieldKey.MERCHANT to 0.8f,
                 FieldKey.DESCRIPTION to 0.85f,
                 FieldKey.EXPENSE_CATEGORY to 0.7f,
-                FieldKey.TAGS to 0.9f,
-                FieldKey.NOTE to 0.9f
+                FieldKey.TAGS to 0.9f
             )
         )
 
@@ -39,14 +37,12 @@ class FieldSelectionStrategyTest {
             expenseCategory = "Dining",
             incomeCategory = "",
             tags = emptyList(),
-            note = "Manual note",
             confidences = mapOf(
                 FieldKey.MERCHANT to 0.2f,
                 FieldKey.DESCRIPTION to 0.4f,
                 FieldKey.EXPENSE_CATEGORY to 0.9f,
                 FieldKey.INCOME_CATEGORY to 0.1f,
-                FieldKey.TAGS to 0.05f,
-                FieldKey.NOTE to 0.95f
+                FieldKey.TAGS to 0.05f
             )
         )
 
@@ -72,7 +68,6 @@ class FieldSelectionStrategyTest {
             expenseCategory = null,
             incomeCategory = null,
             tags = emptyList(),
-            note = null,
             confidences = FieldSelectionStrategy.AI_REFINABLE_FIELDS.associateWith { 0f }
         )
 
@@ -82,7 +77,6 @@ class FieldSelectionStrategyTest {
         assertThat(fields[0]).isEqualTo(FieldKey.MERCHANT)
         assertThat(fields[1]).isEqualTo(FieldKey.DESCRIPTION)
         assertThat(fields).contains(FieldKey.ACCOUNT)
-        assertThat(fields).doesNotContain(FieldKey.NOTE)
     }
 
     @Test
@@ -94,14 +88,12 @@ class FieldSelectionStrategyTest {
             expenseCategory = "",
             tags = emptyList(),
             account = null,
-            note = "Manual note",
             confidences = mapOf(
                 FieldKey.MERCHANT to 0f,
                 FieldKey.DESCRIPTION to 0f,
                 FieldKey.EXPENSE_CATEGORY to 0f,
                 FieldKey.TAGS to 0f,
-                FieldKey.ACCOUNT to 0f,
-                FieldKey.NOTE to 1f
+                FieldKey.ACCOUNT to 0f
             )
         )
 

@@ -415,8 +415,7 @@ class StagedParsingOrchestrator(
             FieldKey.MERCHANT,
             FieldKey.DESCRIPTION,
             FieldKey.EXPENSE_CATEGORY,
-            FieldKey.INCOME_CATEGORY,
-            FieldKey.NOTE -> json.optString(key).takeUnless { it.isBlank() }?.trim()
+            FieldKey.INCOME_CATEGORY -> json.optString(key).takeUnless { it.isBlank() }?.trim()
             FieldKey.TAGS -> {
                 val arr = json.optJSONArray(key)
                 when {
@@ -469,7 +468,6 @@ class StagedParsingOrchestrator(
                     }
                     merged.copy(tags = mergedTags)
                 }
-                FieldKey.NOTE -> merged.copy(note = (value as? String)?.trim())
                 else -> merged
             }
         }
@@ -502,8 +500,7 @@ class StagedParsingOrchestrator(
         FieldKey.DESCRIPTION -> capitalizeFirst((value as? String)?.trim()?.takeUnless { it.isEmpty() })
 
         FieldKey.EXPENSE_CATEGORY,
-        FieldKey.INCOME_CATEGORY,
-        FieldKey.NOTE -> (value as? String)?.trim()?.takeUnless { it.isEmpty() }
+        FieldKey.INCOME_CATEGORY -> (value as? String)?.trim()?.takeUnless { it.isEmpty() }
 
         FieldKey.ACCOUNT -> {
             val accounts = context.allowedAccounts.ifEmpty { context.knownAccounts }
@@ -533,7 +530,6 @@ class StagedParsingOrchestrator(
         FieldKey.EXPENSE_CATEGORY -> "expenseCategory"
         FieldKey.INCOME_CATEGORY -> "incomeCategory"
         FieldKey.TAGS -> "tags"
-        FieldKey.NOTE -> "note"
         else -> field.name.lowercase(Locale.US)
     }
 
@@ -615,11 +611,6 @@ class StagedParsingOrchestrator(
                     confidences[field] = 0.85f
                     draft.copy(tags = list, confidences = confidences.toMap())
                 } else draft
-            }
-            FieldKey.NOTE -> {
-                val text = (value as? String)?.trim()
-                confidences[field] = if (!text.isNullOrEmpty()) 0.8f else draft.confidence(field)
-                draft.copy(note = text.takeUnless { it.isNullOrEmpty() }, confidences = confidences.toMap())
             }
             else -> draft
         }

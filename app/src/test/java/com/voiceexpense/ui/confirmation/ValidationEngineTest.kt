@@ -21,7 +21,6 @@ class ValidationEngineTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 1f,
             status = TransactionStatus.DRAFT
         )
@@ -42,7 +41,6 @@ class ValidationEngineTest {
             tags = emptyList(),
             account = null,
             splitOverallChargedUsd = BigDecimal("5.00"),
-            note = null,
             confidence = 1f,
             status = TransactionStatus.DRAFT
         )
@@ -51,4 +49,3 @@ class ValidationEngineTest {
         assertThat(res.fieldErrors["overall"]).isNotEmpty()
     }
 }
-

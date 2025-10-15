@@ -47,7 +47,6 @@ class TransactionParserTest {
             userLocalDate = LocalDate.now(),
             account = null,
             splitOverallChargedUsd = null,
-            note = null,
             confidence = 0.8f
         )
         val v = StructuredOutputValidator.validate(res)
@@ -67,7 +66,6 @@ class TransactionParserTest {
             userLocalDate = LocalDate.now(),
             account = null,
             splitOverallChargedUsd = java.math.BigDecimal("20.00"),
-            note = null,
             confidence = 0.8f
         )
         val v = StructuredOutputValidator.validate(res)
@@ -87,7 +85,6 @@ class TransactionParserTest {
             userLocalDate = LocalDate.now(),
             account = null,
             splitOverallChargedUsd = java.math.BigDecimal("10.00"),
-            note = null,
             confidence = 0.6f
         )
         val sanitized = StructuredOutputValidator.sanitizeAmounts(res)

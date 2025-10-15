@@ -117,7 +117,6 @@ class FocusedPromptBuilder {
                 FieldKey.INCOME_CATEGORY -> draft.incomeCategory?.quoteOrMissing()
                 FieldKey.ACCOUNT -> draft.account?.quoteOrMissing()
                 FieldKey.TAGS -> draft.tags.takeIf { it.isNotEmpty() }?.joinToString(prefix = "[", postfix = "]") { it.quoteValue() }
-                FieldKey.NOTE -> draft.note?.quoteOrMissing()
                 else -> null
             } ?: "missing"
         }
@@ -143,7 +142,6 @@ class FocusedPromptBuilder {
             FieldKey.INCOME_CATEGORY -> context.allowedIncomeCategories
             FieldKey.ACCOUNT -> context.allowedAccounts.ifEmpty { context.knownAccounts }
             FieldKey.TAGS -> context.allowedTags
-            FieldKey.NOTE -> emptyList()
             else -> emptyList()
         }
 
@@ -195,7 +193,6 @@ class FocusedPromptBuilder {
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
             FieldKey.ACCOUNT -> "Return the account or card name from the allowed list. Match obvious phonetic or casing variations; if none apply, return null."
             FieldKey.TAGS -> "Return tags from the allowed list that match the transaction. Use both explicit mentions (with fuzzy/phonetic matching like 'autopaid' → 'Auto-Paid') and semantic inference (e.g., if 'paid automatically' or 'autopay' is mentioned, select 'Auto-Paid'; if it's a recurring service or subscription, consider 'Subscription')."
-            FieldKey.NOTE -> "Return a brief note only when the input explicitly provides one; otherwise return null."
             else -> "" // Should not be requested here.
     }
 
@@ -206,7 +203,6 @@ class FocusedPromptBuilder {
         FieldKey.INCOME_CATEGORY -> "Income category"
         FieldKey.ACCOUNT -> "Account"
         FieldKey.TAGS -> "Tags"
-        FieldKey.NOTE -> "Note"
         else -> field.name.lowercase(Locale.US)
     }
 
@@ -217,7 +213,6 @@ class FocusedPromptBuilder {
         FieldKey.INCOME_CATEGORY -> "incomeCategory"
         FieldKey.ACCOUNT -> "account"
         FieldKey.TAGS -> "tags"
-        FieldKey.NOTE -> "note"
         else -> field.name.lowercase(Locale.US)
     }
 
@@ -268,8 +263,7 @@ class FocusedPromptBuilder {
             FieldKey.EXPENSE_CATEGORY,
             FieldKey.INCOME_CATEGORY,
             FieldKey.TAGS,
-            FieldKey.ACCOUNT,
-            FieldKey.NOTE
+            FieldKey.ACCOUNT
         )
 
         private val SPLIT_HINT_REGEX = Regex("""(?i)(splitwise|split|splitting|my share|owe|i owe|owed)""")
@@ -281,7 +275,6 @@ class FocusedPromptBuilder {
             FieldKey.INCOME_CATEGORY -> "Choose exactly one income category from the allowed list; return null if none apply."
             FieldKey.ACCOUNT -> "Return the account/card name from the allowed list, matching obvious phonetic variations; return null if none apply."
             FieldKey.TAGS -> "Return an array of distinct tags chosen only from the allowed list. Match both explicit mentions and semantic meanings. If no allowed tag applies, return an empty array."
-            FieldKey.NOTE -> "Return a brief note only when the input explicitly provides note-like text; otherwise return null."
             else -> null
         }
     }
