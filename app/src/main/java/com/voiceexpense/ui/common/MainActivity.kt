@@ -33,7 +33,6 @@ import dagger.hilt.android.AndroidEntryPoint
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.math.BigDecimal
 import java.time.LocalDate
 
@@ -160,7 +159,7 @@ class MainActivity : AppCompatActivity() {
                         }
                         startActivity(intent)
                         if (debug && loadingFields.isEmpty()) {
-                            Toast.makeText(this@MainActivity, "Parsed with: Heuristic", Toast.LENGTH_SHORT).show()
+                            Log.d(TRACE_TAG, "Draft created via heuristics only; no staged refinement requested")
                         }
                     }
 
@@ -226,9 +225,7 @@ class MainActivity : AppCompatActivity() {
                                 )
                                 if (debug) {
                                     val method = if (detailed.method == ProcessingMethod.AI) "AI" else "Heuristic"
-                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                        Toast.makeText(this@MainActivity, "Parsed with: $method", Toast.LENGTH_SHORT).show()
-                                    }
+                                    Log.d(TRACE_TAG, "Staged refinement completed using $method")
                                 }
                             } else {
                                 // Emit completion signal even if staged parsing disabled downstream
@@ -244,9 +241,7 @@ class MainActivity : AppCompatActivity() {
                                     )
                                 )
                                 if (debug) {
-                                    withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                        Toast.makeText(this@MainActivity, "Parsed with: Heuristic", Toast.LENGTH_SHORT).show()
-                                    }
+                                    Log.d(TRACE_TAG, "Staged refinement skipped; heuristics already satisfied")
                                 }
                                 runLogBuilder.addEntry(
                                     type = ParsingRunLogEntryType.SUMMARY,
@@ -277,9 +272,7 @@ class MainActivity : AppCompatActivity() {
                                 )
                             )
                             if (debug) {
-                                withContext(kotlinx.coroutines.Dispatchers.Main) {
-                                    Toast.makeText(this@MainActivity, "Parsed with: Heuristic", Toast.LENGTH_SHORT).show()
-                                }
+                                Log.d(TRACE_TAG, "Staged refinement failed; heuristics result preserved")
                             }
                         }
                     }

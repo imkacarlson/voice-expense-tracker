@@ -30,6 +30,7 @@ import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.data.config.ConfigRepository
 import com.voiceexpense.data.config.ConfigType
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.Job
 import com.voiceexpense.data.config.DefaultField
 import com.voiceexpense.worker.enqueueSyncNow
 import com.voiceexpense.ui.common.MainActivity
@@ -62,6 +63,12 @@ class TransactionConfirmationActivity : AppCompatActivity() {
     private lateinit var exportButton: Button
     private var currentTransactionId: String? = null
     private var pendingExportNote: String? = null
+    private val loadingDisabledAlpha = 0.45f
+    private var lastCategoryOptions: List<String> = emptyList()
+    private var lastCategoryType: com.voiceexpense.data.model.TransactionType? = null
+    private var lastAccountOptions: List<String> = emptyList()
+    private var categoryBindingJob: Job? = null
+    private var accountBindingJob: Job? = null
     private val diagnosticsDocumentLauncher = registerForActivityResult(
         ActivityResultContracts.CreateDocument("text/markdown")
     ) { uri: Uri? ->
@@ -101,6 +108,11 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         val dateView: TextView = findViewById(R.id.field_date)
         val noteView: EditText = findViewById(R.id.field_note)
 
+        val types = arrayOf("Expense", "Income", "Transfer")
+        val typeAdapter = android.widget.ArrayAdapter(this, android.R.layout.simple_spinner_item, types)
+        typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+        typeSpinner.adapter = typeAdapter
+
         val merchantContainer: View = findViewById(R.id.container_field_merchant)
         val descriptionContainer: View = findViewById(R.id.container_field_description)
         val categoryContainer: View = findViewById(R.id.container_field_category)
@@ -129,6 +141,32 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             FieldKey.TAGS to tagsContainer
         )
 
+        val editableTargets: Map<FieldKey, View> = mapOf(
+            FieldKey.MERCHANT to merchantView,
+            FieldKey.DESCRIPTION to descView,
+            FieldKey.EXPENSE_CATEGORY to categorySpinner,
+            FieldKey.INCOME_CATEGORY to categorySpinner,
+            FieldKey.ACCOUNT to accountSpinner,
+            FieldKey.TAGS to tagsView,
+            FieldKey.NOTE to noteView
+        )
+
+        fun EditText.updateTextPreservingFocus(newValue: String) {
+            val current = text?.toString() ?: ""
+            if (current == newValue || hasFocus()) return
+            setText(newValue)
+        }
+
+        fun TextView.updateTextIfChanged(newValue: String) {
+            if (text.toString() != newValue) {
+                text = newValue
+            }
+        }
+
+        fun TextView.markMissing(missing: Boolean) {
+            setTextColor(if (missing) android.graphics.Color.parseColor("#E65100") else android.graphics.Color.BLACK)
+        }
+
         merchantView.doAfterTextChanged {
             if (merchantView.hasFocus()) {
                 viewModel.markFieldUserModified(FieldKey.MERCHANT)
@@ -137,6 +175,11 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         descView.doAfterTextChanged {
             if (descView.hasFocus()) {
                 viewModel.markFieldUserModified(FieldKey.DESCRIPTION)
+            }
+        }
+        noteView.doAfterTextChanged {
+            if (noteView.hasFocus()) {
+                viewModel.markFieldUserModified(FieldKey.NOTE)
             }
         }
 
@@ -182,6 +225,66 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             override fun onNothingSelected(parent: AdapterView<*>?) {}
         }
 
+        fun bindCategoriesFor(
+            type: com.voiceexpense.data.model.TransactionType,
+            selectedCategory: String?
+        ) {
+            categoryBindingJob?.cancel()
+            categoryBindingJob = lifecycleScope.launch {
+                val cfgType = when (type) {
+                    com.voiceexpense.data.model.TransactionType.Expense -> ConfigType.ExpenseCategory
+                    com.voiceexpense.data.model.TransactionType.Income -> ConfigType.IncomeCategory
+                    com.voiceexpense.data.model.TransactionType.Transfer -> ConfigType.TransferCategory
+                }
+                val opts = configRepo.options(cfgType).first().sortedBy { it.position }
+                val labels = opts.map { it.label }
+                if (type != lastCategoryType || labels != lastCategoryOptions) {
+                    val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
+                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                    categorySpinner.adapter = adapter
+                    lastCategoryType = type
+                    lastCategoryOptions = labels
+                }
+                categoryUserChange = false
+                val currentIdx = selectedCategory?.let { labels.indexOf(it).takeIf { idx -> idx >= 0 } }
+                if (currentIdx != null) {
+                    if (categorySpinner.selectedItemPosition != currentIdx) {
+                        categorySpinner.setSelection(currentIdx, false)
+                    }
+                } else {
+                    val df = when (type) {
+                        com.voiceexpense.data.model.TransactionType.Expense -> DefaultField.DefaultExpenseCategory
+                        com.voiceexpense.data.model.TransactionType.Income -> DefaultField.DefaultIncomeCategory
+                        com.voiceexpense.data.model.TransactionType.Transfer -> DefaultField.DefaultTransferCategory
+                    }
+                    val defId = configRepo.defaultFor(df).first()
+                    val defIdx = opts.indexOfFirst { it.id == defId }
+                    if (defIdx >= 0 && categorySpinner.selectedItemPosition != defIdx) {
+                        categorySpinner.setSelection(defIdx, false)
+                    }
+                }
+            }
+        }
+
+        fun bindAccountOptions(selectedAccount: String?) {
+            accountBindingJob?.cancel()
+            accountBindingJob = lifecycleScope.launch {
+                val opts = configRepo.options(ConfigType.Account).first().sortedBy { it.position }
+                val labels = listOf("None") + opts.map { it.label }
+                if (labels != lastAccountOptions) {
+                    val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
+                    adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
+                    accountSpinner.adapter = adapter
+                    lastAccountOptions = labels
+                }
+                accountUserChange = false
+                val accIdx = selectedAccount?.let { labels.indexOf(it).takeIf { index -> index >= 0 } } ?: 0
+                if (accountSpinner.selectedItemPosition != accIdx) {
+                    accountSpinner.setSelection(accIdx, false)
+                }
+            }
+        }
+
         title.text = getString(R.string.app_name)
         // Disable actions until draft loads
         confirm.isEnabled = false
@@ -219,93 +322,37 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                     if (t == null) return@collect
                     // Enable actions once draft is available
                     confirm.isEnabled = true
-                    amountView.setText(t.amountUsd?.toPlainString() ?: "")
-                    overallView.setText(t.splitOverallChargedUsd?.toPlainString() ?: "")
-                    merchantView.setText(t.merchant)
-                    descView.setText(t.description ?: "")
-                    // Setup type spinner values and selection
-                    val types = arrayOf("Expense", "Income", "Transfer")
-                    val typeAdapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, types)
-                    typeAdapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                    typeSpinner.adapter = typeAdapter
-                    val selIdx =
-                        when (t.type) {
-                            com.voiceexpense.data.model.TransactionType.Expense -> 0
-                            com.voiceexpense.data.model.TransactionType.Income -> 1
-                            com.voiceexpense.data.model.TransactionType.Transfer -> 2
-                        }
-                    typeSpinner.setSelection(selIdx)
-                    viewModel.setSelectedType(
-                        when (selIdx) {
-                            0 -> com.voiceexpense.data.model.TransactionType.Expense
-                            1 -> com.voiceexpense.data.model.TransactionType.Income
-                            else -> com.voiceexpense.data.model.TransactionType.Transfer
-                        }
-                    )
-                    val category = when (t.type) {
+                    amountView.updateTextPreservingFocus(t.amountUsd?.toPlainString() ?: "")
+                    overallView.updateTextPreservingFocus(t.splitOverallChargedUsd?.toPlainString() ?: "")
+                    merchantView.updateTextPreservingFocus(t.merchant)
+                    descView.updateTextPreservingFocus(t.description ?: "")
+                    val selIdx = when (t.type) {
+                        com.voiceexpense.data.model.TransactionType.Expense -> 0
+                        com.voiceexpense.data.model.TransactionType.Income -> 1
+                        com.voiceexpense.data.model.TransactionType.Transfer -> 2
+                    }
+                    if (typeSpinner.selectedItemPosition != selIdx) {
+                        typeSpinner.setSelection(selIdx, false)
+                    }
+                    val selectedType = when (selIdx) {
+                        0 -> com.voiceexpense.data.model.TransactionType.Expense
+                        1 -> com.voiceexpense.data.model.TransactionType.Income
+                        else -> com.voiceexpense.data.model.TransactionType.Transfer
+                    }
+                    viewModel.setSelectedType(selectedType)
+                    val categoryValue = when (t.type) {
                         com.voiceexpense.data.model.TransactionType.Expense -> t.expenseCategory
                         com.voiceexpense.data.model.TransactionType.Income -> t.incomeCategory
                         com.voiceexpense.data.model.TransactionType.Transfer -> null
                     }
-                    // Bind category options by type
-                    fun bindCategoriesFor(type: com.voiceexpense.data.model.TransactionType) {
-                        val cfgType = when (type) {
-                            com.voiceexpense.data.model.TransactionType.Expense -> ConfigType.ExpenseCategory
-                            com.voiceexpense.data.model.TransactionType.Income -> ConfigType.IncomeCategory
-                            com.voiceexpense.data.model.TransactionType.Transfer -> ConfigType.TransferCategory
-                        }
-                        lifecycleScope.launch {
-                            val opts = configRepo.options(cfgType).first()
-                            val labels = opts.sortedBy { it.position }.map { it.label }
-                            val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
-                            adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                            categoryUserChange = false
-                            categorySpinner.adapter = adapter
-                            val idx = labels.indexOf(category ?: "")
-                            if (idx >= 0) {
-                                categorySpinner.setSelection(idx, false)
-                            } else {
-                                // apply default if available
-                                val df = when (type) {
-                                    com.voiceexpense.data.model.TransactionType.Expense -> DefaultField.DefaultExpenseCategory
-                                    com.voiceexpense.data.model.TransactionType.Income -> DefaultField.DefaultIncomeCategory
-                                    com.voiceexpense.data.model.TransactionType.Transfer -> DefaultField.DefaultTransferCategory
-                                }
-                                val defId = configRepo.defaultFor(df).first()
-                                val sorted = opts.sortedBy { it.position }
-                                val defIdx = sorted.indexOfFirst { it.id == defId }
-                                if (defIdx >= 0) categorySpinner.setSelection(defIdx, false)
-                            }
-                        }
-                    }
-                    bindCategoriesFor(t.type)
-                    // Bind account options
-                    lifecycleScope.launch {
-                        val opts = configRepo.options(ConfigType.Account).first()
-                        val configLabels = opts.sortedBy { it.position }.map { it.label }
-                        // Add "None" as the first option
-                        val labels = listOf("None") + configLabels
-                        val adapter = android.widget.ArrayAdapter(this@TransactionConfirmationActivity, android.R.layout.simple_spinner_item, labels)
-                        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-                        accountUserChange = false
-                        accountSpinner.adapter = adapter
-                        // If account is null, select "None" (index 0), otherwise find the account in the list
-                        val accIdx = if (t.account == null) {
-                            0  // Select "None"
-                        } else {
-                            labels.indexOf(t.account).takeIf { it >= 0 } ?: 0
-                        }
-                        accountSpinner.setSelection(accIdx, false)
-                    }
-                    tagsView.setText(if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else "")
+                    bindCategoriesFor(t.type, categoryValue)
+                    bindAccountOptions(t.account)
+                    val tagsText = if (t.tags.isNotEmpty()) t.tags.joinToString(", ") else ""
+                    tagsView.updateTextPreservingFocus(tagsText)
                     // Date display as YYYY-MM-DD (ISO format)
-                    dateView.text = t.userLocalDate.toString()
-                    noteView.setText(t.note ?: "")
+                    dateView.updateTextIfChanged(t.userLocalDate.toString())
+                    noteView.updateTextPreservingFocus(t.note ?: "")
 
-                    // Simple highlighting for missing key fields
-                    fun TextView.markMissing(missing: Boolean) {
-                        setTextColor(if (missing) android.graphics.Color.parseColor("#E65100") else android.graphics.Color.BLACK)
-                    }
                     amountView.markMissing(t.amountUsd == null)
                     merchantView.markMissing(t.merchant.isBlank())
                     // Category highlighting skipped for Spinner control
@@ -460,8 +507,32 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                     val loading = states[field] == true
                     indicator.isVisible = loading
                 }
+                val merchantLoading = states[FieldKey.MERCHANT] == true
+                val descriptionLoading = states[FieldKey.DESCRIPTION] == true
                 val categoryLoading =
                     states[FieldKey.EXPENSE_CATEGORY] == true || states[FieldKey.INCOME_CATEGORY] == true
+                val accountLoading = states[FieldKey.ACCOUNT] == true
+                val tagsLoading = states[FieldKey.TAGS] == true
+                val noteLoading = states[FieldKey.NOTE] == true
+
+                fun applyLoading(field: FieldKey, isLoading: Boolean) {
+                    highlightTargets[field]?.alpha = if (isLoading) loadingDisabledAlpha else 1f
+                    editableTargets[field]?.let { target ->
+                        target.isEnabled = !isLoading
+                        if (target === tagsView) {
+                            target.isClickable = !isLoading
+                        }
+                    }
+                }
+
+                applyLoading(FieldKey.MERCHANT, merchantLoading)
+                applyLoading(FieldKey.DESCRIPTION, descriptionLoading)
+                applyLoading(FieldKey.EXPENSE_CATEGORY, categoryLoading)
+                applyLoading(FieldKey.INCOME_CATEGORY, categoryLoading)
+                applyLoading(FieldKey.ACCOUNT, accountLoading)
+                applyLoading(FieldKey.TAGS, tagsLoading)
+                applyLoading(FieldKey.NOTE, noteLoading)
+
                 categoryProgress.isVisible = categoryLoading
             }
         }
