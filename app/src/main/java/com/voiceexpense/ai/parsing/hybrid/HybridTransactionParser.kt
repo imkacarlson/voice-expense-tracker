@@ -4,6 +4,7 @@ import android.util.Log
 import com.voiceexpense.ai.parsing.ParsedResult
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.StructuredOutputValidator
+import com.voiceexpense.ai.parsing.TagNormalizer
 import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
 import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
@@ -336,14 +337,7 @@ class HybridTransactionParser(
         val accountOptions = if (context.allowedAccounts.isNotEmpty()) context.allowedAccounts else context.knownAccounts
         val account = matchOption(result.account, accountOptions)
 
-        val tags = if (context.allowedTags.isNotEmpty()) {
-            result.tags.mapNotNull { tag ->
-                val normalized = matchOption(tag, context.allowedTags)
-                normalized ?: context.allowedTags.firstOrNull { normalizeToken(it) == normalizeToken(tag) }
-            }.distinct()
-        } else {
-            result.tags
-        }
+        val tags = TagNormalizer.normalize(result.tags, context.allowedTags)
 
         return result.copy(
             expenseCategory = expenseCategory,

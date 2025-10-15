@@ -81,24 +81,24 @@ class HybridTransactionParserTest {
         )
         val context = ParsingContext(
             defaultDate = java.time.LocalDate.of(2025, 9, 13),
-            allowedAccounts = listOf("Citi Double Cash Card")
+            allowedAccounts = listOf("Everyday Rewards Card")
         )
 
         val res = parser.parse(
-            "On September 12th I spent 11.10 getting a takeout pizza from Domino's on my Citi Double Cash card",
+            "On September 12th I spent 11.10 getting a takeout pizza from Domino's on my everyday rewards card",
             context
         )
 
         assertThat(gw.callCount).isEqualTo(0)
         assertThat(res.method).isEqualTo(ProcessingMethod.HEURISTIC)
         assertThat(res.result.userLocalDate).isEqualTo(java.time.LocalDate.of(2025, 9, 12))
-        assertThat(res.result.account).isEqualTo("Citi Double Cash Card")
+        assertThat(res.result.account).isEqualTo("Everyday Rewards Card")
         assertThat(res.result.amountUsd?.toPlainString()).isEqualTo("11.10")
     }
 
     @Test
     fun heuristic_smaller_amount_does_not_override_ai() = runBlocking {
-        val json = "{\"amountUsd\":425,\"merchant\":\"Vanguard Cash Plus\",\"type\":\"Income\"}"
+        val json = "{\"amountUsd\":425,\"merchant\":\"Example Savings Account\",\"type\":\"Income\"}"
         val gw = FakeGateway(available = true, response = Result.success(json))
         val parser = HybridTransactionParser(
             gw,
@@ -107,7 +107,7 @@ class HybridTransactionParserTest {
         val context = ParsingContext(defaultDate = java.time.LocalDate.of(2025, 9, 13))
 
         val res = parser.parse(
-            "On September 12th I got my paycheck deposit into my Vanguard Cash Plus account and it came out to 425 dollars",
+            "On September 12th I got my paycheck deposit into my example savings account and it came out to 425 dollars",
             context
         )
 
@@ -125,11 +125,11 @@ class HybridTransactionParserTest {
         )
         val context = ParsingContext(
             defaultDate = java.time.LocalDate.of(2025, 9, 13),
-            allowedAccounts = listOf("Citi Double Cash Card")
+            allowedAccounts = listOf("Everyday Rewards Card")
         )
 
         val res = parser.parse(
-            "On September 12th I spent $11.10 getting a takeout pizza from Domino's on my Citi Double Cash card",
+            "On September 12th I spent $11.10 getting a takeout pizza from Domino's on my everyday rewards card",
             context
         )
 
@@ -144,7 +144,7 @@ class HybridTransactionParserTest {
             "\"type\":\"Expense\"," +
             "\"expenseCategory\":\"utilities\"," +
             "\"tags\":[\"splitwise\"]," +
-            "\"account\":\"vanguard cash plus (savings)\"," +
+            "\"account\":\"example savings account (1234)\"," +
             "\"userLocalDate\":\"2025-09-11\"," +
             "\"confidence\":0.8}"
         val gw = FakeGateway(available = true, response = Result.success(json))
@@ -156,17 +156,43 @@ class HybridTransactionParserTest {
             defaultDate = java.time.LocalDate.of(2025, 9, 13),
             allowedExpenseCategories = listOf("Utilities", "Groceries"),
             allowedTags = listOf("Auto-Paid", "Splitwise"),
-            allowedAccounts = listOf("Vanguard Cash Plus (Savings)")
+            allowedAccounts = listOf("Example Savings Account (1234)")
         )
 
         val res = parser.parse(
-            "On September 11th the gas bill was charged to my Vanguard Cash Plus account for 22.24 and I owe 11.12",
+            "On September 11th the gas bill was charged to my example savings account for 22.24 and I owe 11.12",
             context
         )
 
         assertThat(res.validated).isTrue()
         assertThat(res.result.expenseCategory).isEqualTo("Utilities")
-        assertThat(res.result.account).isEqualTo("Vanguard Cash Plus (Savings)")
+        assertThat(res.result.account).isEqualTo("Example Savings Account (1234)")
+        assertThat(res.result.tags).containsExactly("Splitwise")
+    }
+
+    @Test
+    fun `splitwise fallback applies even when not in allowed list`() = runBlocking {
+        val json = "{" +
+            "\"amountUsd\":9.95," +
+            "\"merchant\":\"Jenny's Ice Cream\"," +
+            "\"type\":\"Expense\"," +
+            "\"tags\":[\"splitwise\"]," +
+            "\"confidence\":0.6}"
+        val gw = FakeGateway(available = true, response = Result.success(json))
+        val parser = HybridTransactionParser(
+            gw,
+            stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
+        )
+        val context = ParsingContext(
+            defaultDate = java.time.LocalDate.of(2025, 10, 14),
+            allowedTags = listOf("Subscription", "Auto-Paid")
+        )
+
+        val res = parser.parse(
+            "I went to Jenny's ice cream and from that I owe 4.98 after splitwise",
+            context
+        )
+
         assertThat(res.result.tags).containsExactly("Splitwise")
     }
 

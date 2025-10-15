@@ -45,19 +45,19 @@ class PromptBuilderTest {
     fun injects_hint_block() {
         val ctx = ParsingContext(
             defaultDate = java.time.LocalDate.of(2025, 9, 13),
-            allowedAccounts = listOf("Citi Double Cash Card")
+            allowedAccounts = listOf("Everyday Rewards Card")
         )
         val heuristic = HeuristicExtractor().extract(
-            "On September 12th I spent 11.10 at Domino's on my Citi Double Cash card",
+            "On September 12th I spent 11.10 at Domino's on my everyday rewards card",
             ctx
         )
         val p = builder.build(
-            "On September 12th I spent 11.10 at Domino's on my Citi Double Cash card",
+            "On September 12th I spent 11.10 at Domino's on my everyday rewards card",
             ctx,
             heuristic
         )
         assertThat(p).contains("Heuristic hints (confidence 0..1; adjust if incorrect):")
-        assertThat(p).contains("\\"account\\":{\\"value\\":\\"Citi Double Cash Card\\"")
+        assertThat(p).contains("\\"account\\":{\\"value\\":\\"Everyday Rewards Card\\"")
     }
 
     @Test
@@ -70,7 +70,7 @@ class PromptBuilderTest {
             allowedTags = listOf("Auto-Paid", "Subscription", "Splitwise"),
             allowedAccounts = listOf(
                 "Chase Sapphire Preferred",
-                "Citi Double Cash Card",
+                "Everyday Rewards Card",
                 "Vanguard Cash Plus (Savings)"
             )
         )

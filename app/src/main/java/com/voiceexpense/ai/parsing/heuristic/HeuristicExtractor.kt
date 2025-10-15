@@ -224,9 +224,22 @@ class HeuristicExtractor(
         val trimmed = value.trim()
         if (trimmed.length > 30) return true
         val lower = trimmed.lowercase(Locale.US)
+        val tokens = lower.split(Regex("\\s+")).filter { it.isNotBlank() }
+        val firstWord = tokens.firstOrNull()
+
         val verbHits = VERB_CUES.count { lower.contains(it) }
         if (verbHits >= 2) return true
+
+        if (firstWord != null && firstWord in SUSPICIOUS_MERCHANT_PREFIXES) return true
+        if (tokens.any { it in DEBT_CUES }) return true
         if (FILLER_PHRASES.any { lower.contains(it) }) return true
+
+        val lacksCapitalization = trimmed.any { it.isLetter() } &&
+            trimmed.none { it.isUpperCase() || it.isDigit() }
+        if (lacksCapitalization) return true
+
+        if (verbHits >= 1 && trimmed.length > 20) return true
+
         return false
     }
 
@@ -316,7 +329,8 @@ class HeuristicExtractor(
             " paying ",
             " pay ",
             " grabbing ",
-            " taking "
+            " taking ",
+            " owe "
         )
         private val FILLER_PHRASES = listOf(
             " i just ",
@@ -326,6 +340,27 @@ class HeuristicExtractor(
             " on my ",
             " for $"
         )
+        private val SUSPICIOUS_MERCHANT_PREFIXES = setOf(
+            "that",
+            "this",
+            "it",
+            "then",
+            "so",
+            "and",
+            "but",
+            "because",
+            "if",
+            "after",
+            "when",
+            "while",
+            "my",
+            "our",
+            "their",
+            "his",
+            "her",
+            "i"
+        )
+        private val DEBT_CUES = setOf("owe", "owed", "owing", "due")
 
         private val DATE_REGEX = Regex(
             "(?i)(january|february|march|april|may|june|july|august|september|october|november|december)\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(\\d{4}))?"

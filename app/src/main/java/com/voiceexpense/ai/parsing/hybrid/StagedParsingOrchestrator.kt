@@ -4,6 +4,7 @@ import android.util.Log
 import com.voiceexpense.ai.parsing.ParsedResult
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.StructuredOutputValidator
+import com.voiceexpense.ai.parsing.TagNormalizer
 import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
 import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
@@ -447,34 +448,37 @@ class StagedParsingOrchestrator(
         var merged = heuristicDraft.toParsedResult(context)
         refinedFields.forEach { (field, value) ->
             merged = when (field) {
-                FieldKey.MERCHANT -> merged.copy(merchant = (value as? String)?.trim().takeUnless { it.isNullOrBlank() } ?: merged.merchant)
-                FieldKey.DESCRIPTION -> merged.copy(description = (value as? String)?.trim())
+                FieldKey.MERCHANT -> {
+                    val normalized = capitalizeFirst((value as? String)?.trim())
+                    merged.copy(merchant = normalized.takeUnless { it.isNullOrBlank() } ?: merged.merchant)
+                }
+                FieldKey.DESCRIPTION -> {
+                    val normalized = capitalizeFirst((value as? String)?.trim())
+                    merged.copy(description = normalized)
+                }
                 FieldKey.EXPENSE_CATEGORY -> merged.copy(expenseCategory = (value as? String)?.trim())
                 FieldKey.INCOME_CATEGORY -> merged.copy(incomeCategory = (value as? String)?.trim())
                 FieldKey.ACCOUNT -> merged.copy(account = (value as? String)?.trim()?.takeUnless { it.isNullOrEmpty() } ?: merged.account)
-                FieldKey.TAGS -> merged.copy(tags = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() } ?: merged.tags)
+                FieldKey.TAGS -> {
+                    val raw = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() } ?: emptyList()
+                    val normalized = TagNormalizer.normalize(raw, context.allowedTags)
+                    val mergedTags = when {
+                        normalized.isNotEmpty() -> normalized
+                        raw.isEmpty() -> emptyList()
+                        else -> merged.tags
+                    }
+                    merged.copy(tags = mergedTags)
+                }
                 FieldKey.NOTE -> merged.copy(note = (value as? String)?.trim())
                 else -> merged
             }
         }
-        if (context.allowedTags.isNotEmpty()) {
-            merged = merged.copy(tags = normalizeTags(merged.tags, context.allowedTags))
-        }
+        merged = merged.copy(tags = TagNormalizer.normalize(merged.tags, context.allowedTags))
         if (context.allowedAccounts.isNotEmpty() || context.knownAccounts.isNotEmpty()) {
             val accounts = context.allowedAccounts.ifEmpty { context.knownAccounts }
             merged = merged.copy(account = matchOption(merged.account, accounts))
         }
         return StructuredOutputValidator.sanitizeAmounts(merged)
-    }
-
-    private fun normalizeTags(tags: List<String>, allowed: List<String>): List<String> {
-        if (allowed.isEmpty()) return tags
-        val normalizedAllowed = allowed.associateBy { it.trim().lowercase(Locale.US) }
-        return tags.mapNotNull { tag ->
-            val trimmed = tag.trim()
-            if (trimmed.isEmpty()) return@mapNotNull null
-            normalizedAllowed[trimmed.lowercase(Locale.US)]
-        }.distinct()
     }
 
     private fun matchOption(value: String?, options: List<String>): String? {
@@ -511,7 +515,13 @@ class StagedParsingOrchestrator(
         FieldKey.TAGS -> {
             val raw = (value as? List<*>)?.mapNotNull { (it as? String)?.trim() }?.filter { it.isNotEmpty() }
                 ?: emptyList()
-            if (context.allowedTags.isEmpty()) raw.distinct() else normalizeTags(raw, context.allowedTags)
+            val normalized = TagNormalizer.normalize(raw, context.allowedTags)
+            when {
+                normalized.isNotEmpty() -> normalized
+                raw.isEmpty() -> emptyList()
+                context.allowedTags.isEmpty() -> raw.distinct()
+                else -> emptyList()
+            }
         }
 
         else -> value

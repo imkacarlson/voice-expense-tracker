@@ -133,6 +133,83 @@ class StagedParsingOrchestratorTest {
     }
 
     @Test
+    fun `ai refinements are capitalized when merged`() = runBlocking {
+        val draft = HeuristicDraft(
+            merchant = null,
+            description = null,
+            confidences = mapOf(
+                FieldKey.MERCHANT to 0.1f,
+                FieldKey.DESCRIPTION to 0.1f
+            )
+        )
+        val gateway = FakeGenAiGateway().apply {
+            promptProvider = { prompt ->
+                when {
+                    prompt.contains("key \"merchant\"") -> Result.success("""{"merchant":"jenny's ice cream"}""")
+                    prompt.contains("key \"description\"") -> Result.success("""{"description":"ice cream cone"}""")
+                    else -> Result.success("{}")
+                }
+            }
+        }
+        val orchestrator = StagedParsingOrchestrator(
+            heuristicExtractor = heuristicExtractor,
+            genAiGateway = gateway,
+            focusedPromptBuilder = focusedPromptBuilder,
+            thresholds = thresholds
+        )
+        val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
+            heuristicDraft = draft,
+            targetFields = listOf(FieldKey.MERCHANT, FieldKey.DESCRIPTION),
+            stage1DurationMs = 0L
+        )
+
+        val result = orchestrator.parseStaged(
+            "I just went to jenny's ice cream and got myself a cone",
+            ParsingContext(),
+            snapshot
+        )
+
+        assertThat(result.mergedResult.merchant).isEqualTo("Jenny's ice cream")
+        assertThat(result.mergedResult.description).isEqualTo("Ice cream cone")
+    }
+
+    @Test
+    fun `tags keep heuristics when ai suggests unsupported values`() = runBlocking {
+        val draft = HeuristicDraft(
+            tags = listOf("splitwise"),
+            confidences = mapOf(FieldKey.TAGS to 0.2f)
+        )
+        val gateway = FakeGenAiGateway().apply {
+            promptProvider = { prompt ->
+                when {
+                    prompt.contains("key \"tags\"") -> Result.success("""{"tags":["ice cream","dollar"]}""")
+                    else -> Result.success("{}")
+                }
+            }
+        }
+        val orchestrator = StagedParsingOrchestrator(
+            heuristicExtractor = heuristicExtractor,
+            genAiGateway = gateway,
+            focusedPromptBuilder = focusedPromptBuilder,
+            thresholds = thresholds
+        )
+        val context = ParsingContext(allowedTags = listOf("Subscription", "Auto-Paid"))
+        val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
+            heuristicDraft = draft,
+            targetFields = listOf(FieldKey.TAGS),
+            stage1DurationMs = 0L
+        )
+
+        val result = orchestrator.parseStaged(
+            "some input",
+            context,
+            snapshot
+        )
+
+        assertThat(result.mergedResult.tags).containsExactly("Splitwise")
+    }
+
+    @Test
     fun falls_back_to_heuristics_when_ai_fails() = runBlocking {
         val draft = HeuristicDraft(
             merchant = "Unknown",
