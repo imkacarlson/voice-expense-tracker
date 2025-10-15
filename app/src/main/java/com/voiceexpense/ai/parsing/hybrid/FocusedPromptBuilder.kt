@@ -190,8 +190,8 @@ class FocusedPromptBuilder {
 
     private fun instructionFor(field: FieldKey): String = when (field) {
             FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"CVS\", \"Trader Joe's\"). If the input mentions payment methods (e.g., payment apps like Splitwise, Venmo, PayPal, Zelle, etc; or payment cards), identify the actual merchant or service being paid for, NOT the payment method."
-            FieldKey.DESCRIPTION -> "Provide a concise noun phrase describing the purchase (examples: \"Prescription\", \"Birthday card\", \"Lunch\"). Preserve key numbers or modifiers from the input. Avoid verbs."
-            FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category. Examples: 'Eating Out' for restaurants/takeout, 'Personal' for entertainment/subscriptions/shopping, 'Groceries' for food/supermarkets, 'Health/medical' for healthcare, 'Utilities' for bills/internet, 'Transportation' for gas/transit."
+            FieldKey.DESCRIPTION -> "Provide a concise noun phrase for the goods or service purchased (e.g., \"Transit fare\", \"Prescription\", \"Birthday card\"). Preserve key numbers or modifiers; do not mention payment methods or account names. Avoid verbs."
+            FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category based on the goods/service. Use 'Eating Out' for meals/takeout, 'Transportation' for transit fares, rideshares, or fuel, and similar mappings for the other options. Ignore payment method mentions; return null if none apply."
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
             FieldKey.ACCOUNT -> "Return the account or card name from the allowed list. Match obvious phonetic or casing variations; if none apply, return null."
             FieldKey.TAGS -> "Return tags from the allowed list that match the transaction. Use both explicit mentions (with fuzzy/phonetic matching like 'autopaid' → 'Auto-Paid') and semantic inference (e.g., if 'paid automatically' or 'autopay' is mentioned, select 'Auto-Paid'; if it's a recurring service or subscription, consider 'Subscription')."
@@ -276,8 +276,8 @@ class FocusedPromptBuilder {
 
         private fun guidelineFor(field: FieldKey): String? = when (field) {
             FieldKey.MERCHANT -> "Return only the merchant or vendor name—no verbs, adjectives, or trailing phrases. Avoid payment methods."
-            FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input."
-            FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category from the allowed list; return null if none apply."
+            FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input and avoids payment method names."
+            FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category from the allowed list based on the purchase/service (e.g., transit fares → 'Transportation'); return null if none apply."
             FieldKey.INCOME_CATEGORY -> "Choose exactly one income category from the allowed list; return null if none apply."
             FieldKey.ACCOUNT -> "Return the account/card name from the allowed list, matching obvious phonetic variations; return null if none apply."
             FieldKey.TAGS -> "Return an array of distinct tags chosen only from the allowed list. Match both explicit mentions and semantic meanings. If no allowed tag applies, return an empty array."

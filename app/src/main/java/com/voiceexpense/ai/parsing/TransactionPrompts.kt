@@ -28,9 +28,10 @@ Rules:
 - Tags array must be lowercase words; omit if none.
 - Heuristic hints may be provided; treat them as suggestions and correct them if the utterance disagrees.
 - Match amountUsd to the spoken spend/share; never invent implausibly large values.
+- Ignore payment methods or account names when inferring merchant, description, or category; focus on the underlying purchase/service.
 - When the utterance mentions a card or account, map it to the closest allowed account option (case-insensitive, tolerate small spelling differences).
-- For expenses, choose an expenseCategory from allowed options that best fits the merchant/description.
-- For description: keep concise (2-6 words); focus on WHAT was purchased or the PURPOSE (e.g., "Groceries", "Dinner", "Running shoes"), not the action of going/buying; omit if it would just repeat the merchant name.
+- For expenses, choose an expenseCategory from allowed options that best fits the merchant/description; use "Transportation" for transit fares, rideshares, or other travel costs, and "Eating Out" only for food or beverage purchases. Base the choice on the goods/service, not the payment method.
+- For description: keep concise (2-6 words); describe the goods/service purchased (e.g., "Transit fare", "Groceries", "Running shoes"), not the payment instrument or action; omit if it would just repeat the merchant name.
 """
 
     data class ExamplePair(
