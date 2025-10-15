@@ -12,16 +12,19 @@ Getting Started
 
 On-device LLM (MediaPipe) Setup
 - Dependency: `com.google.mediapipe:tasks-genai:0.10.27` (already configured).
-- Model file: a `.task` model (e.g., Gemma3 1B 4-bit) must be placed at app-private path: `filesDir/llm/model.task`.
+- Model file: a `.task` or `.litertlm` model (e.g., Gemma3 1B 4-bit) must be placed at app-private path: `filesDir/llm/`.
+- **Supported formats**: Both `.task` and `.litertlm` MediaPipe bundle formats are supported.
 - Option A (no adb): In-app import
-  - Open Settings → On-device LLM Setup (MediaPipe) → “Import model (.task)” and choose the `.task` file. The app copies it into its sandbox.
-  - Tap “Test AI setup” to verify readiness.
+  - Open Settings → On-device LLM Setup (MediaPipe) → "Import model (.task or .litertlm)" and choose your model file.
+  - The app will validate the file (checks for valid zip format and minimum size) and copy it into its sandbox with the original filename preserved.
+  - Tap "Test AI setup" to verify readiness.
 - Option B (adb): Push/copy into sandbox
   1. Create target dir inside app sandbox: `adb shell run-as com.voiceexpense mkdir -p files/llm`
-  2. Push to temp: `adb push gemma3-1b-it-q4.task /data/local/tmp/model.task`
-  3. Copy into app files: `adb shell run-as com.voiceexpense cp /data/local/tmp/model.task files/llm/model.task`
+  2. Push to temp: `adb push your-model.task /data/local/tmp/` (or `your-model.litertlm`)
+  3. Copy into app files: `adb shell run-as com.voiceexpense cp /data/local/tmp/your-model.task files/llm/`
   4. Verify: `adb shell run-as com.voiceexpense ls -la files/llm/`
-- Initialize: Open Settings → On-device LLM Setup → “Test AI setup” to validate the model presence.
+- Initialize: Open Settings → On-device LLM Setup → "Test AI setup" to validate the model presence.
+- Troubleshooting: If you get a "Unable to open zip archive" error, your model file may be corrupted or incomplete. Try re-downloading the model from the source.
 
 Run & Build
 - Debug build via Android Studio or CLI:
@@ -53,7 +56,8 @@ Testing
   - setup guide UI test, and a baseline performance test.
 
 Notes
-- Users can use the Android keyboard mic button for voice-to-text; the app itself is text-only. LLM parsing uses MediaPipe `LlmInference` with a local `.task` model.
+- Users can use the Android keyboard mic button for voice-to-text; the app itself is text-only. LLM parsing uses MediaPipe `LlmInference` with a local `.task` or `.litertlm` model.
+- Both `.task` and `.litertlm` MediaPipe bundle formats are supported. The app automatically detects which format you've imported.
 - Sync posts to your Google Apps Script Web App. If unsigned or token invalid, transactions remain queued and WorkManager retries after sign-in.
 
 Sign-In & Sync Checklist

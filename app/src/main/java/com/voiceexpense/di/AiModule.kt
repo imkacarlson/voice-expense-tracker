@@ -20,7 +20,8 @@ object AiModule {
     fun provideModelManager(): ModelManager = ModelManager()
 
     @Provides @Singleton
-    fun provideMediaPipeClient(@ApplicationContext context: Context): MediaPipeGenAiClient = MediaPipeGenAiClient(context)
+    fun provideMediaPipeClient(@ApplicationContext context: Context, modelManager: ModelManager): MediaPipeGenAiClient =
+        MediaPipeGenAiClient(context, modelManager)
 
     @Provides
     fun provideGenAiGateway(mp: MediaPipeGenAiClient): GenAiGateway = object : GenAiGateway {

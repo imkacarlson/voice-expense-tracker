@@ -3,6 +3,7 @@ package com.voiceexpense.ai.mediapipe
 import android.content.Context
 import com.google.mediapipe.tasks.genai.llminference.LlmInference
 import android.util.Log
+import com.voiceexpense.ai.model.ModelManager
 import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -11,11 +12,10 @@ import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * MediaPipe LLM client implementing the GenAiGateway used by the hybrid parser.
- * Looks for a .task model at app-private path: filesDir/llm/model.task.
+ * Looks for .task or .litertlm models in app-private path: filesDir/llm/
  */
-class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
+class MediaPipeGenAiClient(private val context: Context, private val modelManager: ModelManager) : GenAiGateway {
     companion object {
-        private const val RELATIVE_MODEL_PATH = "llm/model.task"
         private const val TRACE_TAG = "AI.Trace"
     }
 
@@ -52,25 +52,63 @@ class MediaPipeGenAiClient(private val context: Context) : GenAiGateway {
         if (llm != null) return true
         if (!initializing.compareAndSet(false, true)) return llm != null
         try {
-            val modelFile = File(context.filesDir, RELATIVE_MODEL_PATH)
+            // Ensure model is available and detected first
+            // This is a blocking call, but tryInitSync is expected to be called from IO context
+            val status = kotlinx.coroutines.runBlocking {
+                modelManager.ensureModelAvailable(context)
+            }
+
+            if (status !is com.voiceexpense.ai.model.ModelManager.ModelStatus.Ready) {
+                Log.d("AI.MP", "Model not ready: $status")
+                Log.w(TRACE_TAG, "tryInitSync() model not ready")
+                return false
+            }
+
+            // Use ModelManager to get the detected model file path
+            val modelPath = modelManager.getModelPath()
+            if (modelPath == null) {
+                Log.d("AI.MP", "No model path available from ModelManager")
+                Log.w(TRACE_TAG, "tryInitSync() missing model file")
+                return false
+            }
+
+            val modelFile = File(context.filesDir, modelPath)
             Log.i(TRACE_TAG, "tryInitSync() checking ${modelFile.absolutePath}")
+
             if (!modelFile.exists() || !modelFile.isFile) {
                 Log.d("AI.MP", "Model missing at ${modelFile.absolutePath}")
                 Log.w(TRACE_TAG, "tryInitSync() missing model file")
                 return false
             }
+
+            // Log model details for debugging
+            val fileSizeMB = modelFile.length() / (1024 * 1024)
+            val extension = modelFile.extension
+            Log.i("AI.MP", "Initializing model: ${modelFile.name} (${fileSizeMB}MB, extension=.$extension)")
+
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
                 .setPreferredBackend(LlmInference.Backend.GPU)
                 .build()
             llm = LlmInference.createFromOptions(context, options)
-            Log.i("AI.MP", "Model initialized: ${modelFile.absolutePath}")
+            Log.i("AI.MP", "Model initialized successfully: ${modelFile.name}")
             Log.i(TRACE_TAG, "tryInitSync() initialized model at ${modelFile.absolutePath}")
             return true
         } catch (t: Throwable) {
             llm = null
             Log.w("AI.MP", "Model init failed: ${t.message}")
+            Log.e("AI.MP", "Full error details: ${t.javaClass.simpleName}: ${t.message}")
             Log.e(TRACE_TAG, "tryInitSync() failed: ${t.message}")
+
+            // Add more specific error guidance
+            when {
+                t.message?.contains("zip") == true -> {
+                    Log.e("AI.MP", "Zip error detected - file may be corrupted or incomplete. Try re-downloading the model.")
+                }
+                t.message?.contains("format") == true -> {
+                    Log.e("AI.MP", "Format error - ensure the file is a valid MediaPipe .task or .litertlm bundle.")
+                }
+            }
             return false
         } finally {
             initializing.set(false)

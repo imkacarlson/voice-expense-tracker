@@ -21,6 +21,11 @@ import java.io.OutputStream
 class SetupGuidePage : AppCompatActivity() {
     private val scope = CoroutineScope(Dispatchers.Main)
     private val modelManager = ModelManager()
+
+    companion object {
+        private const val MIN_MODEL_SIZE_BYTES = 10 * 1024 * 1024L // 10 MB minimum
+    }
+
     private val importLauncher = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri: Uri? ->
         if (uri == null) return@registerForActivityResult
         scope.launch {
@@ -62,8 +67,32 @@ class SetupGuidePage : AppCompatActivity() {
 
     private suspend fun importModel(uri: Uri): Boolean = withContext(Dispatchers.IO) {
         return@withContext try {
-            val dest = File(filesDir, com.voiceexpense.ai.model.ModelManager.DEFAULT_RELATIVE_MODEL_PATH)
+            // Get the original filename from the URI
+            val originalFileName = getFileName(uri)
+            val extension = originalFileName?.substringAfterLast('.', "") ?: ""
+
+            // Validate file extension
+            if (extension != "task" && extension != "litertlm") {
+                throw IllegalArgumentException("Invalid file type. Please select a .task or .litertlm file.")
+            }
+
+            // Validate file is a zip archive (MediaPipe bundles are zip files)
+            val isValidZip = validateZipFile(uri)
+            if (!isValidZip) {
+                throw IllegalArgumentException("Invalid model file. File is not a valid zip archive. Please check the file integrity.")
+            }
+
+            // Validate minimum file size (at least 10MB for a valid model)
+            val fileSize = getFileSize(uri)
+            if (fileSize < MIN_MODEL_SIZE_BYTES) {
+                throw IllegalArgumentException("File too small (${fileSize / (1024 * 1024)}MB). Model files should be at least ${MIN_MODEL_SIZE_BYTES / (1024 * 1024)}MB.")
+            }
+
+            // Use the original filename to preserve extension
+            val fileName = originalFileName ?: "model.$extension"
+            val dest = File(filesDir, "${com.voiceexpense.ai.model.ModelManager.MODEL_DIRECTORY}/$fileName")
             dest.parentFile?.mkdirs()
+
             contentResolver.openInputStream(uri).use { input ->
                 if (input == null) throw IllegalStateException("Cannot open selected file")
                 dest.outputStream().use { output ->
@@ -75,6 +104,57 @@ class SetupGuidePage : AppCompatActivity() {
             withContext(Dispatchers.Main) {
                 Toast.makeText(this@SetupGuidePage, getString(R.string.setup_guide_import_failure, t.message ?: "unknown"), Toast.LENGTH_LONG).show()
             }
+            false
+        }
+    }
+
+    private fun getFileName(uri: Uri): String? {
+        var result: String? = null
+        if (uri.scheme == "content") {
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val nameIndex = cursor.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+                    if (nameIndex >= 0) {
+                        result = cursor.getString(nameIndex)
+                    }
+                }
+            }
+        }
+        if (result == null) {
+            result = uri.path?.substringAfterLast('/')
+        }
+        return result
+    }
+
+    private fun getFileSize(uri: Uri): Long {
+        var size: Long = 0
+        if (uri.scheme == "content") {
+            contentResolver.query(uri, null, null, null, null)?.use { cursor ->
+                if (cursor.moveToFirst()) {
+                    val sizeIndex = cursor.getColumnIndex(android.provider.OpenableColumns.SIZE)
+                    if (sizeIndex >= 0) {
+                        size = cursor.getLong(sizeIndex)
+                    }
+                }
+            }
+        } else {
+            uri.path?.let { path ->
+                size = File(path).length()
+            }
+        }
+        return size
+    }
+
+    private fun validateZipFile(uri: Uri): Boolean {
+        return try {
+            contentResolver.openInputStream(uri)?.use { input ->
+                // Check for zip file signature (PK\x03\x04)
+                val header = ByteArray(4)
+                val bytesRead = input.read(header)
+                bytesRead == 4 && header[0] == 0x50.toByte() && header[1] == 0x4B.toByte() &&
+                        header[2] == 0x03.toByte() && header[3] == 0x04.toByte()
+            } ?: false
+        } catch (e: Exception) {
             false
         }
     }

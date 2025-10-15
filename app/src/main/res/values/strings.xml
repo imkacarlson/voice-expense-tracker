@@ -27,9 +27,9 @@
     
     <!-- Setup guide -->
     <string name="setup_guide_title">On-device LLM Setup (MediaPipe)</string>
-    <string name="setup_guide_steps">1. Push your .task model to the app sandbox: adb shell run-as com.voiceexpense mkdir -p files/llm; adb push &lt;model.task&gt; /data/local/tmp/model.task; adb shell run-as com.voiceexpense cp /data/local/tmp/model.task files/llm/model.task&#10;2. Tap “Test AI setup” to verify the model is detected.</string>
+    <string name="setup_guide_steps">1. Use "Import model" button below to select a .task or .litertlm file from your device.&#10;2. Alternatively, push your model via adb: adb shell run-as com.voiceexpense mkdir -p files/llm; adb push &lt;your-model.task&gt; /data/local/tmp/; adb shell run-as com.voiceexpense cp /data/local/tmp/your-model.task files/llm/&#10;3. Tap "Test AI setup" to verify the model is detected.</string>
     <string name="setup_guide_test_button">Test AI setup</string>
-    <string name="setup_guide_import_button">Import model (.task)</string>
+    <string name="setup_guide_import_button">Import model (.task or .litertlm)</string>
     <string name="setup_guide_status_ready">On-device LLM detected and ready.</string>
     <string name="setup_guide_status_unavailable">On-device LLM unavailable: %1$s</string>
     <string name="setup_guide_status_error">LLM setup error: %1$s</string>
