@@ -14,7 +14,6 @@ import kotlin.system.measureTimeMillis
 @RunWith(AndroidJUnit4::class)
 class StagedParsingPerformanceTest {
 
-    private val promptBuilder = PromptBuilder()
     private val heuristicExtractor = com.voiceexpense.ai.parsing.heuristic.HeuristicExtractor()
 
     @Test
@@ -52,21 +51,19 @@ class StagedParsingPerformanceTest {
     }
 
     @Test
-    fun staged_total_latency_beats_legacy_prompt() = runBlocking {
+    fun heuristic_only_is_faster_than_staged() = runBlocking {
         val gateway = PromptAwareGateway()
         val thresholds = FieldConfidenceThresholds.DEFAULT
 
         val stagedParser = HybridTransactionParser(
             genai = gateway,
-            promptBuilder = promptBuilder,
             heuristicExtractor = heuristicExtractor,
             thresholds = thresholds,
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = true)
         )
 
-        val legacyParser = HybridTransactionParser(
+        val heuristicOnlyParser = HybridTransactionParser(
             genai = gateway,
-            promptBuilder = promptBuilder,
             heuristicExtractor = heuristicExtractor,
             thresholds = thresholds,
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
@@ -76,11 +73,11 @@ class StagedParsingPerformanceTest {
             stagedParser.parse(STAGED_INPUT, ParsingContext())
         }
 
-        val legacyElapsed = measureTimeMillis {
-            legacyParser.parse(STAGED_INPUT, ParsingContext())
+        val heuristicElapsed = measureTimeMillis {
+            heuristicOnlyParser.parse(STAGED_INPUT, ParsingContext())
         }
 
-        assertThat(stagedElapsed).isLessThan(legacyElapsed)
+        assertThat(heuristicElapsed).isLessThan(stagedElapsed)
     }
 
     private class DelayGateway(

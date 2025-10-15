@@ -5,7 +5,6 @@ import com.voiceexpense.ai.mediapipe.MediaPipeGenAiClient
 import com.voiceexpense.ai.model.ModelManager
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
-import com.voiceexpense.ai.parsing.hybrid.PromptBuilder
 import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
 import dagger.Module
 import dagger.Provides
@@ -23,9 +22,6 @@ object AiModule {
     @Provides @Singleton
     fun provideMediaPipeClient(@ApplicationContext context: Context): MediaPipeGenAiClient = MediaPipeGenAiClient(context)
 
-    @Provides @Singleton
-    fun providePromptBuilder(): PromptBuilder = PromptBuilder()
-
     @Provides
     fun provideGenAiGateway(mp: MediaPipeGenAiClient): GenAiGateway = object : GenAiGateway {
         override fun isAvailable(): Boolean = mp.isAvailable()
@@ -33,7 +29,7 @@ object AiModule {
     }
 
     @Provides
-    fun provideHybridParser(gateway: GenAiGateway, pb: PromptBuilder): HybridTransactionParser = HybridTransactionParser(gateway, pb)
+    fun provideHybridParser(gateway: GenAiGateway): HybridTransactionParser = HybridTransactionParser(gateway)
 
     @Provides
     fun provideParser(mm: ModelManager, hybrid: HybridTransactionParser): TransactionParser = TransactionParser(mm, hybrid)

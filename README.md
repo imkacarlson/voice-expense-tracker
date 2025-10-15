@@ -50,7 +50,7 @@ Testing
 - Key test areas: repository mapping, DAO operations, worker posting, parser validation.
 - Tests:
   - `TransactionParserTest` (MediaPipe path and fallback),
-  - `TransactionPromptsTest`, setup guide UI test, and a baseline performance test.
+  - setup guide UI test, and a baseline performance test.
 
 Notes
 - Users can use the Android keyboard mic button for voice-to-text; the app itself is text-only. LLM parsing uses MediaPipe `LlmInference` with a local `.task` model.

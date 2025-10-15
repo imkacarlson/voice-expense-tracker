@@ -4,7 +4,6 @@ import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
 import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
-import com.voiceexpense.ai.parsing.hybrid.PromptBuilder
 import com.voiceexpense.ai.parsing.hybrid.StagedRefinementDispatcher
 import io.mockk.mockk
 import io.mockk.every
@@ -37,7 +36,6 @@ class ConfirmationViewModelTest {
         }
         val hybrid = HybridTransactionParser(
             dummyGateway,
-            PromptBuilder(),
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
         )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
@@ -77,7 +75,6 @@ class ConfirmationViewModelTest {
         }
         val hybrid = HybridTransactionParser(
             dummyGateway,
-            PromptBuilder(),
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
         )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
@@ -113,7 +110,6 @@ class ConfirmationViewModelTest {
         }
         val hybrid = HybridTransactionParser(
             dummyGateway,
-            PromptBuilder(),
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
         )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
@@ -152,7 +148,6 @@ class ConfirmationViewModelTest {
         }
         val hybrid = HybridTransactionParser(
             dummyGateway,
-            PromptBuilder(),
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
         )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
@@ -189,7 +184,6 @@ class ConfirmationViewModelTest {
         }
         val hybrid = HybridTransactionParser(
             dummyGateway,
-            PromptBuilder(),
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
         )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
@@ -241,7 +235,6 @@ class ConfirmationViewModelTest {
         }
         val hybrid = HybridTransactionParser(
             dummyGateway,
-            PromptBuilder(),
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
         )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))
@@ -281,7 +274,6 @@ class ConfirmationViewModelTest {
         }
         val hybrid = HybridTransactionParser(
             dummyGateway,
-            PromptBuilder(),
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
         )
         val vm = ConfirmationViewModel(repo, TransactionParser(mmDisabled, hybrid))

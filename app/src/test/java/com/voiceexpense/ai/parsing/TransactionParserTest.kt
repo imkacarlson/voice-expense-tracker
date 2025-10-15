@@ -2,10 +2,8 @@ package com.voiceexpense.ai.parsing
 
 import com.google.common.truth.Truth.assertThat
 import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
-import com.voiceexpense.ai.parsing.hybrid.PromptBuilder
 import com.voiceexpense.ai.parsing.hybrid.GenAiGateway
 import kotlinx.coroutines.runBlocking
-import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
 import org.junit.Test
@@ -20,7 +18,7 @@ class TransactionParserTest {
         override suspend fun structured(prompt: String): Result<String> =
             Result.failure(Exception("unavailable"))
     }
-    private val hybrid = HybridTransactionParser(dummyGateway, PromptBuilder())
+    private val hybrid = HybridTransactionParser(dummyGateway)
     private val parser = TransactionParser(mmDisabled, hybrid)
 
     @Test
@@ -132,7 +130,7 @@ class TransactionParserGenAiTest {
             override fun isAvailable(): Boolean = true
             override suspend fun structured(prompt: String): Result<String> = Result.success(json)
         }
-        val hybrid = HybridTransactionParser(gateway, PromptBuilder())
+        val hybrid = HybridTransactionParser(gateway)
         val parser = TransactionParser(mm, hybrid)
         val res = parser.parse("spent 10 at cafe")
         assertThat(res.type).isEqualTo("Expense")
@@ -149,7 +147,7 @@ class TransactionParserGenAiTest {
             override fun isAvailable(): Boolean = true
             override suspend fun structured(prompt: String): Result<String> = Result.failure(IllegalStateException("bad output"))
         }
-        val hybrid = HybridTransactionParser(gateway, PromptBuilder())
+        val hybrid = HybridTransactionParser(gateway)
         val parser = TransactionParser(mm, hybrid)
         val res = parser.parse("Income paycheck two thousand")
         assertThat(res.type).isEqualTo("Income")

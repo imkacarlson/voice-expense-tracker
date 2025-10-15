@@ -5,7 +5,6 @@ import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.heuristic.FieldConfidenceThresholds
 import com.voiceexpense.ai.parsing.heuristic.FieldKey
 import com.voiceexpense.ai.parsing.heuristic.HeuristicExtractor
-import com.voiceexpense.ai.parsing.hybrid.ProcessingMethod
 import kotlinx.coroutines.runBlocking
 import org.junit.Test
 
@@ -27,7 +26,6 @@ class StagedParsingIntegrationTest {
         )
         val parser = HybridTransactionParser(
             genai = gateway,
-            promptBuilder = PromptBuilder(),
             heuristicExtractor = heuristicExtractor,
             thresholds = thresholds,
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = true)
@@ -50,7 +48,7 @@ class StagedParsingIntegrationTest {
     }
 
     @Test
-    fun staged_disabled_uses_legacy_pipeline() = runBlocking {
+    fun staged_disabled_uses_heuristics_only() = runBlocking {
         val response = "{" +
             "\"merchant\":\"Blue Bottle\"," +
             "\"description\":\"Coffee run\"," +
@@ -62,18 +60,15 @@ class StagedParsingIntegrationTest {
         val gateway = IntegrationFakeGateway(Result.success(response))
         val parser = HybridTransactionParser(
             genai = gateway,
-            promptBuilder = PromptBuilder(),
             heuristicExtractor = heuristicExtractor,
             stagedConfig = HybridTransactionParser.StagedParsingConfig(enabled = false)
         )
 
         val result = parser.parse("Coffee 6 dollars at Blue Bottle", ParsingContext())
 
-        assertThat(gateway.calls).isEqualTo(1)
-        assertThat(result.method).isEqualTo(ProcessingMethod.AI)
-        assertThat(result.rawJson).isNotNull()
-        assertThat(result.result.merchant).isEqualTo("Blue Bottle")
-        assertThat(result.result.description).isEqualTo("Coffee run")
+        assertThat(gateway.calls).isEqualTo(0)
+        assertThat(result.method).isEqualTo(ProcessingMethod.HEURISTIC)
+        assertThat(result.rawJson).isNull()
     }
 
     private class IntegrationFakeGateway(var result: Result<String>) : GenAiGateway {

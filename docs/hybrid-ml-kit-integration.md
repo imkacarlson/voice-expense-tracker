@@ -4,8 +4,7 @@ This document describes the hybrid transaction parsing pipeline that combines on
 
 ## Overview
 - Components:
-  - `FewShotExampleRepository`: curated utterances for few-shot prompting.
-  - `PromptBuilder`: composes system constraints, schema templates, context hints, and examples.
+  - `FocusedPromptBuilder`: builds compact, single-field prompts for the staged refinement loop.
   - `ValidationPipeline`: normalizes ML Kit output and validates schema/business rules.
   - `HybridTransactionParser`: orchestrates AI-first → validation → fallback.
   - `ConfidenceScorer`: multi-factor confidence scoring.
@@ -32,9 +31,9 @@ when (res.method) {
 `TransactionParser` internally uses the hybrid path when the model is ready, preserving its public API.
 
 ## Prompt Engineering
-- System instruction enforces strict JSON and field constraints.
-- Schema templates adjust guidance for Basic, Split, and Transfer contexts.
-- Few-shot selection adapts to input (transfer, split cues, income keywords) and app context.
+- Staged refinement prompts focus on one low-confidence field at a time, keeping instructions short and targeted.
+- `FocusedPromptBuilder` supplies field-specific guidelines (e.g., merchant vs. category) while reusing the user utterance verbatim.
+- Heuristic confidences determine which fields need prompting, avoiding unnecessary AI calls.
 
 ## Validation
 - `ValidationPipeline`:
@@ -56,7 +55,7 @@ when (res.method) {
   - Simple circuit breaker after 3 consecutive failures, encouraging fallback and backoff.
 
 ## Testing
-- Unit tests cover prompt building, validation pipeline, repository quality, and integration.
+- Unit tests cover the staged orchestrator, validation pipeline, and end-to-end hybrid parser integration.
 - Android tests benchmark performance and synthetic accuracy.
 
 ## Troubleshooting
@@ -64,4 +63,3 @@ when (res.method) {
 - Split rule failures: ensure `amountUsd <= splitOverallChargedUsd`.
 - Transfer category errors: `expenseCategory` and `incomeCategory` must be null for Transfer.
 - Repeated AI failures: circuit breaker opens; check model readiness and prompt size; fallback remains available.
-
