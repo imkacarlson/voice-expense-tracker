@@ -17,9 +17,9 @@ class TransactionDetailsActivity : AppCompatActivity() {
     @Inject lateinit var dao: TransactionDao
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        setupEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_transaction_details)
+        setupEdgeToEdge()
 
         val id = intent.getStringExtra(EXTRA_ID) ?: run { finish(); return }
         val title: TextView = findViewById(R.id.detail_title)

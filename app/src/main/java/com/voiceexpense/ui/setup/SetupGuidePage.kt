@@ -38,9 +38,9 @@ class SetupGuidePage : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        setupEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup_guide)
+        setupEdgeToEdge()
 
         // Back/up navigation on toolbar
         findViewById<MaterialToolbar>(R.id.toolbar)?.setNavigationOnClickListener {

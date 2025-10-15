@@ -65,9 +65,9 @@ class SettingsActivity : AppCompatActivity() {
     private fun prefsOrInit(): android.content.SharedPreferences =
         if (::prefs.isInitialized) prefs else getSharedPreferences(SettingsKeys.PREFS, Context.MODE_PRIVATE).also { prefs = it }
     override fun onCreate(savedInstanceState: Bundle?) {
-        setupEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_settings)
+        setupEdgeToEdge()
 
         // Back/up navigation on toolbar
         findViewById<MaterialToolbar>(R.id.toolbar)?.setNavigationOnClickListener {

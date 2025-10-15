@@ -81,9 +81,9 @@ class TransactionConfirmationActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        setupEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_transaction_confirmation)
+        setupEdgeToEdge()
 
         // Back/up navigation on toolbar
         findViewById<MaterialToolbar>(R.id.toolbar)?.setNavigationOnClickListener {

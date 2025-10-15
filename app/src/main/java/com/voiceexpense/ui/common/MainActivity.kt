@@ -44,9 +44,9 @@ class MainActivity : AppCompatActivity() {
     @javax.inject.Inject lateinit var configRepo: com.voiceexpense.data.config.ConfigRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        setupEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        setupEdgeToEdge()
 
         findViewById<Button>(R.id.btn_get_started).setOnClickListener {
             startActivity(Intent(this, com.voiceexpense.ui.setup.SetupGuidePage::class.java))
