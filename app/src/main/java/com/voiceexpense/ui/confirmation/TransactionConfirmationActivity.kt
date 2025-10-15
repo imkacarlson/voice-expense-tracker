@@ -29,6 +29,7 @@ import com.voiceexpense.ai.parsing.hybrid.FieldRefinementStatus
 import com.voiceexpense.data.repository.TransactionRepository
 import com.voiceexpense.data.config.ConfigRepository
 import com.voiceexpense.data.config.ConfigType
+import com.voiceexpense.ui.common.setupEdgeToEdge
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.Job
 import com.voiceexpense.data.config.DefaultField
@@ -80,8 +81,10 @@ class TransactionConfirmationActivity : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setupEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_transaction_confirmation)
+
         // Back/up navigation on toolbar
         findViewById<MaterialToolbar>(R.id.toolbar)?.setNavigationOnClickListener {
             onBackPressedDispatcher.onBackPressed()

@@ -44,6 +44,7 @@ class MainActivity : AppCompatActivity() {
     @javax.inject.Inject lateinit var configRepo: com.voiceexpense.data.config.ConfigRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setupEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 

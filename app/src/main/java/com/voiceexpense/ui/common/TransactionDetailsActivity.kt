@@ -17,6 +17,7 @@ class TransactionDetailsActivity : AppCompatActivity() {
     @Inject lateinit var dao: TransactionDao
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setupEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_transaction_details)
 

@@ -10,6 +10,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import com.google.android.material.appbar.MaterialToolbar
 import com.voiceexpense.R
 import com.voiceexpense.ai.model.ModelManager
+import com.voiceexpense.ui.common.setupEdgeToEdge
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -37,8 +38,10 @@ class SetupGuidePage : AppCompatActivity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        setupEdgeToEdge()
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_setup_guide)
+
         // Back/up navigation on toolbar
         findViewById<MaterialToolbar>(R.id.toolbar)?.setNavigationOnClickListener {
             onBackPressedDispatcher.onBackPressed()
