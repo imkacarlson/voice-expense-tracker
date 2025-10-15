@@ -340,7 +340,15 @@ class SettingsActivity : AppCompatActivity() {
         // Probe AI status lazily (ensureModelAvailable does IO internally, but keep off main)
         lifecycleScope.launch(Dispatchers.Main) {
             when (val s = modelManager.ensureModelAvailable(applicationContext)) {
-                is ModelManager.ModelStatus.Ready -> aiStatus.text = getString(R.string.setup_guide_status_ready)
+                is ModelManager.ModelStatus.Ready -> {
+                    val modelInfo = modelManager.getModelInfo(applicationContext)
+                    val statusText = if (modelInfo.fileName != null) {
+                        "${getString(R.string.setup_guide_status_ready)}: ${modelInfo.fileName}"
+                    } else {
+                        getString(R.string.setup_guide_status_ready)
+                    }
+                    aiStatus.text = statusText
+                }
                 is ModelManager.ModelStatus.Unavailable -> aiStatus.text = getString(R.string.setup_guide_status_unavailable, s.reason)
                 is ModelManager.ModelStatus.Error -> aiStatus.text = getString(R.string.setup_guide_status_error, s.throwable.message ?: "unknown")
             }

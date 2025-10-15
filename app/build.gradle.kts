@@ -5,6 +5,12 @@ plugins {
     id("kotlin-kapt")
 }
 
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
+}
+
 android {
     namespace = "com.voiceexpense"
     compileSdk = (project.findProperty("ANDROID_COMPILE_SDK") as String?)?.toInt() ?: 34
@@ -33,11 +39,11 @@ android {
     }
 
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     kotlinOptions {
-        jvmTarget = "17"
+        jvmTarget = "21"
         freeCompilerArgs += listOf(
             "-Xjvm-default=all"
         )
@@ -53,6 +59,13 @@ android {
 
 kapt {
     correctErrorTypes = true
+    arguments {
+        arg("jvm-target", "21")
+    }
+    javacOptions {
+        option("-source", "21")
+        option("-target", "21")
+    }
 }
 
 dependencies {

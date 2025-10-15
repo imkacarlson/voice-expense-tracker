@@ -76,16 +76,24 @@ class SetupGuidePage : AppCompatActivity() {
                 throw IllegalArgumentException("Invalid file type. Please select a .task or .litertlm file.")
             }
 
-            // Validate file is a zip archive (MediaPipe bundles are zip files)
-            val isValidZip = validateZipFile(uri)
-            if (!isValidZip) {
-                throw IllegalArgumentException("Invalid model file. File is not a valid zip archive. Please check the file integrity.")
-            }
-
             // Validate minimum file size (at least 10MB for a valid model)
             val fileSize = getFileSize(uri)
             if (fileSize < MIN_MODEL_SIZE_BYTES) {
                 throw IllegalArgumentException("File too small (${fileSize / (1024 * 1024)}MB). Model files should be at least ${MIN_MODEL_SIZE_BYTES / (1024 * 1024)}MB.")
+            }
+
+            // Log file header for debugging (MediaPipe will validate the format when loading)
+            logFileHeader(uri, "IMPORT_${extension.uppercase()}")
+
+            // Delete any existing model files to ensure only one model at a time
+            val llmDir = File(filesDir, com.voiceexpense.ai.model.ModelManager.MODEL_DIRECTORY)
+            if (llmDir.exists()) {
+                llmDir.listFiles { file ->
+                    file.isFile && (file.name.endsWith(".task") || file.name.endsWith(".litertlm"))
+                }?.forEach { existingModel ->
+                    android.util.Log.i("SetupGuide", "Removing existing model: ${existingModel.name}")
+                    existingModel.delete()
+                }
             }
 
             // Use the original filename to preserve extension
@@ -99,8 +107,10 @@ class SetupGuidePage : AppCompatActivity() {
                     copyStreams(input, output)
                 }
             }
+            android.util.Log.i("SetupGuide", "Successfully imported $fileName (${fileSize / (1024 * 1024)}MB)")
             true
         } catch (t: Throwable) {
+            android.util.Log.e("SetupGuide", "Import failed: ${t.message}", t)
             withContext(Dispatchers.Main) {
                 Toast.makeText(this@SetupGuidePage, getString(R.string.setup_guide_import_failure, t.message ?: "unknown"), Toast.LENGTH_LONG).show()
             }
@@ -145,17 +155,18 @@ class SetupGuidePage : AppCompatActivity() {
         return size
     }
 
-    private fun validateZipFile(uri: Uri): Boolean {
-        return try {
+    private fun logFileHeader(uri: Uri, tag: String) {
+        try {
             contentResolver.openInputStream(uri)?.use { input ->
-                // Check for zip file signature (PK\x03\x04)
-                val header = ByteArray(4)
+                val header = ByteArray(16)
                 val bytesRead = input.read(header)
-                bytesRead == 4 && header[0] == 0x50.toByte() && header[1] == 0x4B.toByte() &&
-                        header[2] == 0x03.toByte() && header[3] == 0x04.toByte()
-            } ?: false
+                val hexString = header.take(bytesRead).joinToString(" ") {
+                    String.format("%02X", it)
+                }
+                android.util.Log.i("SetupGuide", "$tag - File header (first $bytesRead bytes): $hexString")
+            }
         } catch (e: Exception) {
-            false
+            android.util.Log.w("SetupGuide", "$tag - Failed to read file header: ${e.message}")
         }
     }
 
