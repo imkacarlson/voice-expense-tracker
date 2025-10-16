@@ -33,5 +33,5 @@ object AiModule {
     fun provideHybridParser(gateway: GenAiGateway): HybridTransactionParser = HybridTransactionParser(gateway)
 
     @Provides
-    fun provideParser(mm: ModelManager, hybrid: HybridTransactionParser): TransactionParser = TransactionParser(mm, hybrid)
+    fun provideParser(hybrid: HybridTransactionParser): TransactionParser = TransactionParser(hybrid)
 }

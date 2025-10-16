@@ -27,6 +27,11 @@ class App : Application(), Configuration.Provider {
     override fun onCreate() {
         super.onCreate()
 
+        // Initialize parsing module logger
+        com.voiceexpense.ai.parsing.logging.Log.setLogger(
+            com.voiceexpense.logging.AndroidLogger()
+        )
+
         // Enable StrictMode in debug to surface disk/network on main thread
         if (isAppDebuggable()) {
             StrictMode.setThreadPolicy(
