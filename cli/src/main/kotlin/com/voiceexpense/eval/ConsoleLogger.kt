@@ -7,7 +7,7 @@ import com.voiceexpense.ai.parsing.logging.Logger
  */
 class ConsoleLogger : Logger {
     override fun d(tag: String, message: String) {
-        println("DEBUG [$tag]: $message")
+        System.err.println("DEBUG [$tag]: $message")
     }
 
     override fun e(tag: String, message: String, throwable: Throwable?) {
@@ -16,14 +16,14 @@ class ConsoleLogger : Logger {
     }
 
     override fun w(tag: String, message: String) {
-        println("WARN [$tag]: $message")
+        System.err.println("WARN [$tag]: $message")
     }
 
     override fun i(tag: String, message: String) {
-        println("INFO [$tag]: $message")
+        System.err.println("INFO [$tag]: $message")
     }
 
     override fun v(tag: String, message: String) {
-        println("VERBOSE [$tag]: $message")
+        System.err.println("VERBOSE [$tag]: $message")
     }
 }

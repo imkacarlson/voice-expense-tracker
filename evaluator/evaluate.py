@@ -44,7 +44,7 @@ FIELD_LABELS = {
 }
 
 
-@dataclass(slots=True)
+@dataclass
 class TestCase:
     """Structured representation of a single evaluation test case."""
 
@@ -61,7 +61,7 @@ class TestCase:
     notes: Optional[str]
 
 
-@dataclass(slots=True)
+@dataclass
 class PromptExchange:
     """Tracks a single prompt/response interaction with the AI model."""
 
@@ -70,7 +70,7 @@ class PromptExchange:
     response: Optional[str] = None
 
 
-@dataclass(slots=True)
+@dataclass
 class TestExecutionResult:
     """Outcome of running a single test case through the evaluator."""
 
@@ -86,7 +86,7 @@ class TestExecutionResult:
     ai_calls: int
 
 
-@dataclass(slots=True)
+@dataclass
 class FieldComparison:
     """Comparison result for a single parsed field."""
 
@@ -96,7 +96,7 @@ class FieldComparison:
     match: bool
 
 
-@dataclass(slots=True)
+@dataclass
 class TestComparison:
     """Comparison summary for a test case."""
 
@@ -105,7 +105,7 @@ class TestComparison:
     overall_match: bool
 
 
-@dataclass(slots=True)
+@dataclass
 class EvaluationMetrics:
     """Aggregate accuracy metrics across all test cases."""
 
@@ -121,7 +121,7 @@ class EvaluationMetrics:
     average_stage1_ms: Optional[float]
 
 
-@dataclass(slots=True)
+@dataclass
 class CliResponse:
     """Represents the decoded stdout payload from a CLI invocation."""
 

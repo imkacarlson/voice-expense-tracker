@@ -20,27 +20,41 @@ This tool wraps the production Kotlin parsing pipeline in a local CLI so you can
 2. **Install Python dependencies**
    ```bash
    cd evaluator
+   python -m venv venv
+   venv/Scripts/activate  # Windows
+   # OR: source venv/bin/activate  # Linux/Mac
    pip install -r requirements.txt
    ```
 
-3. **Provide configuration**
+3. **Authenticate with HuggingFace (for gated models like Gemma)**
+   - Visit https://huggingface.co/google/gemma-3-1b-it and click "Agree and access repository" to accept the license
+   - Get your access token from https://huggingface.co/settings/tokens (create a new token with "Read" permissions if needed)
+   - Log in via the CLI:
+     ```bash
+     huggingface-cli login
+     ```
+     Paste your token when prompted
+   - The model will be downloaded automatically on first run (~2GB) and cached locally for future runs
+
+4. **Provide configuration**
    - Copy your exported app configuration to `evaluator/config.json`.
    - The file must follow the ConfigImportSchema used by the Android app (categories, accounts, tags, defaults).
 
-4. **Create or edit test cases**
+5. **Create or edit test cases**
    - Open `evaluator/test_cases.md`.
    - Each row in the markdown table should include the utterance plus expected values (amount, merchant, type, category, tags, date, account, split overall, notes).
    - Leave cells blank for fields that are not relevant to a scenario.
 
 ## Running an evaluation
 
-Once orchestration CLI flags are wired up, you will be able to execute:
-
 ```bash
 python evaluate.py \
   --model google/gemma-3-1b-it \
-  --jar ../cli/build/libs/cli.jar
+  --test test-001 \
+  --java "C:\Program Files\Android\Android Studio\jbr\bin\java.exe"
 ```
+
+**Note:** On Windows, if your Java path contains spaces, use the `--java` flag to specify the full path to Java 21+ (required by the CLI jar).
 
 The workflow performs two phases per test case:
 1. Call the Kotlin CLI to determine whether AI assistance (prompt generation) is required.
