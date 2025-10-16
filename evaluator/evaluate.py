@@ -2,16 +2,18 @@
 
 from __future__ import annotations
 
+import argparse
 import json
+import shlex
 import subprocess
 import sys
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import Any, List, Mapping, MutableMapping, Optional
+from typing import Any, Collection, List, Mapping, MutableMapping, Optional
 
-from models import ModelInference
+from models import ModelInference, SUPPORTED_MODELS
 
 CLI_TIMEOUT_SECONDS = 30
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -385,6 +387,7 @@ def execute_test_case(
     model: ModelInference,
     base_context: Mapping[str, Any],
     jar_path: Optional[Path] = None,
+    java_cmd: tuple[str, ...] = DEFAULT_JAVA_CMD,
 ) -> TestExecutionResult:
     context = dict(base_context)
     if case.expected_date:
@@ -396,7 +399,11 @@ def execute_test_case(
     heuristic_results: Optional[MutableMapping[str, Any]] = None
 
     try:
-        first = run_cli(build_cli_payload(case.utterance, context), jar_path=jar_path)
+        first = run_cli(
+            build_cli_payload(case.utterance, context),
+            jar_path=jar_path,
+            java_cmd=java_cmd,
+        )
     except CliInvocationError as exc:
         errors.append(f"CLI error (stage1): {exc}")
         return TestExecutionResult(
@@ -467,8 +474,13 @@ def execute_test_case(
 
         try:
             final_response = run_cli(
-                build_cli_payload(case.utterance, context, model_responses=ai_responses),
+                build_cli_payload(
+                    case.utterance,
+                    context,
+                    model_responses=ai_responses,
+                ),
                 jar_path=jar_path,
+                java_cmd=java_cmd,
             )
         except CliInvocationError as exc:
             errors.append(f"CLI error (stage2): {exc}")
@@ -510,12 +522,31 @@ def run_evaluation(
     test_cases_path: Optional[Path] = None,
     config_path: Optional[Path] = None,
     jar_path: Optional[Path] = None,
+    only_test_ids: Optional[Collection[str]] = None,
+    java_cmd: Optional[tuple[str, ...]] = None,
 ) -> List[TestExecutionResult]:
     """Execute the full evaluation workflow for all test cases."""
 
     test_cases = load_test_cases(test_cases_path)
+    if only_test_ids:
+        normalized_ids = {
+            str(identifier).strip()
+            for identifier in only_test_ids
+            if str(identifier).strip()
+        }
+        if normalized_ids:
+            filtered_cases: List[TestCase] = [
+                case for case in test_cases if case.identifier in normalized_ids
+            ]
+            missing = sorted(normalized_ids - {case.identifier for case in filtered_cases})
+            for missing_id in missing:
+                print(f"Warning: test ID '{missing_id}' not found in test_cases.md", file=sys.stderr)
+            if not filtered_cases:
+                return []
+            test_cases = filtered_cases
     base_context = load_config_context(config_path)
     model = ModelInference(model_name)
+    java_cmd = java_cmd or DEFAULT_JAVA_CMD
 
     results: List[TestExecutionResult] = []
     for case in test_cases:
@@ -524,6 +555,7 @@ def run_evaluation(
             model=model,
             base_context=base_context,
             jar_path=jar_path,
+            java_cmd=java_cmd,
         )
         results.append(result)
     return results
@@ -917,13 +949,107 @@ def _mean(values: List[float]) -> Optional[float]:
     return (sum(values) / len(values)) if values else None
 
 
-def main() -> None:  # pragma: no cover - stub entry point
-    """Placeholder entrypoint until orchestration is implemented."""
-    print(
-        "Evaluator modules initialized. Implement the orchestration logic before running main().",
-        file=sys.stderr,
+def parse_cli_args(argv: Optional[List[str]] = None) -> argparse.Namespace:
+    parser = argparse.ArgumentParser(
+        description="Run the AI parsing evaluator against configured test cases.",
     )
-    raise SystemExit(1)
+    parser.add_argument(
+        "--model",
+        required=True,
+        choices=SUPPORTED_MODELS,
+        help="HuggingFace model identifier to use for AI refinement.",
+    )
+    parser.add_argument(
+        "--jar",
+        type=Path,
+        help="Path to the Kotlin CLI jar. Defaults to the latest build in cli/build/libs.",
+    )
+    parser.add_argument(
+        "--config",
+        type=Path,
+        default=CONFIG_FILE,
+        help="Path to config.json exported from the app (defaults to evaluator/config.json).",
+    )
+    parser.add_argument(
+        "--test-cases",
+        type=Path,
+        default=TEST_CASES_FILE,
+        help="Path to the markdown table of test cases (defaults to evaluator/test_cases.md).",
+    )
+    parser.add_argument(
+        "--test",
+        dest="tests",
+        action="append",
+        help="Limit evaluation to specific test case IDs. Supply multiple times to include several IDs.",
+    )
+    parser.add_argument(
+        "--results-dir",
+        type=Path,
+        default=RESULTS_DIR,
+        help="Directory to write markdown reports (defaults to evaluator/results/).",
+    )
+    parser.add_argument(
+        "--java",
+        metavar="CMD",
+        help="Override the java command used to launch the CLI (e.g. 'java -Xmx4g').",
+    )
+    return parser.parse_args(argv)
+
+
+def main(argv: Optional[List[str]] = None) -> None:  # pragma: no cover - CLI entrypoint
+    args = parse_cli_args(argv)
+    java_cmd: Optional[tuple[str, ...]] = None
+    if args.java:
+        tokens = shlex.split(args.java)
+        if not tokens:
+            print("Error: --java command is empty after parsing.", file=sys.stderr)
+            raise SystemExit(2)
+        java_cmd = tuple(tokens)
+
+    try:
+        executions = run_evaluation(
+            model_name=args.model,
+            test_cases_path=args.test_cases,
+            config_path=args.config,
+            jar_path=args.jar,
+            only_test_ids=args.tests,
+            java_cmd=java_cmd,
+        )
+    except FileNotFoundError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(2) from exc
+    except (RuntimeError, ValueError) as exc:
+        print(f"Error: {exc}", file=sys.stderr)
+        raise SystemExit(3) from exc
+
+    if not executions:
+        print("No matching test cases to execute.", file=sys.stderr)
+        raise SystemExit(4)
+
+    comparisons = compare_results(executions)
+    metrics = compute_metrics(comparisons)
+    results_path, summary_path = write_markdown_reports(
+        comparisons,
+        metrics,
+        output_dir=args.results_dir,
+    )
+
+    print(f"Model: {args.model}")
+    print(f"Tests processed: {metrics.total_tests}")
+    print(f"Passed: {metrics.passed_tests} | Failed: {metrics.total_tests - metrics.passed_tests}")
+    print(f"Results written to: {results_path}")
+    print(f"Summary written to: {summary_path}")
+
+    failing = [
+        comp.execution.case.identifier
+        for comp in comparisons
+        if not comp.overall_match
+    ]
+    if failing:
+        print("Failing test IDs: " + ", ".join(failing), file=sys.stderr)
+        raise SystemExit(5)
+
+    raise SystemExit(0)
 
 
 if __name__ == "__main__":
