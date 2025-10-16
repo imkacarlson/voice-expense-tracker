@@ -8,6 +8,7 @@ import com.voiceexpense.ai.parsing.ParsedResult
 import com.voiceexpense.ai.parsing.ParsingContext
 import com.voiceexpense.ai.parsing.TransactionParser
 import com.voiceexpense.ai.parsing.heuristic.HeuristicDraft
+import com.voiceexpense.ai.parsing.hybrid.HybridParsingResult
 import com.voiceexpense.ai.parsing.hybrid.HybridTransactionParser
 import com.voiceexpense.ai.parsing.hybrid.ProcessingMethod
 import kotlinx.coroutines.runBlocking
@@ -25,6 +26,9 @@ private val completeAdapter = moshi.adapter(CliOutputComplete::class.java)
 private val errorAdapter = moshi.adapter(CliError::class.java)
 
 fun main() {
+    // Initialize console logger for parsing module
+    com.voiceexpense.ai.parsing.logging.Log.setLogger(ConsoleLogger())
+
     val stdin = readStdin()
     if (stdin.isBlank()) {
         emitError("EMPTY_INPUT", "No input provided on stdin")

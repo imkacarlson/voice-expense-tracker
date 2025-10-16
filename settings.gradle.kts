@@ -17,3 +17,4 @@ dependencyResolutionManagement {
 rootProject.name = "voice-expense-tracker"
 include(":app")
 include(":cli")
+include(":parsing")

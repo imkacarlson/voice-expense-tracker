@@ -69,6 +69,9 @@ kapt {
 }
 
 dependencies {
+    // Shared parsing library
+    implementation(project(":parsing"))
+
     // Kotlin and Android core
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")

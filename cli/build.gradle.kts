@@ -1,8 +1,7 @@
-import org.gradle.api.tasks.bundling.DuplicatesStrategy
 import org.gradle.jvm.tasks.Jar
 
 plugins {
-    kotlin("jvm") version "2.0.21"
+    kotlin("jvm")
     application
 }
 
@@ -15,7 +14,7 @@ application {
 }
 
 dependencies {
-    implementation(project(":app"))
+    implementation(project(":parsing"))
     implementation("com.squareup.moshi:moshi-kotlin:1.15.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
 }
