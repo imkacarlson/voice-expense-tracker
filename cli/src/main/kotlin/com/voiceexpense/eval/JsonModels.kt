@@ -2,7 +2,6 @@ package com.voiceexpense.eval
 
 import com.squareup.moshi.Json
 import com.squareup.moshi.JsonClass
-import java.math.BigDecimal
 
 /**
  * Data model for stdin payload consumed by the CLI. The shape mirrors the Python orchestrator
@@ -61,7 +60,7 @@ data class CliOutputComplete(
 /** Compact snapshot of the parsed result for JSON interchange. */
 @JsonClass(generateAdapter = true)
 data class ParsedSnapshot(
-    val amountUsd: BigDecimal?,
+    val amountUsd: Double?,
     val merchant: String?,
     val description: String?,
     val type: String?,
@@ -71,21 +70,21 @@ data class ParsedSnapshot(
     @Json(name = "userLocalDate")
     val userLocalDateIso: String?,
     val account: String?,
-    val splitOverallChargedUsd: BigDecimal?,
+    val splitOverallChargedUsd: Double?,
     val confidence: Float?
 )
 
 /** Summary of heuristic output returned when AI refinement is required. */
 @JsonClass(generateAdapter = true)
 data class HeuristicSummary(
-    val amountUsd: BigDecimal?,
+    val amountUsd: Double?,
     val merchant: String?,
     val description: String?,
     val type: String?,
     val expenseCategory: String?,
     val incomeCategory: String?,
     val tags: List<String>? = null,
-    val splitOverallChargedUsd: BigDecimal? = null,
+    val splitOverallChargedUsd: Double? = null,
     val account: String?,
     val confidence: Float?
 )

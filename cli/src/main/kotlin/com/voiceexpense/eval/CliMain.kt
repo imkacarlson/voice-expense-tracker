@@ -82,7 +82,7 @@ fun main() {
 }
 
 private fun ParsedResult.toSnapshot(): ParsedSnapshot = ParsedSnapshot(
-    amountUsd = amountUsd,
+    amountUsd = amountUsd?.toDouble(),
     merchant = merchant,
     description = description,
     type = type,
@@ -91,7 +91,7 @@ private fun ParsedResult.toSnapshot(): ParsedSnapshot = ParsedSnapshot(
     tags = tags,
     userLocalDateIso = userLocalDate.toString(),
     account = account,
-    splitOverallChargedUsd = splitOverallChargedUsd,
+    splitOverallChargedUsd = splitOverallChargedUsd?.toDouble(),
     confidence = confidence
 )
 
@@ -117,14 +117,14 @@ private fun CliContext?.toParsingContext(): ParsingContext {
 }
 
 private fun HeuristicDraft.toSummary(parsed: ParsedResult): HeuristicSummary = HeuristicSummary(
-    amountUsd = amountUsd,
+    amountUsd = amountUsd?.toDouble(),
     merchant = merchant,
     description = description,
     type = type,
     expenseCategory = expenseCategory,
     incomeCategory = incomeCategory,
     tags = tags,
-    splitOverallChargedUsd = splitOverallChargedUsd,
+    splitOverallChargedUsd = splitOverallChargedUsd?.toDouble(),
     account = account,
     confidence = coverageScore
 )

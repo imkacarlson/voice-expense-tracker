@@ -1,2 +1,8 @@
 results/
 __pycache__/
+venv/
+*.pyc
+
+# Private test data - contains personal expense information
+test_cases.md
+config.json
