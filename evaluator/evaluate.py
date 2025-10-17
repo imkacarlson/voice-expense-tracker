@@ -58,7 +58,6 @@ class TestCase:
     expected_date: Optional[date]
     expected_account: Optional[str]
     expected_split_overall: Optional[Decimal]
-    notes: Optional[str]
 
 
 @dataclass
@@ -254,7 +253,6 @@ def build_test_case(row: Mapping[str, str], *, line_number: int) -> Optional[Tes
         expected_date=parse_date(row.get("date")),
         expected_account=normalize_string(row.get("account")),
         expected_split_overall=parse_decimal(row.get("split_overall")),
-        notes=normalize_string(row.get("notes")),
     )
 
 

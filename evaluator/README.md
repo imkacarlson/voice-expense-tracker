@@ -42,7 +42,7 @@ This tool wraps the production Kotlin parsing pipeline in a local CLI so you can
 
 5. **Create or edit test cases**
    - Open `evaluator/test_cases.md`.
-   - Each row in the markdown table should include the utterance plus expected values (amount, merchant, type, category, tags, date, account, split overall, notes).
+   - Each row in the markdown table should include the utterance plus expected values (amount, merchant, type, category, tags, date, account, split overall).
    - Leave cells blank for fields that are not relevant to a scenario.
 
 ## Running an evaluation
