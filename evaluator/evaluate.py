@@ -127,6 +127,18 @@ class EvaluationMetrics:
 
 
 @dataclass
+class PendingStageTwo:
+    """Holds intermediate data for cases that require AI refinement."""
+
+    case: TestCase
+    context: MutableMapping[str, Any]
+    first_response: CliResponse
+    prompts: List[PromptExchange]
+    heuristic_results: Optional[MutableMapping[str, Any]]
+    heuristic_stats: Optional[MutableMapping[str, Any]]
+
+
+@dataclass
 class CliResponse:
     """Represents the decoded stdout payload from a CLI invocation."""
 
@@ -386,6 +398,67 @@ def run_cli(
     return CliResponse(data=data, stdout=stdout, stderr=stderr, returncode=completed.returncode)
 
 
+def _build_case_context(case: TestCase, base_context: Mapping[str, Any]) -> MutableMapping[str, Any]:
+    """Build the CLI context for a specific test case."""
+    context = dict(base_context)
+    if case.expected_date:
+        context["defaultDate"] = case.expected_date.isoformat()
+    return context
+
+
+def _collect_prompt_exchanges(prompt_entries: Collection[Any]) -> List[PromptExchange]:
+    """Convert CLI prompt entries into structured exchanges."""
+    exchanges: List[PromptExchange] = []
+    for entry in prompt_entries:
+        if not isinstance(entry, Mapping):
+            continue
+        field = normalize_string(str(entry.get("field", "")))
+        prompt_text = normalize_string(entry.get("prompt"))
+        if not field or not prompt_text:
+            continue
+        exchanges.append(PromptExchange(field=field, prompt=prompt_text))
+    return exchanges
+
+
+def _build_test_execution_result(
+    case: TestCase,
+    prompts: List[PromptExchange],
+    response: CliResponse,
+    heuristic_results: Optional[MutableMapping[str, Any]],
+    heuristic_stats: Optional[MutableMapping[str, Any]],
+    errors: Collection[str],
+) -> TestExecutionResult:
+    """Assemble the final TestExecutionResult from a CLI response."""
+
+    parsed = response.data.get("parsed") if isinstance(response.data.get("parsed"), MutableMapping) else None
+    stats = response.data.get("stats") if isinstance(response.data.get("stats"), MutableMapping) else {}
+    method = normalize_string(response.data.get("method"))
+
+    if isinstance(response.data.get("heuristic_results"), MutableMapping):
+        heuristic_results = response.data["heuristic_results"]  # type: ignore[assignment]
+    if isinstance(response.data.get("heuristic_stats"), MutableMapping):
+        heuristic_stats = response.data["heuristic_stats"]  # type: ignore[assignment]
+
+    error_list = list(errors)
+    if response.status == "error":
+        message = normalize_string(response.data.get("message"))
+        if message:
+            error_list.append(message)
+
+    return TestExecutionResult(
+        case=case,
+        status=response.status,
+        parsed=parsed,
+        method=method,
+        prompts=prompts,
+        stats=stats if isinstance(stats, MutableMapping) else {},
+        heuristic_results=heuristic_results,
+        heuristic_stats=heuristic_stats,
+        errors=error_list,
+        ai_calls=len([p for p in prompts if p.response]),
+    )
+
+
 def execute_test_case(
     case: TestCase,
     *,
@@ -394,10 +467,7 @@ def execute_test_case(
     jar_path: Optional[Path] = None,
     java_cmd: tuple[str, ...] = DEFAULT_JAVA_CMD,
 ) -> TestExecutionResult:
-    context = dict(base_context)
-    if case.expected_date:
-        context["defaultDate"] = case.expected_date.isoformat()
-
+    context = _build_case_context(case, base_context)
     prompts: List[PromptExchange] = []
     errors: List[str] = []
     heuristic_stats: Optional[MutableMapping[str, Any]] = None
@@ -447,23 +517,11 @@ def execute_test_case(
     final_response = first
 
     if first.status == "needs_ai":
-        prompt_entries = first.data.get("prompts_needed") or []
+        exchanges_for_generation = _collect_prompt_exchanges(first.data.get("prompts_needed") or [])
         ai_responses: MutableMapping[str, str] = {}
-        exchanges_for_generation: List[PromptExchange] = []
-        prompts_to_generate: List[str] = []
-        for entry in prompt_entries:
-            if not isinstance(entry, Mapping):
-                continue
-            field = normalize_string(str(entry.get("field", "")))
-            prompt_text = normalize_string(entry.get("prompt"))
-            if not field or not prompt_text:
-                continue
-            exchange = PromptExchange(field=field, prompt=prompt_text)
-            exchanges_for_generation.append(exchange)
-            prompts.append(exchange)
-            prompts_to_generate.append(prompt_text)
-
-        if prompts_to_generate:
+        prompts.extend(exchanges_for_generation)
+        if exchanges_for_generation:
+            prompts_to_generate = [exchange.prompt for exchange in exchanges_for_generation]
             try:
                 responses = model.generate_batch(prompts_to_generate)
             except Exception as exc:  # pragma: no cover - model runtime issue
@@ -573,22 +631,206 @@ def run_evaluation(
             if not filtered_cases:
                 return []
             test_cases = filtered_cases
+
     base_context = load_config_context(config_path)
     model = ModelInference(model_name)
     resolved_jar_path = jar_path or find_cli_jar()
     java_cmd = java_cmd or DEFAULT_JAVA_CMD
 
-    results: List[TestExecutionResult] = []
-    for case in tqdm(test_cases, desc="Running tests", unit="test"):
-        result = execute_test_case(
-            case,
-            model=model,
-            base_context=base_context,
-            jar_path=resolved_jar_path,
-            java_cmd=java_cmd,
+    total_cases = len(test_cases)
+    results: List[Optional[TestExecutionResult]] = [None] * total_cases
+    pending_stage_two: List[tuple[int, PendingStageTwo]] = []
+
+    progress = tqdm(total=total_cases, desc="Running tests", unit="test")
+
+    for idx, case in enumerate(test_cases):
+        context = _build_case_context(case, base_context)
+        errors: List[str] = []
+        try:
+            first_response = run_cli(
+                build_cli_payload(case.utterance, context),
+                jar_path=resolved_jar_path,
+                java_cmd=java_cmd,
+            )
+        except CliInvocationError as exc:
+            errors.append(f"CLI error (stage1): {exc}")
+            results[idx] = TestExecutionResult(
+                case=case,
+                status="cli_error",
+                parsed=None,
+                method=None,
+                prompts=[],
+                stats={},
+                heuristic_results=None,
+                heuristic_stats=None,
+                errors=errors,
+                ai_calls=0,
+            )
+            progress.update(1)
+            continue
+
+        heuristic_stats = first_response.data.get("stats") if isinstance(first_response.data.get("stats"), MutableMapping) else None
+        heuristic_results = first_response.data.get("heuristic_results") if isinstance(first_response.data.get("heuristic_results"), MutableMapping) else None
+
+        if first_response.status == "error":
+            errors.append(str(first_response.data.get("message", "CLI reported error")))
+            results[idx] = _build_test_execution_result(
+                case,
+                [],
+                first_response,
+                heuristic_results,
+                heuristic_stats,
+                errors,
+            )
+            progress.update(1)
+            continue
+
+        if first_response.status != "needs_ai":
+            results[idx] = _build_test_execution_result(
+                case,
+                [],
+                first_response,
+                heuristic_results,
+                heuristic_stats,
+                errors,
+            )
+            progress.update(1)
+            continue
+
+        exchanges = _collect_prompt_exchanges(first_response.data.get("prompts_needed") or [])
+        pending_stage_two.append(
+            (
+                idx,
+                PendingStageTwo(
+                    case=case,
+                    context=context,
+                    first_response=first_response,
+                    prompts=exchanges,
+                    heuristic_results=heuristic_results,
+                    heuristic_stats=heuristic_stats,
+                ),
+            )
         )
-        results.append(result)
-    return results
+
+    total_prompts = sum(len(pending.prompts) for _, pending in pending_stage_two)
+    batched_responses: List[str] = []
+
+    if total_prompts:
+        all_prompts: List[str] = []
+        for _, pending in pending_stage_two:
+            all_prompts.extend(exchange.prompt for exchange in pending.prompts)
+        try:
+            batched_responses = model.generate_batch(all_prompts)
+        except Exception as exc:  # pragma: no cover - model runtime issue
+            error_message = f"Model inference failed: {exc}"
+            for idx, pending in pending_stage_two:
+                errors = [error_message]
+                results[idx] = TestExecutionResult(
+                    case=pending.case,
+                    status="model_error",
+                    parsed=None,
+                    method=None,
+                    prompts=pending.prompts,
+                    stats={},
+                    heuristic_results=pending.heuristic_results,
+                    heuristic_stats=pending.heuristic_stats,
+                    errors=errors,
+                    ai_calls=len([p for p in pending.prompts if p.response]),
+                )
+                progress.update(1)
+            progress.close()
+            return [res for res in results if res is not None]
+
+        if len(batched_responses) != total_prompts:  # pragma: no cover - defensive
+            error_message = (
+                f"Model returned {len(batched_responses)} responses for {total_prompts} prompts."
+            )
+            for idx, pending in pending_stage_two:
+                errors = [error_message]
+                results[idx] = TestExecutionResult(
+                    case=pending.case,
+                    status="model_error",
+                    parsed=None,
+                    method=None,
+                    prompts=pending.prompts,
+                    stats={},
+                    heuristic_results=pending.heuristic_results,
+                    heuristic_stats=pending.heuristic_stats,
+                    errors=errors,
+                    ai_calls=len([p for p in pending.prompts if p.response]),
+                )
+                progress.update(1)
+            progress.close()
+            return [res for res in results if res is not None]
+
+    response_iter = iter(batched_responses)
+    for idx, pending in pending_stage_two:
+        ai_responses: MutableMapping[str, str] = {}
+        errors: List[str] = []
+        for exchange in pending.prompts:
+            try:
+                response_text = next(response_iter)
+            except StopIteration:
+                errors.append("Model provided insufficient responses for queued prompts.")
+                break
+            exchange.response = response_text
+            ai_responses[exchange.field] = response_text
+
+        if errors:
+            results[idx] = TestExecutionResult(
+                case=pending.case,
+                status="model_error",
+                parsed=None,
+                method=None,
+                prompts=pending.prompts,
+                stats={},
+                heuristic_results=pending.heuristic_results,
+                heuristic_stats=pending.heuristic_stats,
+                errors=errors,
+                ai_calls=len([p for p in pending.prompts if p.response]),
+            )
+            progress.update(1)
+            continue
+
+        try:
+            final_response = run_cli(
+                build_cli_payload(
+                    pending.case.utterance,
+                    pending.context,
+                    model_responses=ai_responses,
+                ),
+                jar_path=resolved_jar_path,
+                java_cmd=java_cmd,
+            )
+        except CliInvocationError as exc:
+            results[idx] = TestExecutionResult(
+                case=pending.case,
+                status="cli_error",
+                parsed=None,
+                method=None,
+                prompts=pending.prompts,
+                stats={},
+                heuristic_results=pending.heuristic_results,
+                heuristic_stats=pending.heuristic_stats,
+                errors=[f"CLI error (stage2): {exc}"],
+                ai_calls=len([p for p in pending.prompts if p.response]),
+            )
+            progress.update(1)
+            continue
+
+        results[idx] = _build_test_execution_result(
+            pending.case,
+            pending.prompts,
+            final_response,
+            pending.heuristic_results,
+            pending.heuristic_stats,
+            [],
+        )
+        progress.update(1)
+
+    progress.close()
+
+    return [res for res in results if res is not None]
 
 
 def compare_results(executions: List[TestExecutionResult]) -> List[TestComparison]:
