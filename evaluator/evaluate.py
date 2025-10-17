@@ -7,6 +7,7 @@ import json
 import shlex
 import subprocess
 import sys
+import time
 from dataclasses import dataclass
 from datetime import date, datetime
 from decimal import Decimal, InvalidOperation
@@ -23,7 +24,7 @@ DEFAULT_JAVA_CMD = ("java",)
 TEST_CASES_FILE = Path(__file__).resolve().with_name("test_cases.md")
 CONFIG_FILE = Path(__file__).resolve().with_name("config.json")
 RESULTS_DIR = Path(__file__).resolve().with_name("results")
-AI_GENERATION_CHUNK_SIZE = 8
+AI_GENERATION_CHUNK_SIZE = 4
 DECIMAL_TOLERANCE = Decimal("0.01")
 FIELD_ORDER = [
     "amountUsd",
@@ -650,8 +651,20 @@ def run_evaluation(
     results: List[Optional[TestExecutionResult]] = [None] * total_cases
     pending_stage_two: List[tuple[int, PendingStageTwo]] = []
 
-    stage1_bar = tqdm(total=total_cases, desc="Stage 1 (CLI heuristics)", unit="test")
-    completed_bar = tqdm(total=total_cases, desc="Completed tests", unit="test")
+    stage1_bar = tqdm(
+        total=total_cases,
+        desc="Stage 1 (CLI heuristics)",
+        unit="test",
+        position=0,
+        leave=True,
+    )
+    completed_bar = tqdm(
+        total=total_cases,
+        desc="Completed tests",
+        unit="test",
+        position=2,
+        leave=True,
+    )
 
     for idx, case in enumerate(test_cases):
         context = _build_case_context(case, base_context)
@@ -736,10 +749,26 @@ def run_evaluation(
         for _, pending in pending_stage_two:
             all_prompts.extend(exchange.prompt for exchange in pending.prompts)
         tqdm.write(f"Running batched AI generation for {total_prompts} prompt(s)...")
-        ai_bar = tqdm(total=total_prompts, desc="Stage 2 (AI prompts)", unit="prompt")
+        ai_bar = tqdm(
+            total=total_prompts,
+            desc="Stage 2 (AI prompts)",
+            unit="prompt",
+            position=1,
+            leave=True,
+        )
+        total_duration = 0.0
         try:
             batched_chunks = _chunked(all_prompts, AI_GENERATION_CHUNK_SIZE)
-            for chunk in batched_chunks:
+            total_chunks = len(batched_chunks) if batched_chunks else 0
+            ai_generation_start = time.perf_counter()
+            for chunk_index, chunk in enumerate(batched_chunks, start=1):
+                processed = len(batched_responses)
+                start_prompt_index = processed + 1
+                end_prompt_index = processed + len(chunk)
+                tqdm.write(
+                    f"Stage 2 chunk {chunk_index}/{total_chunks}: prompts {start_prompt_index}-{end_prompt_index}"
+                )
+                chunk_start = time.perf_counter()
                 try:
                     chunk_responses = model.generate_batch(chunk)
                 except Exception as exc:  # pragma: no cover - model runtime issue
@@ -750,6 +779,16 @@ def run_evaluation(
                     )
                 batched_responses.extend(chunk_responses)
                 ai_bar.update(len(chunk_responses))
+                chunk_duration = time.perf_counter() - chunk_start
+                ai_bar.set_postfix(
+                    chunk=f"{chunk_index}/{total_chunks}",
+                    last=f"{chunk_duration:.1f}s",
+                )
+                tqdm.write(
+                    f"Stage 2 chunk {chunk_index}/{total_chunks} finished in "
+                    f"{chunk_duration:.1f}s (processed {len(batched_responses)}/{total_prompts} prompts)."
+                )
+            total_duration = time.perf_counter() - ai_generation_start
         except Exception as exc:
             ai_bar.close()
             error_message = str(exc)
@@ -772,6 +811,7 @@ def run_evaluation(
             return [res for res in results if res is not None]
         finally:
             ai_bar.close()
+        tqdm.write(f"AI generation complete in {total_duration:.1f}s.")
         if len(batched_responses) != total_prompts:  # pragma: no cover - defensive
             error_message = (
                 f"Model returned {len(batched_responses)} responses for {total_prompts} prompts."
