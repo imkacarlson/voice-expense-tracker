@@ -168,14 +168,58 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             setTextColor(if (missing) android.graphics.Color.parseColor("#E65100") else android.graphics.Color.BLACK)
         }
 
+        // Helper function to update transaction from current UI state and re-validate
+        fun updateTransactionFromUI() {
+            val current = viewModel.transaction.value ?: return
+
+            fun parseAmount(text: String): java.math.BigDecimal? =
+                text.trim().takeIf { it.isNotEmpty() }?.let { runCatching { java.math.BigDecimal(it) }.getOrNull() }
+
+            val newAmount = parseAmount(amountView.text?.toString() ?: "")
+            val newOverall = parseAmount(overallView.text?.toString() ?: "")
+            val newMerchant = (merchantView.text?.toString() ?: "").trim()
+            val newDescription = (descView.text?.toString() ?: "").trim().ifEmpty { null }
+            val categoryText = (categorySpinner.selectedItem?.toString() ?: "").trim().ifEmpty { null }
+            val newExpenseCategory = if (current.type == com.voiceexpense.data.model.TransactionType.Expense) categoryText else null
+            val newIncomeCategory = if (current.type == com.voiceexpense.data.model.TransactionType.Income) categoryText else null
+            val newTags = (tagsView.text?.toString() ?: "").split(',').map { it.trim() }.filter { it.isNotEmpty() }
+            val selectedAccount = (accountSpinner.selectedItem?.toString() ?: "").trim()
+            val newAccount = if (selectedAccount == "None" || selectedAccount.isEmpty()) null else selectedAccount
+
+            val updated = current.copy(
+                amountUsd = newAmount,
+                splitOverallChargedUsd = newOverall,
+                merchant = newMerchant,
+                description = newDescription,
+                expenseCategory = newExpenseCategory,
+                incomeCategory = newIncomeCategory,
+                tags = newTags,
+                account = newAccount
+            )
+
+            viewModel.applyManualEdits(updated)
+        }
+
+        amountView.doAfterTextChanged {
+            if (amountView.hasFocus()) {
+                updateTransactionFromUI()
+            }
+        }
+        overallView.doAfterTextChanged {
+            if (overallView.hasFocus()) {
+                updateTransactionFromUI()
+            }
+        }
         merchantView.doAfterTextChanged {
             if (merchantView.hasFocus()) {
                 viewModel.markFieldUserModified(FieldKey.MERCHANT)
+                updateTransactionFromUI()
             }
         }
         descView.doAfterTextChanged {
             if (descView.hasFocus()) {
                 viewModel.markFieldUserModified(FieldKey.DESCRIPTION)
+                updateTransactionFromUI()
             }
         }
         var categoryUserChange = false
@@ -195,6 +239,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                         com.voiceexpense.data.model.TransactionType.Income -> viewModel.markFieldUserModified(FieldKey.INCOME_CATEGORY)
                         else -> {}
                     }
+                    updateTransactionFromUI()
                     categoryUserChange = false
                 }
             }
@@ -213,6 +258,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
             override fun onItemSelected(parent: AdapterView<*>?, view: View?, position: Int, id: Long) {
                 if (accountUserChange) {
                     viewModel.markFieldUserModified(FieldKey.ACCOUNT)
+                    updateTransactionFromUI()
                     accountUserChange = false
                 }
             }
@@ -486,6 +532,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
                         val selected = labels.filterIndexed { index, _ -> checked[index] }
                         tagsView.setText(selected.joinToString(", "))
                         viewModel.markFieldUserModified(FieldKey.TAGS)
+                        updateTransactionFromUI()
                     }
                     .setNegativeButton("Cancel", null)
                     .show()
