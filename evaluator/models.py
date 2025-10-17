@@ -77,22 +77,43 @@ class ModelInference:
         )
         if self.device == "cpu":
             self.model = self.model.to(self.device)
+        self.model.eval()
 
     def generate(self, prompt: str, *, system_prompt: Optional[str] = None) -> str:
         """Generate a deterministic response for the supplied prompt."""
-        chat = self._build_messages(prompt, system_prompt)
-        template = self.tokenizer.apply_chat_template(
-            chat,
-            tokenize=False,
-            add_generation_prompt=True,
-        )
+        responses = self.generate_batch([prompt], system_prompt=system_prompt)
+        return responses[0]
+
+    def generate_batch(
+        self,
+        prompts: List[str],
+        *,
+        system_prompt: Optional[str] = None,
+    ) -> List[str]:
+        """Generate deterministic responses for a batch of prompts."""
+        if not prompts:
+            return []
+
+        chats = [self._build_messages(prompt, system_prompt) for prompt in prompts]
+        templates = [
+            self.tokenizer.apply_chat_template(
+                chat,
+                tokenize=False,
+                add_generation_prompt=True,
+            )
+            for chat in chats
+        ]
         inputs = self.tokenizer(
-            template,
+            templates,
             return_tensors="pt",
+            padding=True,
             add_special_tokens=True,
         )
         inputs = {k: v.to(self.device) for k, v in inputs.items()}
-        self.model.eval()
+        prompt_lengths = None
+        attention = inputs.get("attention_mask")
+        if attention is not None:
+            prompt_lengths = attention.sum(dim=1).tolist()
         with torch.inference_mode():
             generation = self.model.generate(
                 **inputs,
@@ -101,12 +122,19 @@ class ModelInference:
                 do_sample=False,
                 pad_token_id=self.tokenizer.eos_token_id,
             )
-        output_tokens = generation[0][inputs["input_ids"].shape[-1] :]
-        response = self.tokenizer.decode(
-            output_tokens,
-            skip_special_tokens=True,
-        )
-        return response.strip()
+        responses: List[str] = []
+        input_ids = inputs["input_ids"]
+        for index, sequence in enumerate(generation):
+            prompt_length = prompt_lengths[index] if prompt_lengths else input_ids.shape[1]
+            if prompt_length > sequence.shape[-1]:
+                prompt_length = sequence.shape[-1]
+            output_tokens = sequence[prompt_length:]
+            decoded = self.tokenizer.decode(
+                output_tokens,
+                skip_special_tokens=True,
+            )
+            responses.append(decoded.strip())
+        return responses
 
     def _build_messages(
         self,

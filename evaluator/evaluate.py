@@ -449,6 +449,8 @@ def execute_test_case(
     if first.status == "needs_ai":
         prompt_entries = first.data.get("prompts_needed") or []
         ai_responses: MutableMapping[str, str] = {}
+        exchanges_for_generation: List[PromptExchange] = []
+        prompts_to_generate: List[str] = []
         for entry in prompt_entries:
             if not isinstance(entry, Mapping):
                 continue
@@ -457,11 +459,16 @@ def execute_test_case(
             if not field or not prompt_text:
                 continue
             exchange = PromptExchange(field=field, prompt=prompt_text)
+            exchanges_for_generation.append(exchange)
+            prompts.append(exchange)
+            prompts_to_generate.append(prompt_text)
+
+        if prompts_to_generate:
             try:
-                exchange.response = model.generate(prompt_text)
+                responses = model.generate_batch(prompts_to_generate)
             except Exception as exc:  # pragma: no cover - model runtime issue
-                errors.append(f"Model inference failed for field '{field}': {exc}")
-                prompts.append(exchange)
+                failed_field = exchanges_for_generation[0].field if exchanges_for_generation else "unknown"
+                errors.append(f"Model inference failed for field '{failed_field}': {exc}")
                 return TestExecutionResult(
                     case=case,
                     status="model_error",
@@ -474,8 +481,25 @@ def execute_test_case(
                     errors=errors,
                     ai_calls=len([p for p in prompts if p.response]),
                 )
-            ai_responses[field] = exchange.response
-            prompts.append(exchange)
+            if len(responses) != len(exchanges_for_generation):  # pragma: no cover - defensive
+                errors.append(
+                    f"Model returned {len(responses)} responses for {len(exchanges_for_generation)} prompts."
+                )
+                return TestExecutionResult(
+                    case=case,
+                    status="model_error",
+                    parsed=None,
+                    method=None,
+                    prompts=prompts,
+                    stats={},
+                    heuristic_results=heuristic_results,
+                    heuristic_stats=heuristic_stats,
+                    errors=errors,
+                    ai_calls=len([p for p in prompts if p.response]),
+                )
+            for exchange, response in zip(exchanges_for_generation, responses):
+                exchange.response = response
+                ai_responses[exchange.field] = response
 
         try:
             final_response = run_cli(
@@ -551,6 +575,7 @@ def run_evaluation(
             test_cases = filtered_cases
     base_context = load_config_context(config_path)
     model = ModelInference(model_name)
+    resolved_jar_path = jar_path or find_cli_jar()
     java_cmd = java_cmd or DEFAULT_JAVA_CMD
 
     results: List[TestExecutionResult] = []
@@ -559,7 +584,7 @@ def run_evaluation(
             case,
             model=model,
             base_context=base_context,
-            jar_path=jar_path,
+            jar_path=resolved_jar_path,
             java_cmd=java_cmd,
         )
         results.append(result)
