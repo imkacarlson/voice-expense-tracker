@@ -822,21 +822,24 @@ def write_markdown_reports(
     metrics: EvaluationMetrics,
     *,
     output_dir: Optional[Path] = None,
-) -> tuple[Path, Path]:
-    """Generate detailed and summary markdown reports."""
+) -> tuple[Path, Path, Path]:
+    """Generate detailed, summary, and debug markdown reports."""
 
     target_dir = output_dir or RESULTS_DIR
     target_dir.mkdir(parents=True, exist_ok=True)
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
     results_path = target_dir / f"{timestamp}_results.md"
     summary_path = target_dir / f"{timestamp}_summary.md"
+    debug_path = target_dir / f"{timestamp}_debug.md"
 
     results_markdown = build_results_markdown(comparisons)
     summary_markdown = build_summary_markdown(metrics)
+    debug_markdown = build_debug_markdown(comparisons)
 
     results_path.write_text(results_markdown, encoding="utf-8")
     summary_path.write_text(summary_markdown, encoding="utf-8")
-    return results_path, summary_path
+    debug_path.write_text(debug_markdown, encoding="utf-8")
+    return results_path, summary_path, debug_path
 
 
 def build_results_markdown(comparisons: List[TestComparison]) -> str:
@@ -905,6 +908,172 @@ def build_summary_markdown(metrics: EvaluationMetrics) -> str:
 
     lines.append("")
     return "\n".join(lines)
+
+
+def build_debug_markdown(comparisons: List[TestComparison]) -> str:
+    """Generate detailed debug output for each test case."""
+
+    lines: List[str] = ["# Evaluation Debug Log", ""]
+
+    for comp in comparisons:
+        execution = comp.execution
+        case = execution.case
+        symbol = "✅" if comp.overall_match else "❌"
+
+        lines.append(f"## Test: {escape_markdown(case.identifier)} {symbol}")
+        lines.append("")
+
+        # Input section
+        lines.append("### Input")
+        lines.append(escape_markdown(case.utterance))
+        lines.append("")
+
+        # Expected values section
+        lines.append("### Expected Values")
+        lines.append("")
+        if case.expected_amount is not None:
+            lines.append(f"- **Amount:** {case.expected_amount}")
+        if case.expected_merchant:
+            lines.append(f"- **Merchant:** {escape_markdown(case.expected_merchant)}")
+        if case.expected_description:
+            lines.append(f"- **Description:** {escape_markdown(case.expected_description)}")
+        if case.expected_type:
+            lines.append(f"- **Type:** {escape_markdown(case.expected_type)}")
+        if case.expected_category:
+            lines.append(f"- **Category:** {escape_markdown(case.expected_category)}")
+        if case.expected_tags:
+            tags_str = ", ".join(case.expected_tags)
+            lines.append(f"- **Tags:** {escape_markdown(tags_str)}")
+        if case.expected_date:
+            lines.append(f"- **Date:** {case.expected_date.isoformat()}")
+        if case.expected_account:
+            lines.append(f"- **Account:** {escape_markdown(case.expected_account)}")
+        if case.expected_split_overall is not None:
+            lines.append(f"- **Split Overall:** {case.expected_split_overall}")
+        lines.append("")
+
+        # Heuristic extraction section
+        lines.append("### Stage 0: Heuristic Extraction")
+        lines.append("")
+        if execution.heuristic_results:
+            heur = execution.heuristic_results
+            confidence = heur.get("confidence")
+            if confidence is not None:
+                lines.append(f"**Confidence:** {confidence}")
+                lines.append("")
+
+            lines.append("| Field | Value |")
+            lines.append("|-------|-------|")
+            for field in FIELD_ORDER:
+                json_field = _get_json_field_name(field)
+                value = heur.get(json_field)
+                if value is None and field == "category":
+                    value = heur.get("expenseCategory") or heur.get("incomeCategory")
+                value_str = _format_value_for_display(value)
+                lines.append(f"| {FIELD_LABELS[field]} | {escape_markdown(value_str)} |")
+            lines.append("")
+
+            if execution.heuristic_stats:
+                stage0_ms = execution.heuristic_stats.get("stage0_ms")
+                if stage0_ms is not None:
+                    lines.append(f"**Timing:** {format_ms(stage0_ms)}")
+                    lines.append("")
+        else:
+            lines.append("No heuristic results captured")
+            lines.append("")
+
+        # AI Refinement section
+        if execution.prompts:
+            lines.append("### Stage 1: AI Refinement")
+            lines.append("")
+
+            fields_refined = [p.field for p in execution.prompts]
+            lines.append(f"**Fields refined:** {', '.join(fields_refined)}")
+            lines.append("")
+
+            for i, prompt in enumerate(execution.prompts, 1):
+                lines.append(f"#### Prompt {i}: {prompt.field}")
+                lines.append("")
+                lines.append("**Prompt:**")
+                lines.append("```")
+                lines.append(prompt.prompt)
+                lines.append("```")
+                lines.append("")
+
+                if prompt.response:
+                    lines.append("**AI Response:**")
+                    lines.append("```")
+                    lines.append(prompt.response)
+                    lines.append("```")
+                    lines.append("")
+
+            if execution.stats:
+                stage1_ms = execution.stats.get("stage1_ms")
+                if stage1_ms is not None:
+                    lines.append(f"**Timing:** {format_ms(stage1_ms)}")
+                    lines.append("")
+
+        # Final result section
+        lines.append("### Final Result")
+        lines.append("")
+        lines.append("| Field | Value | Match |")
+        lines.append("|-------|-------|-------|")
+
+        field_map = {fr.field: fr for fr in comp.field_results}
+        for field in FIELD_ORDER:
+            field_comp = field_map.get(field)
+            if field_comp:
+                match_symbol = "✅" if field_comp.match else "❌"
+                actual_str = _format_value_for_display(field_comp.actual)
+                expected_str = _format_value_for_display(field_comp.expected)
+
+                if field_comp.expected is None:
+                    match_detail = match_symbol
+                elif field_comp.match:
+                    match_detail = f"{match_symbol}"
+                else:
+                    match_detail = f"{match_symbol} (expected {escape_markdown(expected_str)})"
+
+                lines.append(f"| {FIELD_LABELS[field]} | {escape_markdown(actual_str)} | {match_detail} |")
+        lines.append("")
+
+        # Summary section
+        lines.append("### Summary")
+        lines.append("")
+        lines.append(f"- **Method:** {execution.method or 'Unknown'}")
+        lines.append(f"- **Total AI calls:** {execution.ai_calls}")
+        if execution.stats:
+            total_ms = execution.stats.get("total_ms")
+            if total_ms is not None:
+                lines.append(f"- **Total time:** {format_ms(total_ms)}")
+        lines.append(f"- **Overall:** {symbol} {'PASSED' if comp.overall_match else 'FAILED'}")
+
+        if execution.errors:
+            lines.append(f"- **Errors:** {'; '.join(execution.errors)}")
+
+        lines.append("")
+        lines.append("---")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def _get_json_field_name(field: str) -> str:
+    """Convert internal field name to JSON field name."""
+    if field == "category":
+        return "expenseCategory"  # Will check both in the function
+    return field
+
+
+def _format_value_for_display(value: Any) -> str:
+    """Format a value for display in debug output."""
+    if value is None:
+        return "null"
+    if isinstance(value, (list, tuple)):
+        if not value:
+            return "[]"
+        return ", ".join(str(v) for v in value)
+    return str(value)
 
 
 def format_field_cell(field_comp: Optional[FieldComparison]) -> str:
@@ -1038,7 +1207,7 @@ def main(argv: Optional[List[str]] = None) -> None:  # pragma: no cover - CLI en
 
     comparisons = compare_results(executions)
     metrics = compute_metrics(comparisons)
-    results_path, summary_path = write_markdown_reports(
+    results_path, summary_path, debug_path = write_markdown_reports(
         comparisons,
         metrics,
         output_dir=args.results_dir,
@@ -1049,6 +1218,7 @@ def main(argv: Optional[List[str]] = None) -> None:  # pragma: no cover - CLI en
     print(f"Passed: {metrics.passed_tests} | Failed: {metrics.total_tests - metrics.passed_tests}")
     print(f"Results written to: {results_path}")
     print(f"Summary written to: {summary_path}")
+    print(f"Debug log written to: {debug_path}")
 
     failing = [
         comp.execution.case.identifier
