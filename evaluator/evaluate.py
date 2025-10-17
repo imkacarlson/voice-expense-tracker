@@ -641,7 +641,8 @@ def run_evaluation(
     results: List[Optional[TestExecutionResult]] = [None] * total_cases
     pending_stage_two: List[tuple[int, PendingStageTwo]] = []
 
-    progress = tqdm(total=total_cases, desc="Running tests", unit="test")
+    stage1_bar = tqdm(total=total_cases, desc="Stage 1 (CLI heuristics)", unit="test")
+    completed_bar = tqdm(total=total_cases, desc="Completed tests", unit="test")
 
     for idx, case in enumerate(test_cases):
         context = _build_case_context(case, base_context)
@@ -666,7 +667,8 @@ def run_evaluation(
                 errors=errors,
                 ai_calls=0,
             )
-            progress.update(1)
+            stage1_bar.update(1)
+            completed_bar.update(1)
             continue
 
         heuristic_stats = first_response.data.get("stats") if isinstance(first_response.data.get("stats"), MutableMapping) else None
@@ -682,7 +684,8 @@ def run_evaluation(
                 heuristic_stats,
                 errors,
             )
-            progress.update(1)
+            stage1_bar.update(1)
+            completed_bar.update(1)
             continue
 
         if first_response.status != "needs_ai":
@@ -694,7 +697,8 @@ def run_evaluation(
                 heuristic_stats,
                 errors,
             )
-            progress.update(1)
+            stage1_bar.update(1)
+            completed_bar.update(1)
             continue
 
         exchanges = _collect_prompt_exchanges(first_response.data.get("prompts_needed") or [])
@@ -711,6 +715,9 @@ def run_evaluation(
                 ),
             )
         )
+        stage1_bar.update(1)
+
+    stage1_bar.close()
 
     total_prompts = sum(len(pending.prompts) for _, pending in pending_stage_two)
     batched_responses: List[str] = []
@@ -719,6 +726,7 @@ def run_evaluation(
         all_prompts: List[str] = []
         for _, pending in pending_stage_two:
             all_prompts.extend(exchange.prompt for exchange in pending.prompts)
+        tqdm.write(f"Running batched AI generation for {total_prompts} prompt(s)...")
         try:
             batched_responses = model.generate_batch(all_prompts)
         except Exception as exc:  # pragma: no cover - model runtime issue
@@ -737,8 +745,8 @@ def run_evaluation(
                     errors=errors,
                     ai_calls=len([p for p in pending.prompts if p.response]),
                 )
-                progress.update(1)
-            progress.close()
+                completed_bar.update(1)
+            completed_bar.close()
             return [res for res in results if res is not None]
 
         if len(batched_responses) != total_prompts:  # pragma: no cover - defensive
@@ -759,9 +767,10 @@ def run_evaluation(
                     errors=errors,
                     ai_calls=len([p for p in pending.prompts if p.response]),
                 )
-                progress.update(1)
-            progress.close()
+                completed_bar.update(1)
+            completed_bar.close()
             return [res for res in results if res is not None]
+        tqdm.write("AI generation complete.")
 
     response_iter = iter(batched_responses)
     for idx, pending in pending_stage_two:
@@ -789,7 +798,7 @@ def run_evaluation(
                 errors=errors,
                 ai_calls=len([p for p in pending.prompts if p.response]),
             )
-            progress.update(1)
+            completed_bar.update(1)
             continue
 
         try:
@@ -815,7 +824,7 @@ def run_evaluation(
                 errors=[f"CLI error (stage2): {exc}"],
                 ai_calls=len([p for p in pending.prompts if p.response]),
             )
-            progress.update(1)
+            completed_bar.update(1)
             continue
 
         results[idx] = _build_test_execution_result(
@@ -826,9 +835,9 @@ def run_evaluation(
             pending.heuristic_stats,
             [],
         )
-        progress.update(1)
+        completed_bar.update(1)
 
-    progress.close()
+    completed_bar.close()
 
     return [res for res in results if res is not None]
 
