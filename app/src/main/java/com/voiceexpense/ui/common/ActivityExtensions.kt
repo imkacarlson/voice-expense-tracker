@@ -34,10 +34,15 @@ fun ComponentActivity.setupEdgeToEdge() {
     val contentView = findViewById<ViewGroup>(android.R.id.content)
     val rootView = contentView.getChildAt(0)
 
+    // Capture the original padding from XML once, before any insets are applied
+    // This prevents accumulation when the listener is called multiple times
+    val originalPaddingTop = rootView.paddingTop
+
     ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
         val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-        // Only add top padding for the status bar, preserve other padding from XML
-        view.updatePadding(top = view.paddingTop + systemBars.top)
+        // Always add system insets to the ORIGINAL padding, not the current padding
+        // This prevents accumulation on keyboard open/close and navigation events
+        view.updatePadding(top = originalPaddingTop + systemBars.top)
         insets
     }
 }
