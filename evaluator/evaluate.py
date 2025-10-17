@@ -23,6 +23,7 @@ DEFAULT_JAVA_CMD = ("java",)
 TEST_CASES_FILE = Path(__file__).resolve().with_name("test_cases.md")
 CONFIG_FILE = Path(__file__).resolve().with_name("config.json")
 RESULTS_DIR = Path(__file__).resolve().with_name("results")
+AI_GENERATION_CHUNK_SIZE = 8
 DECIMAL_TOLERANCE = Decimal("0.01")
 FIELD_ORDER = [
     "amountUsd",
@@ -459,6 +460,14 @@ def _build_test_execution_result(
     )
 
 
+def _chunked(sequence: Collection[Any], size: int) -> List[List[Any]]:
+    """Split a sequence into fixed-size chunks while preserving order."""
+    if size <= 0:
+        raise ValueError("Chunk size must be positive")
+    items = list(sequence)
+    return [items[i : i + size] for i in range(0, len(items), size)]
+
+
 def execute_test_case(
     case: TestCase,
     *,
@@ -727,10 +736,23 @@ def run_evaluation(
         for _, pending in pending_stage_two:
             all_prompts.extend(exchange.prompt for exchange in pending.prompts)
         tqdm.write(f"Running batched AI generation for {total_prompts} prompt(s)...")
+        ai_bar = tqdm(total=total_prompts, desc="Stage 2 (AI prompts)", unit="prompt")
         try:
-            batched_responses = model.generate_batch(all_prompts)
-        except Exception as exc:  # pragma: no cover - model runtime issue
-            error_message = f"Model inference failed: {exc}"
+            batched_chunks = _chunked(all_prompts, AI_GENERATION_CHUNK_SIZE)
+            for chunk in batched_chunks:
+                try:
+                    chunk_responses = model.generate_batch(chunk)
+                except Exception as exc:  # pragma: no cover - model runtime issue
+                    raise RuntimeError(f"Model inference failed: {exc}") from exc
+                if len(chunk_responses) != len(chunk):  # pragma: no cover - defensive
+                    raise RuntimeError(
+                        f"Model returned {len(chunk_responses)} responses for {len(chunk)} prompts."
+                    )
+                batched_responses.extend(chunk_responses)
+                ai_bar.update(len(chunk_responses))
+        except Exception as exc:
+            ai_bar.close()
+            error_message = str(exc)
             for idx, pending in pending_stage_two:
                 errors = [error_message]
                 results[idx] = TestExecutionResult(
@@ -748,7 +770,8 @@ def run_evaluation(
                 completed_bar.update(1)
             completed_bar.close()
             return [res for res in results if res is not None]
-
+        finally:
+            ai_bar.close()
         if len(batched_responses) != total_prompts:  # pragma: no cover - defensive
             error_message = (
                 f"Model returned {len(batched_responses)} responses for {total_prompts} prompts."
