@@ -13,6 +13,8 @@ from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any, Collection, List, Mapping, MutableMapping, Optional
 
+from tqdm import tqdm
+
 from models import ModelInference, SUPPORTED_MODELS
 
 CLI_TIMEOUT_SECONDS = 30
@@ -552,7 +554,7 @@ def run_evaluation(
     java_cmd = java_cmd or DEFAULT_JAVA_CMD
 
     results: List[TestExecutionResult] = []
-    for case in test_cases:
+    for case in tqdm(test_cases, desc="Running tests", unit="test"):
         result = execute_test_case(
             case,
             model=model,
