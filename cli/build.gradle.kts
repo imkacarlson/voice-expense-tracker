@@ -20,6 +20,7 @@ dependencies {
 }
 
 tasks.named<Jar>("jar") {
+    dependsOn(":parsing:jar")
     manifest {
         attributes["Main-Class"] = "com.voiceexpense.eval.CliMainKt"
     }

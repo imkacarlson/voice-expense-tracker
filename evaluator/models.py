@@ -66,9 +66,14 @@ class ModelInference:
         if self.device != "cpu":
             if BitsAndBytesConfig is None:
                 raise RuntimeError(
-                    "bitsandbytes is required for 8-bit quantization; install it via requirements.txt."
+                    "bitsandbytes is required for quantization; install it via requirements.txt."
                 )
-            quantization = BitsAndBytesConfig(load_in_8bit=True)
+            # Use 4-bit quantization for E2B model (matches device deployment), 8-bit for others
+            use_4bit = "E2B" in model_name
+            quantization = BitsAndBytesConfig(
+                load_in_4bit=use_4bit,
+                load_in_8bit=not use_4bit,
+            )
         self.model = AutoModelForCausalLM.from_pretrained(
             model_name,
             device_map="auto" if self.device != "cpu" else None,
