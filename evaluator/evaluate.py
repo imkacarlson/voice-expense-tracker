@@ -96,6 +96,7 @@ class FieldComparison:
     expected: Any
     actual: Any
     match: bool
+    informational: bool = False
 
 
 @dataclass
@@ -593,6 +594,7 @@ def compare_results(executions: List[TestExecutionResult]) -> List[TestCompariso
                 execution.case.expected_description,
                 parsed.get("description"),
                 kind="string",
+                informational=True,
             )
         )
         field_results.append(
@@ -646,7 +648,7 @@ def compare_results(executions: List[TestExecutionResult]) -> List[TestCompariso
         )
 
         overall_match = execution.status == "complete" and all(
-            fr.match for fr in field_results if fr.expected is not None
+            fr.match for fr in field_results if fr.expected is not None and not fr.informational
         )
         comparisons.append(
             TestComparison(
@@ -658,7 +660,7 @@ def compare_results(executions: List[TestExecutionResult]) -> List[TestCompariso
     return comparisons
 
 
-def compare_field(field: str, expected: Any, actual: Any, *, kind: str) -> FieldComparison:
+def compare_field(field: str, expected: Any, actual: Any, *, kind: str, informational: bool = False) -> FieldComparison:
     expected_canonical = canonical_value(expected, kind)
     actual_canonical = canonical_value(actual, kind)
     match = values_match(expected_canonical, actual_canonical, kind)
@@ -667,6 +669,7 @@ def compare_field(field: str, expected: Any, actual: Any, *, kind: str) -> Field
         expected=format_display(expected, kind),
         actual=format_display(actual, kind),
         match=match,
+        informational=informational,
     )
 
 
@@ -1023,7 +1026,11 @@ def build_debug_markdown(comparisons: List[TestComparison]) -> str:
         for field in FIELD_ORDER:
             field_comp = field_map.get(field)
             if field_comp:
-                match_symbol = "✅" if field_comp.match else "❌"
+                # Use info icon for informational fields, check/cross for regular fields
+                if field_comp.informational:
+                    match_symbol = "ℹ️" if not field_comp.match else "✅"
+                else:
+                    match_symbol = "✅" if field_comp.match else "❌"
                 actual_str = _format_value_for_display(field_comp.actual)
                 expected_str = _format_value_for_display(field_comp.expected)
 
@@ -1079,7 +1086,11 @@ def _format_value_for_display(value: Any) -> str:
 def format_field_cell(field_comp: Optional[FieldComparison]) -> str:
     if field_comp is None:
         return "—"
-    symbol = "✅" if field_comp.match else "❌"
+    # Use info icon for informational fields, check/cross for regular fields
+    if field_comp.informational:
+        symbol = "ℹ️" if not field_comp.match else "✅"
+    else:
+        symbol = "✅" if field_comp.match else "❌"
     actual_text = value_to_text(field_comp.actual)
     expected_text = value_to_text(field_comp.expected)
     if field_comp.expected is None or expected_text == "—":
