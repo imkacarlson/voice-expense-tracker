@@ -25,6 +25,7 @@ DECIMAL_TOLERANCE = Decimal("0.01")
 FIELD_ORDER = [
     "amountUsd",
     "merchant",
+    "description",
     "type",
     "category",
     "tags",
@@ -35,6 +36,7 @@ FIELD_ORDER = [
 FIELD_LABELS = {
     "amountUsd": "Amount",
     "merchant": "Merchant",
+    "description": "Description",
     "type": "Type",
     "category": "Category",
     "tags": "Tags",
@@ -52,6 +54,7 @@ class TestCase:
     utterance: str
     expected_amount: Optional[Decimal]
     expected_merchant: Optional[str]
+    expected_description: Optional[str]
     expected_type: Optional[str]
     expected_category: Optional[str]
     expected_tags: List[str]
@@ -247,6 +250,7 @@ def build_test_case(row: Mapping[str, str], *, line_number: int) -> Optional[Tes
         utterance=utterance,
         expected_amount=parse_decimal(row.get("amount")),
         expected_merchant=normalize_string(row.get("merchant")),
+        expected_description=normalize_string(row.get("description")),
         expected_type=normalize_string(row.get("type")),
         expected_category=normalize_string(row.get("category")),
         expected_tags=parse_tags(row.get("tags")),
@@ -580,6 +584,14 @@ def compare_results(executions: List[TestExecutionResult]) -> List[TestCompariso
                 "merchant",
                 execution.case.expected_merchant,
                 parsed.get("merchant"),
+                kind="string",
+            )
+        )
+        field_results.append(
+            compare_field(
+                "description",
+                execution.case.expected_description,
+                parsed.get("description"),
                 kind="string",
             )
         )
