@@ -79,6 +79,7 @@ dependencies {
     // Needed for Activity.viewModels() delegate
     implementation("androidx.activity:activity-ktx:1.9.2")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.6")
+    implementation("androidx.lifecycle:lifecycle-process:2.8.6")
     implementation("androidx.lifecycle:lifecycle-viewmodel-ktx:2.8.6")
     implementation("androidx.recyclerview:recyclerview:1.3.2")
 
