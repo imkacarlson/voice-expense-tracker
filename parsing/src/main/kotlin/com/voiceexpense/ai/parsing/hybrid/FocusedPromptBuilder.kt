@@ -187,9 +187,16 @@ class FocusedPromptBuilder {
     private fun instructionFor(field: FieldKey): String = when (field) {
             FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"Starbucks\", \"Target\"). If the input mentions payment methods (e.g., payment apps like Splitwise, Venmo, PayPal, Zelle, etc; or payment cards), identify the actual merchant or service being paid for, NOT the payment method. Examples: 'my roommate put into Splitwise that they reloaded our E-ZPass' → \"E-ZPass\" (NOT \"Splitwise\"); 'my card was charged for the appointment' → null (provider unknown). Return null if the merchant is genuinely unknown."
             FieldKey.DESCRIPTION -> "Provide a concise noun phrase describing what was actually purchased or the service received (e.g., \"Coffee and pastry\", \"Household items\", \"Utility bill\"). Preserve key numbers or modifiers from the input; do not mention payment methods or account names. Avoid verbs. Do not use generic placeholders—describe the specific goods or service mentioned."
-            FieldKey.EXPENSE_CATEGORY -> "Choose the best matching expense category based on the goods/service. Use 'Eating Out' for meals/takeout, 'Transportation' for transit fares, rideshares, or fuel, and similar mappings for the other options. Ignore payment method mentions; return null if none apply."
+            FieldKey.EXPENSE_CATEGORY -> """Choose the best matching expense category based on what was purchased or the service received:
+- 'Eating Out': restaurant meals, takeout, coffee shops, fast food, snacks, drinks
+- 'Transportation': vehicle gas/gasoline/fuel for cars, parking, tolls, transit fares, rideshares, vehicle expenses
+- 'Groceries': supermarket shopping, food purchases at grocery stores
+- 'Home': household supplies, cleaning products, organization items, furniture, home improvement, utilities (gas/electric/water/internet bills - these are home utility bills, not vehicle fuel)
+- 'Personal': subscriptions (streaming services, news, software, online services), personal care, entertainment, memberships
+- 'Health/medical': doctor visits, therapy appointments, prescriptions, medical equipment, vision care, dental
+Return null if none of these categories apply to the transaction."""
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
-            FieldKey.ACCOUNT -> "Return the account or card name from the allowed list. Match obvious phonetic or casing variations; if none apply, return null."
+            FieldKey.ACCOUNT -> "Return the account or card name from the allowed list. Match phonetic variations, case differences, and minor spelling differences common in voice-to-text (e.g., 'built' → 'Bilt', 'siti' → 'Citi', 'chase sapphire' → 'Chase Sapphire Preferred'). Return null if no account name is mentioned."
             FieldKey.TAGS -> "Return tags from the allowed list that match the transaction. Use both explicit mentions (with fuzzy/phonetic matching like 'autopaid' → 'Auto-Paid') and semantic inference (e.g., if 'paid automatically' or 'autopay' is mentioned, select 'Auto-Paid'; if it's a recurring service or subscription, consider 'Subscription')."
             else -> "" // Should not be requested here.
     }
@@ -269,9 +276,9 @@ class FocusedPromptBuilder {
         private fun guidelineFor(field: FieldKey): String? = when (field) {
             FieldKey.MERCHANT -> "Return only the merchant or vendor name—no verbs, adjectives, or trailing phrases. Avoid payment methods."
             FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input and avoids payment method names."
-            FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category from the allowed list based on the purchase/service (e.g., transit fares → 'Transportation'); return null if none apply."
+            FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category: 'Eating Out' for food/drinks, 'Home' for household items/utility bills (gas/electric/water/internet bills), 'Personal' for subscriptions/services, 'Transportation' for vehicle fuel/parking/transit, 'Groceries' for supermarket food, 'Health/medical' for medical services. Return null if none apply."
             FieldKey.INCOME_CATEGORY -> "Choose exactly one income category from the allowed list; return null if none apply."
-            FieldKey.ACCOUNT -> "Return the account/card name from the allowed list, matching obvious phonetic variations; return null if none apply."
+            FieldKey.ACCOUNT -> "Return the account/card name from the allowed list, matching phonetic variations and spelling differences from voice-to-text (e.g., 'built' → 'Bilt', 'siti' → 'Citi'). Return null if none apply."
             FieldKey.TAGS -> "Return an array of distinct tags chosen only from the allowed list. Match both explicit mentions and semantic meanings. If no allowed tag applies, return an empty array."
             else -> null
         }

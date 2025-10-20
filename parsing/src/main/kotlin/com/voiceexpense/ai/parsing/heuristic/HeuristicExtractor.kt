@@ -28,11 +28,21 @@ class HeuristicExtractor(
             confidences[FieldKey.USER_LOCAL_DATE] = 0.85f
         }
 
+        // Collect all date number ranges to exclude from amount parsing
         val dateNumberRanges = mutableListOf<IntRange>()
+
+        // Extract ranges from "Month Day" pattern
         DATE_REGEX.findAll(normalized).forEach { match ->
             match.groups[2]?.range?.let { dateNumberRanges += it }
             match.groups[3]?.range?.let { dateNumberRanges += it }
         }
+
+        // Extract ranges from "Day of Month" pattern (e.g., "the 18th of October")
+        DATE_DAY_OF_MONTH_REGEX.findAll(normalized).forEach { match ->
+            match.groups[1]?.range?.let { dateNumberRanges += it }
+            match.groups[3]?.range?.let { dateNumberRanges += it }
+        }
+
         val amountInfo = parseAmounts(normalized, dateNumberRanges)
         val amount = amountInfo.share?.also {
             confidences[FieldKey.AMOUNT_USD] = amountInfo.shareConfidence
@@ -88,6 +98,10 @@ class HeuristicExtractor(
 
     private fun normalizeNumbers(text: String): String {
         var updated = text
+
+        // Convert spelled-out numbers to digits (common voice patterns)
+        updated = normalizeSpelledOutNumbers(updated)
+
         // Convert patterns like "17 50" into "17.50"
         updated = COMBINED_DECIMAL_REGEX.replace(updated) { matchResult ->
             val whole = matchResult.groupValues[1]
@@ -101,20 +115,74 @@ class HeuristicExtractor(
         return updated
     }
 
-    private fun parseDate(lower: String, context: ParsingContext): LocalDate? {
-        val match = DATE_REGEX.find(lower) ?: return null
-        val monthName = match.groupValues[1]
-        val day = match.groupValues[2].toIntOrNull() ?: return null
-        val year = match.groupValues.getOrNull(3)?.takeIf { it.isNotBlank() }?.toIntOrNull()
-        val month = MONTHS[monthName] ?: return null
-        val baseYear = year ?: context.defaultDate.year
-        var candidate = LocalDate.of(baseYear, month, day)
-        // If the candidate is more than ~90 days in the future relative to the default date, assume it referred to last year.
-        val diff = candidate.toEpochDay() - context.defaultDate.toEpochDay()
-        if (year == null && diff > 90) {
-            candidate = candidate.minusYears(1)
+    private fun normalizeSpelledOutNumbers(text: String): String {
+        var result = text.lowercase(Locale.US)
+
+        // Handle "X dollar(s) and Y cents" pattern first (most specific)
+        // Example: "two dollars and thirty nine cents" -> "2.39"
+        result = SPELLED_DOLLARS_AND_CENTS_REGEX.replace(result) { match ->
+            val dollars = wordToNumber(match.groupValues[1]) ?: match.groupValues[1]
+            val cents = wordToNumber(match.groupValues[2]) ?: match.groupValues[2]
+            "$dollars.${cents.toString().padStart(2, '0')}"
         }
-        return candidate
+
+        // Handle "X dollar(s) Y cents" (with or without "and")
+        // Example: "two dollars thirty nine cents" -> "2.39"
+        result = SPELLED_DOLLARS_CENTS_REGEX.replace(result) { match ->
+            val dollars = wordToNumber(match.groupValues[1]) ?: match.groupValues[1]
+            val cents = wordToNumber(match.groupValues[2]) ?: match.groupValues[2]
+            "$dollars.${cents.toString().padStart(2, '0')}"
+        }
+
+        // Handle standalone spelled amounts like "twenty three dollars"
+        result = SPELLED_DOLLARS_ONLY_REGEX.replace(result) { match ->
+            val amount = wordToNumber(match.groupValues[1]) ?: match.groupValues[1]
+            "$amount"
+        }
+
+        return result
+    }
+
+    private fun wordToNumber(word: String): String? {
+        val normalized = word.trim().lowercase(Locale.US)
+        return WORD_TO_NUMBER[normalized]?.toString()
+    }
+
+    private fun parseDate(lower: String, context: ParsingContext): LocalDate? {
+        // Try "Month Day" pattern first (e.g., "September 7th")
+        val monthDayMatch = DATE_REGEX.find(lower)
+        if (monthDayMatch != null) {
+            val monthName = monthDayMatch.groupValues[1]
+            val day = monthDayMatch.groupValues[2].toIntOrNull() ?: return null
+            val year = monthDayMatch.groupValues.getOrNull(3)?.takeIf { it.isNotBlank() }?.toIntOrNull()
+            val month = MONTHS[monthName] ?: return null
+            val baseYear = year ?: context.defaultDate.year
+            var candidate = LocalDate.of(baseYear, month, day)
+            // If the candidate is more than ~90 days in the future relative to the default date, assume it referred to last year.
+            val diff = candidate.toEpochDay() - context.defaultDate.toEpochDay()
+            if (year == null && diff > 90) {
+                candidate = candidate.minusYears(1)
+            }
+            return candidate
+        }
+
+        // Try "Day of Month" pattern (e.g., "the 18th of October")
+        val dayOfMonthMatch = DATE_DAY_OF_MONTH_REGEX.find(lower)
+        if (dayOfMonthMatch != null) {
+            val day = dayOfMonthMatch.groupValues[1].toIntOrNull() ?: return null
+            val monthName = dayOfMonthMatch.groupValues[2]
+            val year = dayOfMonthMatch.groupValues.getOrNull(3)?.takeIf { it.isNotBlank() }?.toIntOrNull()
+            val month = MONTHS[monthName] ?: return null
+            val baseYear = year ?: context.defaultDate.year
+            var candidate = LocalDate.of(baseYear, month, day)
+            val diff = candidate.toEpochDay() - context.defaultDate.toEpochDay()
+            if (year == null && diff > 90) {
+                candidate = candidate.minusYears(1)
+            }
+            return candidate
+        }
+
+        return null
     }
 
     private fun parseAmounts(text: String, excludeRanges: List<IntRange> = emptyList()): AmountParseResult {
@@ -189,6 +257,31 @@ class HeuristicExtractor(
         return candidate.substring(0, cutIndex).trimEnd()
     }
 
+    private fun stripTrailingStopwords(merchant: String): String {
+        var result = merchant.trim()
+        val lower = result.lowercase(Locale.US)
+
+        // Find the earliest position where a trailing stopword pattern appears
+        var cutIndex = result.length
+
+        for (stopword in MERCHANT_TRAILING_STOPWORDS) {
+            // Look for the stopword as a word boundary (preceded by space)
+            val pattern = " $stopword"
+            val idx = lower.indexOf(pattern)
+            if (idx >= 0) {
+                cutIndex = minOf(cutIndex, idx)
+            }
+        }
+
+        // Also check for amount patterns like " $XX" or " and $"
+        val amountPattern = Regex("""\s+(?:and\s+)?\$""")
+        amountPattern.find(lower)?.let { match ->
+            cutIndex = minOf(cutIndex, match.range.first)
+        }
+
+        return result.substring(0, cutIndex).trim()
+    }
+
     private fun inferType(lower: String): Pair<String, Float>? {
         return when {
             lower.contains("transfer") || lower.contains("moved") -> "Transfer" to 0.85f
@@ -205,8 +298,9 @@ class HeuristicExtractor(
         val atMatch = MERCHANT_REGEX.find(original)
         val merchant = atMatch?.groupValues?.getOrNull(1)?.trim()?.takeIf { it.isNotBlank() }
         if (merchant != null) {
-            val cleaned = stripAccountMentions(merchant)
-            val normalized = cleaned.ifBlank { merchant }
+            val withoutAccount = stripAccountMentions(merchant)
+            val withoutTrailing = stripTrailingStopwords(withoutAccount)
+            val normalized = withoutTrailing.ifBlank { merchant }
             val suspicious = looksLikeVerboseMerchant(normalized)
             val confidence = if (suspicious) 0f else 0.65f
             val value = normalized.takeIf { it.isNotBlank() } ?: merchant
@@ -311,6 +405,22 @@ class HeuristicExtractor(
         private val NUMBER_REGEX = Regex("""\d+(?:[.\,]\d+)?""")
         private val COMBINED_DECIMAL_REGEX = Regex("""(\d+)\s+(\d{2})(?!\d)""")
         private val SPOKEN_POINT_REGEX = Regex("""(\d+)\s+point\s+(\d+)""", RegexOption.IGNORE_CASE)
+
+        // Spelled-out number patterns
+        private val WORD_PATTERN = """(zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred)"""
+        private val SPELLED_DOLLARS_AND_CENTS_REGEX = Regex("""$WORD_PATTERN\s*dollars?\s+and\s+$WORD_PATTERN\s*cents?""", RegexOption.IGNORE_CASE)
+        private val SPELLED_DOLLARS_CENTS_REGEX = Regex("""$WORD_PATTERN\s*dollars?\s+$WORD_PATTERN\s*cents?""", RegexOption.IGNORE_CASE)
+        private val SPELLED_DOLLARS_ONLY_REGEX = Regex("""$WORD_PATTERN\s*dollars?""", RegexOption.IGNORE_CASE)
+
+        private val WORD_TO_NUMBER = mapOf(
+            "zero" to 0, "one" to 1, "two" to 2, "three" to 3, "four" to 4,
+            "five" to 5, "six" to 6, "seven" to 7, "eight" to 8, "nine" to 9,
+            "ten" to 10, "eleven" to 11, "twelve" to 12, "thirteen" to 13, "fourteen" to 14,
+            "fifteen" to 15, "sixteen" to 16, "seventeen" to 17, "eighteen" to 18, "nineteen" to 19,
+            "twenty" to 20, "thirty" to 30, "forty" to 40, "fifty" to 50,
+            "sixty" to 60, "seventy" to 70, "eighty" to 80, "ninety" to 90,
+            "hundred" to 100
+        )
         private const val HINT_WINDOW_RADIUS = 60
         private val SHARE_HINT_REGEX = Regex("(?i)(my share|owe|i owe|i will owe)")
         private val SPLIT_HINT_REGEX = Regex("(?i)(splitwise|my share|split|overall)")
@@ -361,8 +471,18 @@ class HeuristicExtractor(
         )
         private val DEBT_CUES = setOf("owe", "owed", "owing", "due")
 
+        private val MERCHANT_TRAILING_STOPWORDS = listOf(
+            "and", "it", "for", "on", "using", "with", "to", "costed", "cost",
+            "costs", "charged", "the", "was", "is"
+        )
+
         private val DATE_REGEX = Regex(
             "(?i)(january|february|march|april|may|june|july|august|september|october|november|december)\\s+(\\d{1,2})(?:st|nd|rd|th)?(?:,?\\s*(\\d{4}))?"
+        )
+
+        // Matches "the 18th of October" or "18th of October"
+        private val DATE_DAY_OF_MONTH_REGEX = Regex(
+            "(?i)(?:the\\s+)?(\\d{1,2})(?:st|nd|rd|th)?\\s+(?:of\\s+)?(january|february|march|april|may|june|july|august|september|october|november|december)(?:,?\\s*(\\d{4}))?"
         )
 
         private val MONTHS: Map<String, Month> = Month.values().associateBy { it.name.lowercase(Locale.US) }
