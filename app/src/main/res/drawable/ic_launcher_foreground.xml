@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.65"
+        android:scaleY="0.65"
+        android:translateX="18.9"
+        android:translateY="18.9">
+        <!-- Microphone body -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M44,26 C44,20.477 48.477,16 54,16 C59.523,16 64,20.477 64,26 L64,42 C64,47.523 59.523,52 54,52 C48.477,52 44,47.523 44,42 Z" />
+
+        <!-- Microphone stand -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M54,52 L54,66 M44,66 L64,66"
+            android:strokeWidth="4"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round" />
+
+        <!-- Microphone arc -->
+        <path
+            android:fillColor="@android:color/transparent"
+            android:pathData="M38,42 C38,51.389 45.163,59 54,59 C62.837,59 70,51.389 70,42"
+            android:strokeWidth="4"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round" />
+
+        <!-- Dollar sign -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M76,34 C76,30.686 78.686,28 82,28 L86,28 C89.314,28 92,30.686 92,34 C92,37.314 89.314,40 86,40 L82,40 C78.686,40 76,42.686 76,46 C76,49.314 78.686,52 82,52 L86,52 C89.314,52 92,49.314 92,46 M84,24 L84,56"
+            android:strokeWidth="3.5"
+            android:strokeColor="#FFFFFF"
+            android:strokeLineCap="round" />
+    </group>
+</vector>
