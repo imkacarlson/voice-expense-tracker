@@ -149,7 +149,14 @@ class HeuristicExtractor(
     }
 
     private fun parseDate(lower: String, context: ParsingContext): LocalDate? {
-        // Try "Month Day" pattern first (e.g., "September 7th")
+        // Try relative dates first (yesterday, today, tomorrow)
+        when {
+            lower.contains("yesterday") -> return context.defaultDate.minusDays(1)
+            lower.contains("today") -> return context.defaultDate
+            lower.contains("tomorrow") -> return context.defaultDate.plusDays(1)
+        }
+
+        // Try "Month Day" pattern (e.g., "September 7th")
         val monthDayMatch = DATE_REGEX.find(lower)
         if (monthDayMatch != null) {
             val monthName = monthDayMatch.groupValues[1]
