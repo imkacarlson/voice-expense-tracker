@@ -1,6 +1,7 @@
 package com.voiceexpense.ai.parsing.hybrid
 
 import com.voiceexpense.ai.parsing.heuristic.FieldKey
+import kotlinx.coroutines.channels.BufferOverflow
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
@@ -21,7 +22,9 @@ object StagedRefinementDispatcher {
     )
 
     private val _updates = MutableSharedFlow<RefinementEvent>(
-        extraBufferCapacity = 32
+        replay = 1,
+        extraBufferCapacity = 32,
+        onBufferOverflow = BufferOverflow.DROP_OLDEST
     )
 
     val updates: SharedFlow<RefinementEvent> = _updates.asSharedFlow()
