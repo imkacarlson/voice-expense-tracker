@@ -15,9 +15,13 @@ import com.squareup.moshi.Moshi
 import com.squareup.moshi.kotlin.reflect.KotlinJsonAdapterFactory
 import java.util.LinkedHashSet
 import java.util.Locale
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.system.measureTimeMillis
 
 private const val TAG = "StagedOrchestrator"
+private const val GENAI_WAIT_TIMEOUT_MS = 8000L
+private const val GENAI_WAIT_POLL_MS = 200L
 
 data class FieldRefinementUpdate(
     val field: FieldKey,
@@ -111,7 +115,7 @@ class StagedParsingOrchestrator(
             } catch (_: Throwable) {}
             Log.d(TAG, "Stage1 (precomputed) duration=${stage1DurationMs}ms confidences=${heuristicDraft.confidences}")
         }
-        val genAiAvailable = genAiGateway.isAvailable()
+        val genAiAvailable = awaitGenAiAvailability(orderedTargetFields.isNotEmpty())
 
         try {
             val summary = if (orderedTargetFields.isEmpty()) {
@@ -609,6 +613,45 @@ class StagedParsingOrchestrator(
             }
             else -> draft
         }
+    }
+
+    private suspend fun awaitGenAiAvailability(hasTargets: Boolean): Boolean {
+        if (!hasTargets) return genAiGateway.isAvailable()
+        if (genAiGateway.isAvailable()) return true
+
+        try {
+            Log.w(
+                TAG,
+                "GenAI unavailable; waiting up to ${GENAI_WAIT_TIMEOUT_MS}ms for availability"
+            )
+            Log.w(
+                "AI.Validate",
+                "GenAI unavailable; waiting up to ${GENAI_WAIT_TIMEOUT_MS}ms before falling back"
+            )
+        } catch (_: Throwable) {}
+
+        var available = false
+        val waitedMs = measureTimeMillis {
+            available = withTimeoutOrNull(GENAI_WAIT_TIMEOUT_MS) {
+                while (!genAiGateway.isAvailable()) {
+                    delay(GENAI_WAIT_POLL_MS)
+                }
+                true
+            } ?: false
+        }
+
+        if (available) {
+            try {
+                Log.i(TAG, "GenAI became available after ${waitedMs}ms")
+                Log.i("AI.Validate", "GenAI became available after ${waitedMs}ms")
+            } catch (_: Throwable) {}
+        } else {
+            try {
+                Log.w(TAG, "GenAI still unavailable after ${waitedMs}ms")
+                Log.w("AI.Validate", "GenAI still unavailable after ${waitedMs}ms")
+            } catch (_: Throwable) {}
+        }
+        return available
     }
 
     private data class SingleFieldAttempt(
