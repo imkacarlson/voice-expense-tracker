@@ -199,6 +199,11 @@ class StagedParsingOrchestrator(
                     },
                     field = field
                 )
+                if (field == FieldKey.MERCHANT || field == FieldKey.DESCRIPTION) {
+                    System.err.println(
+                        "DEBUG [AI.Debug]: Applied refinement for ${field.name.lowercase(Locale.US)} merchant='${currentDraft.merchant}' merchantConf=$postMerchantConf"
+                    )
+                }
             }
             listener?.let { callback ->
                 callback(
@@ -269,6 +274,9 @@ class StagedParsingOrchestrator(
             Log.d(
                 "AI.Debug",
                 "Focused prompt context field=${field.name.lowercase(Locale.US)} merchant='${draftForPrompt.merchant}' merchantConf=${String.format(Locale.US, "%.2f", merchantConfidence)}"
+            )
+            System.err.println(
+                "DEBUG [AI.Debug]: Focused prompt context field=${field.name.lowercase(Locale.US)} merchant='${draftForPrompt.merchant}' merchantConf=${String.format(Locale.US, "%.2f", merchantConfidence)}"
             )
         } catch (_: Throwable) {}
         val prePromptMerchantConf = String.format(Locale.US, "%.2f", draftForPrompt.confidence(FieldKey.MERCHANT))
