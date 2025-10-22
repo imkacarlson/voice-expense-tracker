@@ -185,12 +185,17 @@ class StagedParsingOrchestrator(
             normalizedValue?.let { value ->
                 cumulativeRefinements[field] = value
                 currentDraft = applyRefinementToDraft(currentDraft, field, value)
+                val postMerchantConf = String.format(Locale.US, "%.2f", currentDraft.confidence(FieldKey.MERCHANT))
                 logger?.addEntry(
                     type = ParsingRunLogEntryType.SUMMARY,
                     title = "Refinement applied for ${field.name.lowercase(Locale.US)}",
                     detail = buildString {
                         appendLine("duration=${attempt.durationMs}ms")
                         appendLine("value=$value")
+                        if (field == FieldKey.MERCHANT || field == FieldKey.DESCRIPTION) {
+                            appendLine("merchant='${currentDraft.merchant}'")
+                            appendLine("merchantConf=$postMerchantConf")
+                        }
                     },
                     field = field
                 )
@@ -266,6 +271,16 @@ class StagedParsingOrchestrator(
                 "Focused prompt context field=${field.name.lowercase(Locale.US)} merchant='${draftForPrompt.merchant}' merchantConf=${String.format(Locale.US, "%.2f", merchantConfidence)}"
             )
         } catch (_: Throwable) {}
+        val prePromptMerchantConf = String.format(Locale.US, "%.2f", draftForPrompt.confidence(FieldKey.MERCHANT))
+        logger?.addEntry(
+            type = ParsingRunLogEntryType.SUMMARY,
+            title = "Draft before ${field.name.lowercase(Locale.US)} prompt",
+            detail = buildString {
+                appendLine("merchant='${draftForPrompt.merchant}'")
+                appendLine("merchantConf=$prePromptMerchantConf")
+            },
+            field = field
+        )
         val prompt = focusedPromptBuilder.buildFocusedPrompt(
             input = input,
             heuristicDraft = draftForPrompt,
