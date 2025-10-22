@@ -625,11 +625,11 @@ class StagedParsingOrchestrator(
             when (field) {
                 FieldKey.MERCHANT -> Log.d(
                     "AI.Debug",
-                    "Updated draft merchant='${updated.merchant}' merchantConf=${String.format(Locale.US, \"%.2f\", updated.confidence(FieldKey.MERCHANT))}"
+                    "Updated draft merchant='${updated.merchant}' merchantConf=${String.format(Locale.US, "%.2f", updated.confidence(FieldKey.MERCHANT))}"
                 )
                 FieldKey.DESCRIPTION -> Log.d(
                     "AI.Debug",
-                    "Updated draft description='${updated.description}' descriptionConf=${String.format(Locale.US, \"%.2f\", updated.confidence(FieldKey.DESCRIPTION))}"
+                    "Updated draft description='${updated.description}' descriptionConf=${String.format(Locale.US, "%.2f", updated.confidence(FieldKey.DESCRIPTION))}"
                 )
                 else -> {}
             }
