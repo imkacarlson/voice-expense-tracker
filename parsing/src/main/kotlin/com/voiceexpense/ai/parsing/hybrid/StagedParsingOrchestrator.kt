@@ -185,25 +185,15 @@ class StagedParsingOrchestrator(
             normalizedValue?.let { value ->
                 cumulativeRefinements[field] = value
                 currentDraft = applyRefinementToDraft(currentDraft, field, value)
-                val postMerchantConf = String.format(Locale.US, "%.2f", currentDraft.confidence(FieldKey.MERCHANT))
                 logger?.addEntry(
                     type = ParsingRunLogEntryType.SUMMARY,
                     title = "Refinement applied for ${field.name.lowercase(Locale.US)}",
                     detail = buildString {
                         appendLine("duration=${attempt.durationMs}ms")
                         appendLine("value=$value")
-                        if (field == FieldKey.MERCHANT || field == FieldKey.DESCRIPTION) {
-                            appendLine("merchant='${currentDraft.merchant}'")
-                            appendLine("merchantConf=$postMerchantConf")
-                        }
                     },
                     field = field
                 )
-                if (field == FieldKey.MERCHANT || field == FieldKey.DESCRIPTION) {
-                    System.err.println(
-                        "DEBUG [AI.Debug]: Applied refinement for ${field.name.lowercase(Locale.US)} merchant='${currentDraft.merchant}' merchantConf=$postMerchantConf"
-                    )
-                }
             }
             listener?.let { callback ->
                 callback(
@@ -269,26 +259,6 @@ class StagedParsingOrchestrator(
         refinementErrors: MutableList<String>
     ): SingleFieldAttempt {
         val logger = context.runLogBuilder
-        try {
-            val merchantConfidence = draftForPrompt.confidence(FieldKey.MERCHANT)
-            Log.d(
-                "AI.Debug",
-                "Focused prompt context field=${field.name.lowercase(Locale.US)} merchant='${draftForPrompt.merchant}' merchantConf=${String.format(Locale.US, "%.2f", merchantConfidence)}"
-            )
-            System.err.println(
-                "DEBUG [AI.Debug]: Focused prompt context field=${field.name.lowercase(Locale.US)} merchant='${draftForPrompt.merchant}' merchantConf=${String.format(Locale.US, "%.2f", merchantConfidence)}"
-            )
-        } catch (_: Throwable) {}
-        val prePromptMerchantConf = String.format(Locale.US, "%.2f", draftForPrompt.confidence(FieldKey.MERCHANT))
-        logger?.addEntry(
-            type = ParsingRunLogEntryType.SUMMARY,
-            title = "Draft before ${field.name.lowercase(Locale.US)} prompt",
-            detail = buildString {
-                appendLine("merchant='${draftForPrompt.merchant}'")
-                appendLine("merchantConf=$prePromptMerchantConf")
-            },
-            field = field
-        )
         val prompt = focusedPromptBuilder.buildFocusedPrompt(
             input = input,
             heuristicDraft = draftForPrompt,
@@ -609,7 +579,7 @@ class StagedParsingOrchestrator(
         value: Any?
     ): HeuristicDraft {
         val confidences = draft.confidences.toMutableMap()
-        val updated = when (field) {
+        return when (field) {
             FieldKey.MERCHANT -> {
                 val text = (value as? String)?.trim()
                 confidences[field] = if (!text.isNullOrEmpty()) 0.95f else draft.confidence(field)
@@ -644,20 +614,6 @@ class StagedParsingOrchestrator(
             }
             else -> draft
         }
-        try {
-            when (field) {
-                FieldKey.MERCHANT -> Log.d(
-                    "AI.Debug",
-                    "Updated draft merchant='${updated.merchant}' merchantConf=${String.format(Locale.US, "%.2f", updated.confidence(FieldKey.MERCHANT))}"
-                )
-                FieldKey.DESCRIPTION -> Log.d(
-                    "AI.Debug",
-                    "Updated draft description='${updated.description}' descriptionConf=${String.format(Locale.US, "%.2f", updated.confidence(FieldKey.DESCRIPTION))}"
-                )
-                else -> {}
-            }
-        } catch (_: Throwable) {}
-        return updated
     }
 
     private suspend fun awaitGenAiAvailability(hasTargets: Boolean): Boolean {
