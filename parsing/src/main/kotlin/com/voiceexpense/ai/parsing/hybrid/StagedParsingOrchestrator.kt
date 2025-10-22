@@ -259,6 +259,13 @@ class StagedParsingOrchestrator(
         refinementErrors: MutableList<String>
     ): SingleFieldAttempt {
         val logger = context.runLogBuilder
+        try {
+            val merchantConfidence = draftForPrompt.confidence(FieldKey.MERCHANT)
+            Log.d(
+                "AI.Debug",
+                "Focused prompt context field=${field.name.lowercase(Locale.US)} merchant='${draftForPrompt.merchant}' merchantConf=${String.format(Locale.US, "%.2f", merchantConfidence)}"
+            )
+        } catch (_: Throwable) {}
         val prompt = focusedPromptBuilder.buildFocusedPrompt(
             input = input,
             heuristicDraft = draftForPrompt,
@@ -579,7 +586,7 @@ class StagedParsingOrchestrator(
         value: Any?
     ): HeuristicDraft {
         val confidences = draft.confidences.toMutableMap()
-        return when (field) {
+        val updated = when (field) {
             FieldKey.MERCHANT -> {
                 val text = (value as? String)?.trim()
                 confidences[field] = if (!text.isNullOrEmpty()) 0.95f else draft.confidence(field)
@@ -614,6 +621,20 @@ class StagedParsingOrchestrator(
             }
             else -> draft
         }
+        try {
+            when (field) {
+                FieldKey.MERCHANT -> Log.d(
+                    "AI.Debug",
+                    "Updated draft merchant='${updated.merchant}' merchantConf=${String.format(Locale.US, \"%.2f\", updated.confidence(FieldKey.MERCHANT))}"
+                )
+                FieldKey.DESCRIPTION -> Log.d(
+                    "AI.Debug",
+                    "Updated draft description='${updated.description}' descriptionConf=${String.format(Locale.US, \"%.2f\", updated.confidence(FieldKey.DESCRIPTION))}"
+                )
+                else -> {}
+            }
+        } catch (_: Throwable) {}
+        return updated
     }
 
     private suspend fun awaitGenAiAvailability(hasTargets: Boolean): Boolean {
