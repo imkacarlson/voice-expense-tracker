@@ -17,12 +17,22 @@ class FocusedPromptBuilder {
 
     private val tag = "FocusedPrompt"
 
+    /**
+     * Builds a focused prompt for a SINGLE field refinement.
+     * The orchestrator calls this once per field that needs AI refinement.
+     */
     fun buildFocusedPrompt(
         input: String,
         heuristicDraft: HeuristicDraft,
         targetFields: Set<FieldKey>,
         context: ParsingContext = ParsingContext()
     ): String {
+        // In practice, targetFields always contains exactly one field since the orchestrator
+        // refines fields one at a time. This assertion ensures we catch any misuse.
+        require(targetFields.size <= 1) {
+            "FocusedPromptBuilder only supports single-field refinement. Got ${targetFields.size} fields: ${targetFields.joinToString()}"
+        }
+
         if (targetFields.isEmpty()) {
             return buildString {
                 appendLine(FOCUSED_SYSTEM)
@@ -31,25 +41,19 @@ class FocusedPromptBuilder {
             }
         }
 
-        val orderedFields = targetFields
-            .sortedBy { FIELD_ORDER.indexOf(it).takeIf { index -> index >= 0 } ?: Int.MAX_VALUE }
-
-        val prompt = if (orderedFields.size <= 2) {
-            buildTemplatePrompt(orderedFields, input, heuristicDraft, context)
-        } else {
-            buildMultiFieldPrompt(orderedFields.toSet(), input, heuristicDraft, context)
-        }
+        val field = targetFields.single()
+        val prompt = buildSingleFieldPrompt(field, input, heuristicDraft, context)
 
         val clamped = prompt.take(MAX_PROMPT_LENGTH)
         Log.d(
             tag,
-            "built prompt len=${clamped.length} fields=${orderedFields.joinToString()}"
+            "built prompt len=${clamped.length} field=${field.name}"
         )
         return clamped
     }
 
-    private fun buildTemplatePrompt(
-        fields: List<FieldKey>,
+    private fun buildSingleFieldPrompt(
+        field: FieldKey,
         input: String,
         heuristicDraft: HeuristicDraft,
         context: ParsingContext
@@ -59,44 +63,15 @@ class FocusedPromptBuilder {
             appendLine()
             appendLine("Input: $input")
             appendLine()
-            fields.forEach { field ->
-                appendLine("Field: ${fieldLabel(field)} (key \"${jsonKey(field)}\")")
-                appendLine("Heuristic: ${formatHeuristic(field, heuristicDraft)}")
-                val options = formatOptions(field, heuristicDraft, context, input)
-                if (options.isNotBlank()) {
-                    appendLine("Allowed values: $options")
-                }
-                appendLine("Instruction: ${instructionFor(field)}")
-                appendLine()
-            }
-            appendGuidelines(fields.toSet())
-        }
-    }
-
-    private fun buildMultiFieldPrompt(
-        fields: Set<FieldKey>,
-        input: String,
-        heuristicDraft: HeuristicDraft,
-        context: ParsingContext
-    ): String {
-        val keys = fields.joinToString { "\"${jsonKey(it)}\"" }
-        val heuristics = fields.joinToString(separator = "\n") { field ->
-            "- ${jsonKey(field)}: ${formatHeuristic(field, heuristicDraft)}"
-        }
-        val options = buildSharedOptions(fields, heuristicDraft, context, input)
-
-        return buildString {
-            appendLine(FOCUSED_SYSTEM)
-            appendLine()
-            appendLine("Input: $input")
-            appendLine()
-            appendLine("Return a JSON object with only these keys: $keys")
-            appendLine("Heuristic summary:")
-            appendLine(heuristics)
+            appendLine("Field: ${fieldLabel(field)} (key \"${jsonKey(field)}\")")
+            appendLine("Heuristic: ${formatHeuristic(field, heuristicDraft)}")
+            val options = formatOptions(field, heuristicDraft, context, input)
             if (options.isNotBlank()) {
                 appendLine("Allowed values: $options")
             }
-            appendGuidelines(fields)
+            appendLine("Instruction: ${instructionFor(field, heuristicDraft)}")
+            appendLine()
+            appendGuideline(field)
         }
     }
 
@@ -153,40 +128,17 @@ class FocusedPromptBuilder {
         return if (options.isEmpty()) "" else options.joinToString()
     }
 
-    private fun buildSharedOptions(
-        fields: Set<FieldKey>,
-        draft: HeuristicDraft,
-        context: ParsingContext,
-        input: String
-    ): String {
-        val parts = mutableListOf<String>()
-        if (fields.any { it == FieldKey.MERCHANT } && context.recentMerchants.isNotEmpty()) {
-            parts += "recentMerchants=${context.recentMerchants.take(MAX_OPTIONS).joinToString()}"
-        }
-        if (fields.any { it == FieldKey.EXPENSE_CATEGORY } && context.allowedExpenseCategories.isNotEmpty()) {
-            parts += "expenseCategories=${context.allowedExpenseCategories.take(MAX_OPTIONS).joinToString()}"
-        }
-        if (fields.any { it == FieldKey.INCOME_CATEGORY } && context.allowedIncomeCategories.isNotEmpty()) {
-            parts += "incomeCategories=${context.allowedIncomeCategories.take(MAX_OPTIONS).joinToString()}"
-        }
-        if (fields.any { it == FieldKey.ACCOUNT }) {
-            val accounts = context.allowedAccounts.ifEmpty { context.knownAccounts }
-            if (accounts.isNotEmpty()) {
-                parts += "accounts=${accounts.joinToString()}"
-            }
-        }
-        if (fields.any { it == FieldKey.TAGS } && context.allowedTags.isNotEmpty()) {
-            val tags = filterTagOptions(context.allowedTags, draft, input).take(MAX_OPTIONS)
-            if (tags.isNotEmpty()) {
-                parts += "tags=${tags.joinToString()}"
-            }
-        }
-        return parts.joinToString("; ")
-    }
-
-    private fun instructionFor(field: FieldKey): String = when (field) {
+    private fun instructionFor(field: FieldKey, draft: HeuristicDraft = HeuristicDraft()): String = when (field) {
             FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"Starbucks\", \"Target\"). If the input mentions payment methods (e.g., payment apps like Splitwise, Venmo, PayPal, Zelle, etc; or payment cards), identify the actual merchant or service being paid for, NOT the payment method. Examples: 'my roommate put into Splitwise that they reloaded our E-ZPass' → \"E-ZPass\" (NOT \"Splitwise\"); 'my card was charged for the appointment' → null (provider unknown). Return null if the merchant is genuinely unknown."
-            FieldKey.DESCRIPTION -> "Provide a concise noun phrase describing what was actually purchased or the service received (e.g., \"Coffee and pastry\", \"Household items\", \"Utility bill\"). Preserve key numbers or modifiers from the input; do not mention payment methods or account names. Avoid verbs. Do not use generic placeholders—describe the specific goods or service mentioned. Do not repeat the merchant name in the description."
+            FieldKey.DESCRIPTION -> buildString {
+                append("Provide a concise noun phrase describing what was actually purchased or the service received (e.g., \"Coffee and pastry\", \"Household items\", \"Utility bill\"). Preserve key numbers or modifiers from the input; do not mention payment methods or account names. Avoid verbs. Do not use generic placeholders—describe the specific goods or service mentioned. Do not repeat the merchant name in the description.")
+                // If merchant is already known from earlier refinement, make it explicit
+                val merchant = draft.merchant
+                val merchantConfidence = draft.confidence(FieldKey.MERCHANT)
+                if (!merchant.isNullOrBlank() && merchantConfidence >= HEURISTIC_INCLUSION_THRESHOLD) {
+                    append(" The merchant is '$merchant' - do not repeat this name in the description.")
+                }
+            }
             FieldKey.EXPENSE_CATEGORY -> """Choose the best matching expense category based on what was purchased or the service received:
 - 'Eating Out': restaurant meals, takeout, coffee shops, fast food, snacks, drinks
 - 'Transportation': vehicle gas/gasoline/fuel for cars, parking, tolls, transit fares, rideshares, vehicle expenses
@@ -196,7 +148,7 @@ class FocusedPromptBuilder {
 - 'Health/medical': doctor visits, therapy appointments, prescriptions, medical equipment, vision care, dental
 Return null if none of these categories apply to the transaction."""
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
-            FieldKey.ACCOUNT -> "Return the account or card name from the allowed list. Match phonetic variations, case differences, and minor spelling differences common in voice-to-text (e.g., 'built' → 'Bilt', 'siti' → 'Citi', 'chase sapphire' → 'Chase Sapphire Preferred'). Return null if no account name is mentioned."
+            FieldKey.ACCOUNT -> "Return the account or card name from the allowed list. Match phonetic variations, case differences, and minor spelling differences common in voice-to-text (e.g., 'built' → 'Bilt', 'siti' → 'Citi', 'chase sapphire' → 'Chase Sapphire Preferred'). Do NOT infer or guess account names from generic references like 'her card' or 'my card'. Only match if the actual account name is explicitly stated in the input. Return null if no account name is mentioned."
             FieldKey.TAGS -> "Return tags from the allowed list that match the transaction. Only include tags if explicitly mentioned or clearly implied in the input. Use fuzzy/phonetic matching (e.g., 'autopaid' → 'Auto-Paid', 'splitwise' → 'Splitwise'). For 'Auto-Paid': only if the input explicitly mentions automatic payment, autopay, or auto-charge. For 'Subscription': only if the input explicitly mentions it's a subscription or recurring payment. Return empty array if no tags clearly apply."
             else -> "" // Should not be requested here.
     }
@@ -229,12 +181,10 @@ Return null if none of these categories apply to the transaction."""
         append('"')
     }
 
-    private fun StringBuilder.appendGuidelines(fields: Set<FieldKey>) {
+    private fun StringBuilder.appendGuideline(field: FieldKey) {
         appendLine("Respond with compact JSON containing only the listed keys.")
-        fields.sortedBy { FIELD_ORDER.indexOf(it).takeIf { idx -> idx >= 0 } ?: Int.MAX_VALUE }.forEach { field ->
-            guidelineFor(field)?.let { rule ->
-                appendLine("Guideline for ${jsonKey(field)}: $rule")
-            }
+        guidelineFor(field)?.let { rule ->
+            appendLine("Guideline for ${jsonKey(field)}: $rule")
         }
     }
 
@@ -262,20 +212,11 @@ Return null if none of these categories apply to the transaction."""
          */
         private const val HEURISTIC_INCLUSION_THRESHOLD = 0.3f
 
-        private val FIELD_ORDER = listOf(
-            FieldKey.MERCHANT,
-            FieldKey.DESCRIPTION,
-            FieldKey.EXPENSE_CATEGORY,
-            FieldKey.INCOME_CATEGORY,
-            FieldKey.TAGS,
-            FieldKey.ACCOUNT
-        )
-
         private val SPLIT_HINT_REGEX = Regex("""(?i)(splitwise|split|splitting|my share|owe|i owe|owed)""")
 
         private fun guidelineFor(field: FieldKey): String? = when (field) {
             FieldKey.MERCHANT -> "Return only the merchant or vendor name—no verbs, adjectives, or trailing phrases. Avoid payment methods."
-            FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input and avoids payment method names. Do not repeat the merchant name."
+            FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input and avoids payment method names. NEVER include the merchant name in the description."
             FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category: 'Eating Out' for food/drinks, 'Home' for household items/utility bills (gas/electric/water/internet bills), 'Personal' for subscriptions/services, 'Transportation' for vehicle fuel/parking/transit, 'Groceries' for supermarket food, 'Health/medical' for medical services. Return null if none apply."
             FieldKey.INCOME_CATEGORY -> "Choose exactly one income category from the allowed list; return null if none apply."
             FieldKey.ACCOUNT -> "Return the account/card name from the allowed list, matching phonetic variations and spelling differences from voice-to-text (e.g., 'built' → 'Bilt', 'siti' → 'Citi'). Return null if none apply."

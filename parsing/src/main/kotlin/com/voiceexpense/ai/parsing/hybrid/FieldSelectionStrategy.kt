@@ -134,9 +134,16 @@ object FieldSelectionStrategy {
         val missingValue: Boolean
     ) {
         fun priority(): Int = when {
-            field in CRITICAL_FIELDS && missingValue -> 0
-            missingValue -> 1
-            else -> 2
+            // MERCHANT gets highest priority to ensure it's refined before DESCRIPTION
+            field == FieldKey.MERCHANT && missingValue -> 0
+            field == FieldKey.MERCHANT && !missingValue -> 1
+            // DESCRIPTION comes after MERCHANT
+            field == FieldKey.DESCRIPTION && missingValue -> 2
+            field == FieldKey.DESCRIPTION && !missingValue -> 3
+            // Other missing fields
+            missingValue -> 4
+            // Other below-threshold fields
+            else -> 5
         }
     }
 
