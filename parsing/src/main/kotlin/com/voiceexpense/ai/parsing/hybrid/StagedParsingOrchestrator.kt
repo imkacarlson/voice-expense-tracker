@@ -171,20 +171,19 @@ class StagedParsingOrchestrator(
         }
         val cumulativeRefinements = linkedMapOf<FieldKey, Any?>()
         var stage2DurationMs = 0L
-        var currentDraft = heuristicDraft  // Track the evolving draft as we refine fields
         orderedTargetFields.forEach { field ->
             val attempt = refineSingleField(
                 field = field,
                 input = input,
                 context = context,
-                draftForPrompt = currentDraft,  // Use the updated draft that includes previously refined fields
+                draftForPrompt = heuristicDraft,
                 refinementErrors = refinementErrors
             )
             stage2DurationMs += attempt.durationMs
             val normalizedValue = normalizeFieldValue(field, attempt.refinedValue, context)
             normalizedValue?.let { value ->
                 cumulativeRefinements[field] = value
-                currentDraft = applyRefinementToDraft(currentDraft, field, value)
+                heuristicDraft = applyRefinementToDraft(heuristicDraft, field, value)
                 logger?.addEntry(
                     type = ParsingRunLogEntryType.SUMMARY,
                     title = "Refinement applied for ${field.name.lowercase(Locale.US)}",
