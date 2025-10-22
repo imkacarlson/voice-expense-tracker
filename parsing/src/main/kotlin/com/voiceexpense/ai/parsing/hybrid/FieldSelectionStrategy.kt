@@ -72,15 +72,19 @@ object FieldSelectionStrategy {
 
         val belowThreshold = confidence <= 0f || confidence < threshold
         val missingValue = isMissing(field, draft)
+        val effectiveMissing = when {
+            field == FieldKey.MERCHANT && belowThreshold -> true
+            else -> missingValue
+        }
 
-        if (!belowThreshold && !missingValue) {
+        if (!belowThreshold && !effectiveMissing) {
             return null
         }
 
         return FieldCandidate(
             field = field,
             confidence = confidence,
-            missingValue = missingValue
+            missingValue = effectiveMissing
         )
     }
 

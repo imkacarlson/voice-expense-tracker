@@ -66,6 +66,11 @@ class FocusedPromptBuilder {
                 if (options.isNotBlank()) {
                     appendLine("Allowed values: $options")
                 }
+                if (field == FieldKey.DESCRIPTION) {
+                    heuristicDraft.merchant?.takeIf { it.isNotBlank() }?.let { merchant ->
+                        appendLine("Context: merchant already resolved as \"$merchant\". Do not repeat it.")
+                    }
+                }
                 appendLine("Instruction: ${instructionFor(field)}")
                 appendLine()
             }
@@ -84,6 +89,7 @@ class FocusedPromptBuilder {
             "- ${jsonKey(field)}: ${formatHeuristic(field, heuristicDraft)}"
         }
         val options = buildSharedOptions(fields, heuristicDraft, context, input)
+        val resolvedMerchant = heuristicDraft.merchant?.takeIf { it.isNotBlank() }
 
         return buildString {
             appendLine(FOCUSED_SYSTEM)
@@ -95,6 +101,9 @@ class FocusedPromptBuilder {
             appendLine(heuristics)
             if (options.isNotBlank()) {
                 appendLine("Allowed values: $options")
+            }
+            if (FieldKey.DESCRIPTION in fields && resolvedMerchant != null) {
+                appendLine("Context: merchant already resolved as \"$resolvedMerchant\". Keep it out of the description.")
             }
             appendGuidelines(fields)
         }
