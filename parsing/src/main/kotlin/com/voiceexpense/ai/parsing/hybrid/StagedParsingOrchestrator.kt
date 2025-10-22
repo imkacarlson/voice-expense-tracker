@@ -580,7 +580,7 @@ class StagedParsingOrchestrator(
         val confidences = draft.confidences.toMutableMap()
         return when (field) {
             FieldKey.MERCHANT -> {
-                val text = (value as? String)?.trim()
+                val text = capitalizeFirst((value as? String)?.trim())
                 confidences[field] = if (!text.isNullOrEmpty()) 0.95f else draft.confidence(field)
                 draft.copy(merchant = text.takeUnless { it.isNullOrEmpty() } ?: draft.merchant, confidences = confidences.toMap())
             }
