@@ -81,7 +81,7 @@ class FocusedPromptBuilderTest {
             context = context
         )
 
-        assertThat(prompt.length).isAtMost(1000)
+        assertThat(prompt.length).isAtMost(5000)
     }
 
     @Test

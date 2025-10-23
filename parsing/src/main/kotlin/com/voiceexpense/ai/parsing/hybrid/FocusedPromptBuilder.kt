@@ -11,7 +11,7 @@ import java.util.Locale
  *
  * The builder emits template-style prompts when one or two fields need help and
  * falls back to a minimal JSON request for larger sets. All prompts are clamped
- * to the 1000 character budget defined in the spec requirements.
+ * to the 5000 character budget defined in the spec requirements.
  */
 class FocusedPromptBuilder {
 
@@ -261,7 +261,7 @@ Return null if none of these categories apply to the transaction."""
     }
 
     companion object {
-        private const val MAX_PROMPT_LENGTH = 1000
+        private const val MAX_PROMPT_LENGTH = 5000
         private const val MAX_OPTIONS = 6
         private const val FOCUSED_SYSTEM = "Refine only the requested transaction fields and keep JSON minimal."
 
