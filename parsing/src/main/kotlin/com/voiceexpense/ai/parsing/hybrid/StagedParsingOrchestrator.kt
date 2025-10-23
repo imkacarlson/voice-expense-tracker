@@ -20,7 +20,7 @@ import kotlinx.coroutines.withTimeoutOrNull
 import kotlin.system.measureTimeMillis
 
 private const val TAG = "StagedOrchestrator"
-private const val GENAI_WAIT_TIMEOUT_MS = 8000L
+private const val GENAI_WAIT_TIMEOUT_MS = 60_000L
 private const val GENAI_WAIT_POLL_MS = 200L
 
 data class FieldRefinementUpdate(
