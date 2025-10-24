@@ -94,11 +94,16 @@ function doPost(e) {
     console.log(`New expense added by user ${userHash} at ${new Date().toISOString()}`);
     console.log(`Description: ${data.description}, Amount: ${data.amount}`);
     writeLog('INFO', 'Expense added successfully', `User: ${userHash}, Amount: ${data.amount}, Desc: ${data.description}`);
-    
+    const amountValue = (() => {
+      if (data.amount === null || data.amount === undefined || data.amount === '') return null;
+      const numeric = Number(data.amount);
+      return Number.isFinite(numeric) ? numeric : null;
+    })();
+
     return createResponse('success', 'Expense added successfully', {
       timestamp: Utilities.formatDate(now, tz, "M/d/yyyy HH:mm:ss"),
       description: data.description,
-      amount: data.amount,
+      amount: amountValue,
       rowNumber: sheet.getLastRow()
     });
     
