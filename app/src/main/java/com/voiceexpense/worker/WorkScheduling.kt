@@ -20,6 +20,5 @@ fun enqueueSyncNow(context: Context) {
         .setBackoffCriteria(BackoffPolicy.EXPONENTIAL, 10, TimeUnit.SECONDS)
         .build()
     WorkManager.getInstance(context)
-        .enqueueUniqueWork(UNIQUE_SYNC_WORK, ExistingWorkPolicy.KEEP, work)
+        .enqueueUniqueWork(UNIQUE_SYNC_WORK, ExistingWorkPolicy.REPLACE, work)
 }
-

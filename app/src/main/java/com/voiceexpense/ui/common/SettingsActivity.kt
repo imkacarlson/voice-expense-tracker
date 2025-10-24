@@ -37,6 +37,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import com.voiceexpense.auth.AuthRepository
 import com.voiceexpense.auth.TokenProvider
+import com.voiceexpense.worker.enqueueSyncNow
 import dagger.hilt.android.AndroidEntryPoint
 
 object SettingsKeys {
@@ -82,6 +83,7 @@ class SettingsActivity : AppCompatActivity() {
         val signOut: Button = findViewById(R.id.btn_sign_out)
         val authStatus: android.widget.TextView = findViewById(R.id.text_auth_status)
         gatingView = findViewById(R.id.text_sync_gating)
+        val syncNow: Button = findViewById(R.id.btn_sync_now)
         val aiStatus: android.widget.TextView = findViewById(R.id.text_ai_status)
         val openSetup: Button = findViewById(R.id.btn_open_setup_guide)
         val modelManager = ModelManager()
@@ -255,6 +257,22 @@ class SettingsActivity : AppCompatActivity() {
                 .apply()
             android.widget.Toast.makeText(this, R.string.info_settings_saved, android.widget.Toast.LENGTH_SHORT).show()
             updateGatingMessage()
+        }
+
+        syncNow.setOnClickListener {
+            val prefsSnapshot = prefsOrInit()
+            val url = prefsSnapshot.getString(SettingsKeys.WEB_APP_URL, "")?.trim().orEmpty()
+            if (url.isBlank()) {
+                android.widget.Toast.makeText(this, R.string.error_missing_web_url, android.widget.Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            val account = GoogleSignIn.getLastSignedInAccount(this)
+            if (account == null) {
+                android.widget.Toast.makeText(this, R.string.info_sign_in_required, android.widget.Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            enqueueSyncNow(applicationContext)
+            android.widget.Toast.makeText(this, R.string.manual_sync_triggered, android.widget.Toast.LENGTH_SHORT).show()
         }
 
         openSetup.setOnClickListener {

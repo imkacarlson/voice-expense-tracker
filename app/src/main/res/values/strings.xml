@@ -18,6 +18,8 @@
     <string name="toast_sign_in_todo">Sign-in flow not yet implemented</string>
     <string name="toast_sign_out_todo">Sign-out not yet implemented</string>
     <string name="error_missing_web_url">Enter the Apps Script Web App URL to enable sync.</string>
+    <string name="manual_sync_now">Sync queued transactions</string>
+    <string name="manual_sync_triggered">Sync requested. Queued expenses will post shortly.</string>
     <string name="info_sign_in_required">Sign in required to post transactions.</string>
     <string name="info_settings_saved">Settings saved.</string>
     <string name="info_sign_in_first">Sign in first</string>
