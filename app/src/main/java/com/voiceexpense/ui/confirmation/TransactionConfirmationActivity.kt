@@ -224,6 +224,7 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         }
         var categoryUserChange = false
         var accountUserChange = false
+        var typeUserChange = false
         categorySpinner.setOnTouchListener { _, _ ->
             categoryUserChange = true
             false
@@ -416,12 +417,28 @@ class TransactionConfirmationActivity : AppCompatActivity() {
         }
 
         // Update visibility on type changes
+        typeSpinner.setOnTouchListener { _, _ ->
+            typeUserChange = true
+            false
+        }
+        typeSpinner.setOnFocusChangeListener { _, hasFocus ->
+            if (hasFocus) typeUserChange = true
+        }
         typeSpinner.onItemSelectedListener = object : android.widget.AdapterView.OnItemSelectedListener {
             override fun onItemSelected(parent: android.widget.AdapterView<*>?, view: android.view.View?, position: Int, id: Long) {
                 val type = when (position) {
                     0 -> com.voiceexpense.data.model.TransactionType.Expense
                     1 -> com.voiceexpense.data.model.TransactionType.Income
                     else -> com.voiceexpense.data.model.TransactionType.Transfer
+                }
+                if (typeUserChange) {
+                    viewModel.markFieldUserModified(FieldKey.TYPE)
+                    val current = viewModel.transaction.value
+                    if (current != null && current.type != type) {
+                        val updated = current.copy(type = type)
+                        viewModel.applyManualEdits(updated)
+                    }
+                    typeUserChange = false
                 }
                 viewModel.setSelectedType(type)
             }

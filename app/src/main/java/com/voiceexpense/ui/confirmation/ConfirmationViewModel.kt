@@ -293,6 +293,10 @@ class ConfirmationViewModel(
                 }
                 if (tags == transaction.tags) transaction else transaction.copy(tags = tags)
             }
+            FieldKey.TYPE -> {
+                val type = value as? com.voiceexpense.data.model.TransactionType ?: return transaction
+                if (type == transaction.type) transaction else transaction.copy(type = type)
+            }
             else -> transaction
         }
     }
