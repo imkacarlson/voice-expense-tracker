@@ -32,7 +32,7 @@ data class FieldConfidenceThresholds(
             FieldKey.AMOUNT_USD to 0.8f,
             FieldKey.USER_LOCAL_DATE to 0.75f,
             FieldKey.TYPE to 0.6f,
-            FieldKey.MERCHANT to 0.6f,
+            FieldKey.MERCHANT to 0.85f,
             FieldKey.ACCOUNT to 0.7f
         )
 
