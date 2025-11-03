@@ -70,6 +70,10 @@
     <string name="import_error_file_read">Failed to read file: %1$s</string>
 
     <!-- Developer options -->
+    <string name="ai_backend_label">AI Inference Backend</string>
+    <string name="ai_backend_description">GPU is faster but has known issues on Pixel 10. Use CPU if you experience crashes.</string>
+    <string name="ai_backend_gpu">GPU (faster, but may crash on Pixel 10)</string>
+    <string name="ai_backend_cpu">CPU (slower but stable, recommended for Pixel 10)</string>
 
     <string name="debug_logs_label">Enable debug logs (toasts + extra logging)</string>
     <string name="debug_logs_enabled">Debug logs enabled</string>

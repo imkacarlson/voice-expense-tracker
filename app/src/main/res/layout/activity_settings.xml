@@ -97,7 +97,40 @@
             android:text="On-device AI status: Unknown"
             android:paddingBottom="8dp" />
 
-        
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ai_backend_label"
+            android:textStyle="bold"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp" />
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/ai_backend_description"
+            android:textSize="12sp"
+            android:paddingBottom="8dp" />
+
+        <RadioGroup
+            android:id="@+id/radio_group_backend"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:paddingBottom="12dp">
+
+            <RadioButton
+                android:id="@+id/radio_backend_gpu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ai_backend_gpu" />
+
+            <RadioButton
+                android:id="@+id/radio_backend_cpu"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/ai_backend_cpu" />
+        </RadioGroup>
 
         <androidx.appcompat.widget.SwitchCompat
             android:id="@+id/switch_debug_logs"

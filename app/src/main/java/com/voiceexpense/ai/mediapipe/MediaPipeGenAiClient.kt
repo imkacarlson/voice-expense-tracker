@@ -86,9 +86,17 @@ class MediaPipeGenAiClient(private val context: Context, private val modelManage
             val extension = modelFile.extension
             Log.i("AI.MP", "Initializing model: ${modelFile.name} (${fileSizeMB}MB, extension=.$extension)")
 
+            // Check user preference for GPU vs CPU backend
+            // Default to GPU for backward compatibility, but allow CPU fallback for Pixel 10 GPU issues
+            val prefs = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
+            val useGpu = prefs.getBoolean("use_gpu_backend", true)
+            val backend = if (useGpu) LlmInference.Backend.GPU else LlmInference.Backend.CPU
+
+            Log.i("AI.MP", "Selected backend: ${if (useGpu) "GPU" else "CPU"}")
+
             val options = LlmInference.LlmInferenceOptions.builder()
                 .setModelPath(modelFile.absolutePath)
-                .setPreferredBackend(LlmInference.Backend.GPU)
+                .setPreferredBackend(backend)
                 .build()
             llm = LlmInference.createFromOptions(context, options)
             Log.i("AI.MP", "Model initialized successfully: ${modelFile.name}")

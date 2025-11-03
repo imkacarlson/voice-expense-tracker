@@ -45,6 +45,7 @@ object SettingsKeys {
     const val WEB_APP_URL = "web_app_url"
     const val KNOWN_ACCOUNTS = "known_accounts" // comma-separated labels
     const val DEBUG_LOGS = "debug_logs" // developer toggle for verbose local logs
+    const val USE_GPU_BACKEND = "use_gpu_backend" // AI inference backend: true=GPU (default), false=CPU
     // Removed: ASR_ONLINE_FALLBACK (voice features removed)
 }
 
@@ -54,6 +55,7 @@ class SettingsActivity : AppCompatActivity() {
     @Inject lateinit var tokenProvider: TokenProvider
     @Inject lateinit var configRepository: ConfigRepository
     @Inject lateinit var configImporter: ConfigImporter
+    @Inject lateinit var mediaPipeClient: com.voiceexpense.ai.mediapipe.MediaPipeGenAiClient
     private val emailScope = Scope("https://www.googleapis.com/auth/userinfo.email")
 
     companion object {
@@ -88,6 +90,9 @@ class SettingsActivity : AppCompatActivity() {
         val openSetup: Button = findViewById(R.id.btn_open_setup_guide)
         val modelManager = ModelManager()
         val debugSwitch: androidx.appcompat.widget.SwitchCompat = findViewById(R.id.switch_debug_logs)
+        val backendRadioGroup: android.widget.RadioGroup = findViewById(R.id.radio_group_backend)
+        val gpuRadio: android.widget.RadioButton = findViewById(R.id.radio_backend_gpu)
+        val cpuRadio: android.widget.RadioButton = findViewById(R.id.radio_backend_cpu)
         // Dropdown configuration views
         val typeSpinner: android.widget.Spinner = findViewById(R.id.spinner_option_type)
         val listView: android.widget.ListView = findViewById(R.id.list_options)
@@ -347,14 +352,40 @@ class SettingsActivity : AppCompatActivity() {
         runCatching {
             val p = prefsOrInit()
             debugSwitch.isChecked = p.getBoolean(SettingsKeys.DEBUG_LOGS, false)
+            val useGpu = p.getBoolean(SettingsKeys.USE_GPU_BACKEND, true)
+            if (useGpu) {
+                gpuRadio.isChecked = true
+            } else {
+                cpuRadio.isChecked = true
+            }
         }
 
-        
+
         // Persist Debug logs toggle
         debugSwitch.setOnCheckedChangeListener { _, isChecked ->
             prefsOrInit().edit().putBoolean(SettingsKeys.DEBUG_LOGS, isChecked).apply()
             val msg = if (isChecked) R.string.debug_logs_enabled else R.string.debug_logs_disabled
             android.widget.Toast.makeText(this, msg, android.widget.Toast.LENGTH_SHORT).show()
+        }
+
+        // Persist AI backend selection and invalidate current model
+        backendRadioGroup.setOnCheckedChangeListener { _, checkedId ->
+            val useGpu = checkedId == R.id.radio_backend_gpu
+            prefsOrInit().edit().putBoolean(SettingsKeys.USE_GPU_BACKEND, useGpu).apply()
+
+            // Close the existing model instance so it will reinitialize with the new backend
+            // on the next inference. This allows switching without restarting the app.
+            lifecycleScope.launch(Dispatchers.IO) {
+                mediaPipeClient.close()
+                android.util.Log.i("SettingsActivity", "Closed model instance for backend switch to ${if (useGpu) "GPU" else "CPU"}")
+            }
+
+            val backendName = if (useGpu) "GPU" else "CPU"
+            android.widget.Toast.makeText(
+                this,
+                "AI backend switched to $backendName. Model will reinitialize on next use.",
+                android.widget.Toast.LENGTH_LONG
+            ).show()
         }
 
         // Probe AI status lazily (ensureModelAvailable does IO internally, but keep off main)
