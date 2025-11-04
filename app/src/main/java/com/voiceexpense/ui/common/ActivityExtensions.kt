@@ -30,19 +30,27 @@ fun ComponentActivity.setupEdgeToEdge() {
     }
 
     // Apply window insets to the root content view
-    // This adds additional top padding for the status bar while preserving existing padding
+    // This adds additional padding for all system bars while preserving existing padding
     val contentView = findViewById<ViewGroup>(android.R.id.content)
     val rootView = contentView.getChildAt(0)
 
     // Capture the original padding from XML once, before any insets are applied
     // This prevents accumulation when the listener is called multiple times
     val originalPaddingTop = rootView.paddingTop
+    val originalPaddingBottom = rootView.paddingBottom
+    val originalPaddingLeft = rootView.paddingLeft
+    val originalPaddingRight = rootView.paddingRight
 
     ViewCompat.setOnApplyWindowInsetsListener(rootView) { view, insets ->
         val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
         // Always add system insets to the ORIGINAL padding, not the current padding
         // This prevents accumulation on keyboard open/close and navigation events
-        view.updatePadding(top = originalPaddingTop + systemBars.top)
+        view.updatePadding(
+            top = originalPaddingTop + systemBars.top,
+            bottom = originalPaddingBottom + systemBars.bottom,
+            left = originalPaddingLeft + systemBars.left,
+            right = originalPaddingRight + systemBars.right
+        )
         insets
     }
 }
