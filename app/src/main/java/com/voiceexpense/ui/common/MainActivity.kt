@@ -4,14 +4,14 @@ import android.content.Intent
 import android.content.Context
 import android.os.Bundle
 import android.widget.Button
-import android.widget.EditText
 import android.util.Log
 import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
+import com.google.android.material.appbar.MaterialToolbar
+import com.google.android.material.textfield.TextInputEditText
 import androidx.activity.viewModels
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
-import androidx.recyclerview.widget.DividerItemDecoration
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.voiceexpense.R
@@ -48,18 +48,22 @@ class MainActivity : AppCompatActivity() {
         setContentView(R.layout.activity_main)
         setupEdgeToEdge()
 
-        findViewById<Button>(R.id.btn_get_started).setOnClickListener {
-            startActivity(Intent(this, com.voiceexpense.ui.setup.SetupGuidePage::class.java))
-        }
-        findViewById<Button>(R.id.btn_open_settings).setOnClickListener {
-            startActivity(Intent(this, SettingsActivity::class.java))
+        // Setup toolbar with settings menu
+        val toolbar = findViewById<MaterialToolbar>(R.id.toolbar)
+        toolbar.setOnMenuItemClickListener { menuItem ->
+            when (menuItem.itemId) {
+                R.id.action_settings -> {
+                    startActivity(Intent(this, SettingsActivity::class.java))
+                    true
+                }
+                else -> false
+            }
         }
 
         val list = findViewById<RecyclerView>(R.id.list_recent)
         val adapter = RecentTransactionsAdapter(onClick = { t -> onTransactionClick(t) })
         list.layoutManager = LinearLayoutManager(this)
         list.adapter = adapter
-        list.addItemDecoration(DividerItemDecoration(this, DividerItemDecoration.VERTICAL))
 
         lifecycleScope.launch {
             vm.recent.collectLatest { items ->
@@ -67,7 +71,7 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        val input: EditText = findViewById(R.id.input_utterance)
+        val input: TextInputEditText = findViewById(R.id.input_utterance)
         val create: Button = findViewById(R.id.btn_create_draft)
         fun submit() {
             val text = input.text?.toString()?.trim().orEmpty()
