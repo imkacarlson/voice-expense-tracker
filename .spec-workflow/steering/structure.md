@@ -4,68 +4,66 @@
 
 ```
 voice-expense-tracker/
-├── app/                          # Android application module
+├── app/                          # Android app module (UI, data, DI, WorkManager)
 │   ├── src/
 │   │   ├── main/
 │   │   │   ├── java/com/voiceexpense/
-│   │   │   │   ├── ui/           # User interface components
-│   │   │   │   │   ├── confirmation/ # Transaction confirmation form activity
-│   │   │   │   │   ├── common/   # MainActivity, adapters, ViewModels
-│   │   │   │   │   ├── setup/    # Initial app setup screens
-│   │   │   │   │   └── settings/ # Configuration management UI
-│   │   │   │   ├── service/      # Background services
-│   │   │   │   │   └── sync/     # Background sync services
-│   │   │   │   ├── data/         # Data layer
-│   │   │   │   │   ├── local/    # Room database, DAOs
-│   │   │   │   │   ├── remote/   # Google Apps Script Web App integration
-│   │   │   │   │   ├── repository/ # Repository pattern implementations
-│   │   │   │   │   └── model/    # Data models and entities
-│   │   │   │   ├── ai/           # On-device AI processing
-│   │   │   │   │   ├── parsing/  # Gemma 3 structured parsing
-│   │   │   │   │   │   └── hybrid/ # Hybrid AI + heuristic processing
-│   │   │   │   │   ├── model/    # MediaPipe Tasks model management
-│   │   │   │   │   ├── mediapipe/ # MediaPipe GenAI client
-│   │   │   │   │   ├── performance/ # AI performance optimization
-│   │   │   │   │   └── error/    # AI error handling
-│   │   │   │   ├── auth/         # Google OAuth implementation
-│   │   │   │   ├── worker/       # WorkManager background tasks
-│   │   │   │   ├── di/           # Hilt dependency injection modules
-│   │   │   │   └── util/         # Utility classes and extensions
-│   │   │   ├── res/              # Android resources
-│   │   │   │   ├── layout/       # XML layouts (form interface, lists)
-│   │   │   │   ├── values/       # Strings, colors, dimensions
-│   │   │   │   ├── drawable/     # Icons and graphics
-│   │   │   │   └── xml/          # App widget configurations
+│   │   │   │   ├── ui/                # Screens, adapters, ViewModels
+│   │   │   │   │   ├── confirmation/  # Transaction confirmation workflow
+│   │   │   │   │   ├── common/        # MainActivity, shared components
+│   │   │   │   │   ├── setup/         # First-run and model setup flows
+│   │   │   │   │   └── settings/      # Config management UI
+│   │   │   │   ├── data/              # Room models, repositories, remote clients
+│   │   │   │   ├── auth/              # Google sign-in & token cache
+│   │   │   │   ├── worker/            # WorkManager jobs (sync, diagnostics)
+│   │   │   │   ├── di/                # Hilt modules (parsing, repositories, workers)
+│   │   │   │   └── util/              # Shared helpers/extensions
+│   │   │   ├── res/                   # Android resources (layouts, themes, drawables)
 │   │   │   └── AndroidManifest.xml
-│   │   ├── test/                 # Unit tests
-│   │   │   └── java/com/voiceexpense/
-│   │   │       ├── ai/           # AI parsing tests with fixtures
-│   │   │       │   ├── parsing/  # Transaction parser tests
-│   │   │       │   └── hybrid/   # Hybrid processing tests
-│   │   │       ├── data/         # Repository and model tests
-│   │   │       ├── ui/           # UI component tests
-│   │   │       └── util/         # Utility testing
-│   │   └── androidTest/          # Instrumentation tests
-│   │       └── java/com/voiceexpense/
-│   │           ├── ui/           # UI and widget integration tests
-│   │           ├── service/      # Service lifecycle tests
-│   │           ├── data/         # Database integration tests
-│   │           └── ai/           # AI integration tests
-│   ├── build.gradle.kts          # App module build configuration
-│   └── proguard-rules.pro        # Code obfuscation rules
-├── gradle/                       # Gradle wrapper and configurations
-├── scripts/                      # Build and utility scripts
-│   └── build_apk.py             # APK build automation script
-├── docs/                        # Project documentation
-│   ├── voice-correction-loop-v1.md # Voice interaction documentation
-│   └── hybrid-ml-kit-integration.md # AI processing documentation
-├── .spec-workflow/              # Specification workflow files
-│   └── steering/                # Steering documents (product, tech, structure)
-├── build.gradle.kts             # Project-level build configuration
-├── gradle.properties            # Gradle configuration properties
-├── settings.gradle.kts          # Project settings
-├── .gitignore                   # Git ignore patterns
-└── README.md                    # Project overview and setup instructions
+│   │   ├── test/                      # JVM unit tests
+│   │   └── androidTest/               # Instrumented tests
+│   ├── build.gradle.kts
+│   └── proguard-rules.pro
+├── parsing/                      # Shared Kotlin parsing library (staged hybrid pipeline)
+│   ├── src/main/kotlin/com/voiceexpense/ai/parsing/
+│   │   ├── TransactionParser.kt
+│   │   ├── ParsedResult.kt
+│   │   ├── ParsingContext.kt
+│   │   ├── logging/              # ParsingRunLog, Log abstraction
+│   │   ├── heuristic/            # HeuristicExtractor, confidence thresholds
+│   │   └── hybrid/               # Staged orchestrator, dispatcher, stats
+│   └── build.gradle.kts
+├── cli/                          # JVM CLI wrapper around shared parser
+│   ├── src/main/kotlin/com/voiceexpense/eval/
+│   │   ├── CliMain.kt
+│   │   ├── PythonGenAiGateway.kt
+│   │   ├── JsonModels.kt
+│   │   └── ConsoleLogger.kt
+│   └── build.gradle.kts
+├── evaluator/                    # Python evaluator harness (HuggingFace-based)
+│   ├── evaluate.py
+│   ├── models.py
+│   ├── test_cases.md
+│   ├── requirements.txt
+│   └── results/
+├── backend/                      # Google Apps Script backend
+│   └── appscript/expense-tracker-api.gs
+├── prompts/                      # Prompt experiments and utterance fixtures
+├── scripts/
+│   └── build_apk.py
+├── docs/                         # Project documentation
+│   ├── voice-correction-loop-v1.md
+│   └── hybrid-ml-kit-integration.md
+├── .spec-workflow/               # Steering workflow assets
+│   └── steering/
+│       ├── product.md
+│       ├── tech.md
+│       └── structure.md
+├── build.gradle.kts              # Root Gradle configuration
+├── settings.gradle.kts           # Module inclusion
+├── gradle.properties             # Project-wide properties
+├── README.md
+└── gradle/                       # Gradle wrapper and scripts
 ```
 
 ## Naming Conventions
@@ -187,9 +185,10 @@ class TransactionFormManager(
 ### Data Class Organization
 ```kotlin
 @Entity(tableName = "transactions")
+@TypeConverters(Converters::class)
 data class Transaction(
     @PrimaryKey val id: String = UUID.randomUUID().toString(),
-    val createdAt: Instant,
+    val createdAt: Instant = Instant.now(),
     val userLocalDate: LocalDate,
     val amountUsd: BigDecimal?,
     val merchant: String,
@@ -197,17 +196,20 @@ data class Transaction(
     val type: TransactionType,
     val expenseCategory: String?,
     val incomeCategory: String?,
+    val transferCategory: String? = null,
+    val transferDestination: String? = null,
     val tags: List<String> = emptyList(),
     val account: String?,
     val splitOverallChargedUsd: BigDecimal?,
-    val note: String?,
     val confidence: Float,
     val correctionsCount: Int = 0,
-    val source: String = "text", // "text" only
+    val source: String = "voice",
     val status: TransactionStatus = TransactionStatus.DRAFT,
     val sheetRef: SheetReference? = null
 )
 ```
+
+`transferCategory` and `transferDestination` remain null unless the confirmation form captures values manually; they reserve space for richer transfer workflows.
 
 ## Code Organization Principles
 
@@ -223,7 +225,7 @@ data class Transaction(
 
 ### Core Application Layers
 - **UI Layer**: Activities, Fragments, ViewModels, Widgets, Form Components - handles user interactions
-- **Domain Layer**: Use cases, business logic - processes voice input, text input, and transaction rules  
+- **Domain Layer**: Use cases, business logic - processes text input via the staged parsing pipeline and enforces transaction rules  
 - **Data Layer**: Repositories, data sources, models - manages local and remote data
 
 ### Feature Boundaries
@@ -243,6 +245,7 @@ Form Components → Validation → Configuration Storage
 - No circular dependencies
 - Inner layers don't know about outer layers
 - Dependency inversion through interfaces
+- Shared `:parsing` module sits below the domain layer; both Android UI and CLI depend on it via interfaces (`GenAiGateway`, `Log`).
 
 ## Code Size Guidelines
 
@@ -268,72 +271,84 @@ Form Components → Validation → Configuration Storage
 
 ## AI Processing Structure
 
-### Text Processing Pipeline
+### Shared Parsing Library (`:parsing`)
+```
+parsing/src/main/kotlin/com/voiceexpense/ai/parsing/
+├── TransactionParser.kt            # Entry point that coordinates staged parsing
+├── ParsedResult.kt                 # Parsed payload + ParsingContext definition
+├── ParsingPrompts.kt               # Shared prompt templates + instructions
+├── StructuredOutputValidator.kt    # JSON schema validation helpers
+├── TagNormalizer.kt                # Tag casing + delimiter normalization
+├── heuristic/                      # Stage 1 heuristics and thresholds
+│   ├── HeuristicExtractor.kt
+│   ├── HeuristicDraft.kt
+│   └── HeuristicMappers.kt
+├── hybrid/                         # Stage 2 orchestrator + metrics
+│   ├── HybridTransactionParser.kt
+│   ├── StagedParsingOrchestrator.kt
+│   ├── StagedRefinementDispatcher.kt
+│   ├── FocusedPromptBuilder.kt
+│   ├── FieldSelectionStrategy.kt
+│   ├── ConfidenceScorer.kt
+│   ├── ProcessingMonitor.kt
+│   └── ValidationPipeline.kt
+└── logging/                        # Run log + logger abstraction
+    ├── ParsingRunLog.kt
+    └── Logger.kt
+```
+
+### Android Integration Layer
 ```
 app/src/main/java/com/voiceexpense/ai/
-├── speech/
-│   ├── SpeechRecognitionService.kt    # ML Kit ASR integration
-│   ├── AudioRecordingManager.kt       # Audio capture and processing
-│   └── TranscriptionListener.kt       # ASR result handling
-├── parsing/
-│   ├── TransactionParser.kt           # Main parsing orchestrator
-│   ├── ParsingPrompts.kt              # System instructions and templates
-│   ├── TransactionPrompts.kt          # Structured prompt templates
-│   ├── ParsedResult.kt                # Parsing result models
-│   ├── ParsingContext.kt              # Context for parsing (recent data)
-│   ├── StructuredOutputValidator.kt   # JSON schema validation
-│   └── hybrid/                        # Hybrid processing strategy
-│       ├── HybridTransactionParser.kt # AI + heuristic orchestrator
-│       ├── GenAiGateway.kt            # MediaPipe abstraction
-│       ├── PromptBuilder.kt           # Intelligent prompt composition
-│       ├── FewShotExampleRepository.kt # Example management
-│       ├── ValidationPipeline.kt      # Output validation
-│       ├── ConfidenceScorer.kt        # Parsing quality assessment
-│       ├── ProcessingModels.kt        # Data models for processing
-│       ├── ProcessingMonitor.kt       # Performance tracking
-│       └── SchemaTemplates.kt         # JSON schema definitions
-├── mediapipe/
-│   └── MediaPipeGenAiClient.kt        # MediaPipe Tasks integration
-├── model/
-│   ├── ModelManager.kt                # AI model lifecycle management
-│   └── OnDeviceConfig.kt              # Model configuration
-├── performance/
-│   └── AiPerformanceOptimizer.kt      # Performance monitoring
-└── error/
-    └── AiErrorHandler.kt              # AI error handling and fallbacks
+├── mediapipe/MediaPipeGenAiClient.kt   # MediaPipe Tasks client, backend toggle, prewarm
+├── model/ModelManager.kt               # Model import, validation, storage helpers
+├── performance/AiPerformanceOptimizer.kt # Timing + warm-up instrumentation
+└── error/AiErrorHandler.kt             # Parser + model error categorisation
 ```
+
+- `TransactionParser` is injected into UI layers via Hilt; it depends on `HybridTransactionParser` and listens for staged refinements through `StagedRefinementDispatcher`.
+- `MediaPipeGenAiClient` selects GPU/CPU backends, prewarms the interpreter, and streams prompts to the parsing module via `GenAiGateway`.
+- Parsing diagnostics accumulate in `ParsingRunLogStore` so the UI and evaluator share identical Markdown exports.
+- Evaluator CLI reuses the same module; only the `GenAiGateway` implementation differs (Python-driven instead of MediaPipe).
 
 ### Form Interface Structure
 ```
 app/src/main/java/com/voiceexpense/ui/
 ├── confirmation/
-│   ├── TransactionConfirmationActivity.kt  # Main form interface
-│   ├── ConfirmationViewModel.kt            # Form state management
-│   ├── FormValidationManager.kt            # Field validation logic
-│   ├── DropdownConfigManager.kt            # Dropdown option management
-│   └── voice/                              # Voice correction components
-│       ├── VoiceCorrectionController.kt    # Voice interaction handler
-│       ├── TtsEngine.kt                    # Text-to-speech
-│       ├── CorrectionIntentParser.kt       # Voice command parsing
-│       └── PromptRenderer.kt               # Voice prompt generation
+│   ├── TransactionConfirmationActivity.kt  # Form UI, staged refinement indicators, diagnostics export
+│   ├── ConfirmationViewModel.kt            # Draft state + dispatcher subscription
+│   └── ValidationEngine.kt                 # Field validation + manual edit reconciliation
 ├── common/
-│   ├── MainActivity.kt                     # Home screen with history
-│   ├── MainViewModel.kt                    # Recent transactions
-│   ├── RecentTransactionsAdapter.kt        # Transaction list
-│   └── TransactionDetailsActivity.kt       # Transaction view/edit
+│   ├── MainActivity.kt                     # Home screen with staged draft creation
+│   ├── MainViewModel.kt                    # Recent transactions stream (top 10)
+│   ├── RecentTransactionsAdapter.kt        # Transaction list binder
+│   └── TransactionDetailsActivity.kt       # Read-only detail and diagnostics view
 └── settings/
     ├── SettingsActivity.kt                 # Configuration management
-    ├── DropdownEditorActivity.kt           # Edit dropdown options
-    └── ModelSetupActivity.kt               # AI model configuration
+    ├── DropdownEditorActivity.kt           # Manage dropdown options
+    └── ModelSetupActivity.kt               # AI model import/test + backend toggle
 ```
 
 ### Separation of Concerns
-- Speech recognition isolated from parsing logic
-- Form management separate from AI processing
-- Dropdown configuration independent of transaction logic
-- Model management handles loading/unloading efficiently
-- Clear error boundaries between ASR failures, parsing failures, and form validation
-- Validation separated from data binding and UI updates
+- Shared `:parsing` module owns heuristics, staged refinement, and logging; Android only provides a `GenAiGateway` implementation.
+- UI layer observes `StagedRefinementDispatcher` events and never touches MediaPipe directly.
+- Settings/configuration screens manage dropdown options and AI model lifecycle independently of transaction storage.
+- MediaPipe client (`MediaPipeGenAiClient`) encapsulates backend selection, model validation, and error conversion into user-facing messages.
+- Diagnostics export leverages `ParsingRunLogStore` so the same instrumentation powers the evaluator and confirmation screen.
+- Validation (`ValidationEngine`) stays isolated from data access and simply emits sanitized drafts back to the ViewModel.
+
+## Evaluation Toolkit
+- `cli/src/main/kotlin/com/voiceexpense/eval/` wraps the shared parser in `CliMain.kt`, serialising stdin/stdout JSON for Stage 1 (needs_ai) and Stage 2 (complete) flows.
+- `PythonGenAiGateway` records prompts during the first pass and replays HuggingFace model responses injected by Python, keeping CLI output deterministic.
+- `evaluator/evaluate.py` orchestrates CLI invocations, batches prompts through Gemma models, and writes Markdown summaries/detailed reports under `evaluator/results/`.
+- `evaluator/test_cases.md` stores utterances + expected fields; blank cells mean "not asserted" so suites stay flexible as prompts evolve.
+- Use the toolkit before shipping prompt or heuristic edits: `./gradlew :cli:build` then `python evaluator/evaluate.py --model google/gemma-3-1b-it --test smoke`.
+
+## Apps Script Backend
+- Located at `backend/appscript/expense-tracker-api.gs`; deployed as a Google Apps Script Web App behind `doPost`.
+- Validates OAuth tokens via `tokeninfo`, enforces a 30-requests/10-minute cache-based rate limit, and hashes emails before logging.
+- Appends expenses using the user's column layout, formatting timestamps with the spreadsheet timezone.
+- Maintains a rolling audit log sheet (capped at 1,000 entries) and gracefully handles configuration gaps or auth failures with structured JSON responses.
 
 ## Documentation Standards
 
@@ -352,32 +367,33 @@ app/src/main/java/com/voiceexpense/ui/
 ```
 app/src/test/java/com/voiceexpense/
 ├── ai/
-│   ├── parsing/
-│   │   ├── TransactionParserTest.kt           # Unit tests with fixtures
-│   │   ├── TransactionPromptsTest.kt          # Prompt template tests
-│   │   └── hybrid/
-│   │       ├── HybridTransactionParserTest.kt # Hybrid processing tests
-│   │       ├── PromptBuilderTest.kt           # Prompt composition tests
-│   │       ├── ValidationPipelineTest.kt      # Validation tests
-│   │       └── FewShotExampleRepositoryTest.kt # Example selection tests
-│   │   └── fixtures/
-│   │       ├── ValidUtterances.kt             # Sample inputs/outputs
-│   │       └── EdgeCaseInputs.kt              # Ambiguous/invalid cases
-│   └── speech/
-│       └── SpeechRecognitionServiceTest.kt    # Mock ASR integration
-├── ui/
-│   ├── confirmation/
-│   │   ├── ConfirmationViewModelTest.kt       # Form state tests
-│   │   └── FormValidationManagerTest.kt       # Validation logic tests
-│   └── common/
-│       └── MainViewModelTest.kt               # Recent transactions tests
+│   ├── error/AiErrorHandlerTest.kt
+│   ├── model/ModelManagerTest.kt
+│   └── parsing/TransactionParserTest.kt
+├── auth/
+│   ├── AuthRepositoryTest.kt
+│   └── TokenProviderTest.kt
 ├── data/
-│   ├── repository/
-│   │   └── TransactionRepositoryTest.kt       # Repository behavior tests
-│   └── local/
-│       └── TransactionDaoTest.kt              # Database operation tests
+│   ├── config/
+│   │   ├── ConfigImporterTest.kt
+│   │   └── ConfigRepositoryTest.kt
+│   ├── local/TransactionDaoTest.kt
+│   ├── remote/AppsScriptClientTest.kt
+│   └── repository/
+│       ├── TransactionRepositoryTest.kt
+│       └── TransactionRepositoryAuthTest.kt
+├── testutil/
+│   ├── MainDispatcherRule.kt
+│   └── TestDispatchers.kt
+├── ui/
+│   ├── common/SettingsActivityAuthTest.kt
+│   └── confirmation/
+│       ├── ConfirmationViewModelTest.kt
+│       ├── ValidationEngineTest.kt
+│       └── ConfirmationActivityNavigationTest.kt
 └── worker/
-    └── SyncWorkerTest.kt                      # Background sync tests
+    ├── SyncWorkerTest.kt
+    └── SyncWorkerAuthTest.kt
 ```
 
 ### Testing Principles
@@ -388,6 +404,7 @@ app/src/test/java/com/voiceexpense/
 - Performance tests for parsing latency requirements (<3s)
 - Error scenario testing for offline/auth failures
 - Configuration management tests for dropdown persistence
+- Offline evaluator harness runs (`./gradlew :cli:build` + `python evaluator/evaluate.py`) guard prompt changes with field-level accuracy metrics.
 
 ## Configuration Management Structure
 

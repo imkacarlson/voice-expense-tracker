@@ -10,22 +10,24 @@ Build an Android app that lets users log financial transactions into a Google Sp
 ## Target User Flow
 1. User opens the app and types a transaction description in the main input field (e.g., "Starbucks $5 latte charged to my Citi card")
 2. Optionally, user can use Android's built-in voice-to-text via Google Keyboard to dictate the transaction
-3. On-device LLM (Gemma 3 1B via MediaPipe Tasks) parses the typed text into structured transaction data.
-4. App shows confirmation screen with a **complete form interface** containing all parsed fields as editable inputs.
+3. Hybrid parser runs Stage 1 heuristics immediately and queues Stage 2 AI prompts for any low-confidence fields.
+4. App shows the confirmation screen seeded with the heuristic draft. Fields still waiting on Stage 2 show inline progress indicators and temporarily disable edits; values re-enable and briefly highlight once AI responses arrive.
 5. User can:
    - **Edit any field directly** using the form inputs (amounts, merchant, category, tags, account, date, etc.)
    - **Use dropdowns** for categories, accounts, tags (configurable in settings)
    - **Use date picker** for transaction date
+   - **Export a Markdown diagnostics run log** capturing heuristics, prompts, and AI responses for debugging or regression notes.
 6. User confirms when satisfied; app posts transaction to Google Sheets via Google Apps Script Web App. If offline, it queues and syncs automatically when online.
 7. **Home Screen History**: Main screen shows the 10 most recent transactions with status indicators (Draft, Queued, Confirmed, Posted, Failed) that users can click to view/edit.
 
 ## Technical Constraints
 - Device: Google Pixel 7a (Android 14+ recommended).
-- AI Processing: On-device only. Use Gemma 3 1B via MediaPipe Tasks (.task file) for NLU/structuring of text input; no cloud AI calls.
+- AI Processing: On-device only. Use Gemma 3 1B via MediaPipe Tasks (`.task` or `.litertlm` bundle) with staged heuristics + AI refinement; no cloud AI calls.
 - Privacy: No cloud-based AI processing; user owns data. Minimal permissions (no microphone access required).
 - Connectivity: Work offline for capture/parsing and confirmation; require network only to post to Google Sheets.
 - Currency: USD-only for v1 (no multi-currency handling).
 - Data Destination: Existing user-owned Google Spreadsheet (configurable spreadsheet and tab).
+- Platform: Android 14+ (API level 34) aligns with current compile/target SDK and WorkManager requirements.
 
 ## Spreadsheet Columns Mapping (Exact Sheet)
 Based on user's actual transaction data, the app will append rows with the following mapping:
@@ -67,14 +69,20 @@ All dropdown fields must be configurable in the app settings. Users should be ab
 - Remove unused options
 - Reorder options by preference
 
+### Field State Feedback
+- Fields flagged for Stage 2 refinement display inline progress indicators and temporarily dimmed inputs until AI responses land.
+- Completed refinements briefly highlight changed values and restore full interactivity so users can verify edits before confirming.
+- The diagnostics export button unlocks after the first staged refinement finishes, guaranteeing the run log captures prompts and responses.
+
 ## Data Models and Transaction Schema
 - Transaction fields:
-  - id (UUID), createdAt (UTC ISO), userLocalDate, amountUsd (decimal), merchant (string), description (string), type ("Expense"|"Income"|"Transfer"), expenseCategory? (string), incomeCategory? (string), tags (string[]), account (string), splitOverallChargedUsd? (decimal), note? (string), confidence (0–1), correctionsCount (int), source ("text"), status ("draft"|"confirmed"|"queued"|"posted"|"failed"), sheetRef (spreadsheetId/sheetId/row if posted).
+  - id (UUID), createdAt (UTC ISO), userLocalDate (LocalDate), amountUsd? (decimal), merchant (string), description? (string), type ("Expense"|"Income"|"Transfer"), expenseCategory? (string), incomeCategory? (string), transferCategory? (string), transferDestination? (string), tags (string[]), account? (string), splitOverallChargedUsd? (decimal), confidence (0–1), correctionsCount (int), source ("voice"), status ("draft"|"confirmed"|"queued"|"posted"|"failed"), sheetRef? (spreadsheetId/sheetId/row).
+  - `transferCategory` and `transferDestination` are reserved for richer transfer flows; they stay null unless the user edits them manually in the confirmation form.
 - Parsing intent: support capturing both the user share amount and, when present, the overall charged amount for split expenses. If only one amount is typed, treat it as the Amount field and leave Overall Charged blank.
 
 ## API Contracts (Structured Parsing)
 - Input: Direct text input, optional context (recent merchants/categories/tags, default account, user locale, time).
-- Output (JSON): { amountUsd, merchant, description?, type, expenseCategory?, incomeCategory?, tags[], userLocalDate, account?, splitOverallChargedUsd?, note?, confidence }
+- Output (JSON): { amountUsd, merchant, description?, type, expenseCategory?, incomeCategory?, tags[], userLocalDate, account?, splitOverallChargedUsd?, confidence }
 - Constraints: Strict JSON schema; enforce USD; reject currency tokens; request clarification on invalid/ambiguous fields.
 
 ### Sample Utterances → Expected Parsed Output (5 examples)
@@ -82,7 +90,7 @@ All dropdown fields must be configurable in the app settings. Users should be ab
 2. "Supermarket in Vienna one eighty seven, groceries, tag Europe Trip Summer 2025, Bilt Card five two one seven" → { amountUsd: 1.87, merchant: "Supermarket in Vienna", type: "Expense", expenseCategory: "Groceries", tags: ["Europe Trip Summer 2025"], account: "Bilt Card (5217)" }
 3. "Dinner at La Fiesta thirty dollars charged to my card, my share is twenty, tag Splitwise" → { amountUsd: 20.00, splitOverallChargedUsd: 30.00, merchant: "La Fiesta", type: "Expense", expenseCategory: "Dining", tags: ["Splitwise"] }
 4. "Income, paycheck two thousand, tag July" → { amountUsd: 2000.00, type: "Income", incomeCategory: "Salary", tags: ["July"] }
-5. "Transfer fifty from checking to savings" → { type: "Transfer", amountUsd: null, expenseCategory: null, incomeCategory: null, tags: [], note: "transfer 50 checking→savings" }
+5. "Transfer fifty from checking to savings" → { type: "Transfer", amountUsd: null, merchant: "Checking", description: "Transfer to savings", tags: [] }
 
 ## Google Sheets Integration
 - Auth: OAuth 2.0 with `userinfo.email` scope using Google Sign-In. Apps Script validates token/email server-side. Store tokens securely (EncryptedSharedPreferences/Hardware-backed Keystore).
@@ -109,9 +117,14 @@ All dropdown fields must be configurable in the app settings. Users should be ab
 - **Click Actions**: Users can click any transaction to view details or edit drafts
 - **Auto-truncation**: List automatically maintains only 10 most recent entries
 
+## Diagnostics & Evaluation
+- Confirmation screen exposes an **Export diagnostics** action once staged AI refinement completes; it saves a Markdown run log (via `ParsingRunLogStore`) that captures inputs, heuristics, prompts, AI responses, and errors for that transaction.
+- Offline evaluator harness pairs the shared Kotlin CLI (`:cli` module) with the Python orchestrator under `evaluator/` so prompt changes can be regression-tested against markdown-defined utterances. Build with `./gradlew :cli:build`, then run `python evaluator/evaluate.py --model google/gemma-3-1b-it --test <suite>`.
+- Evaluation runs emit summary and per-case markdown reports in `evaluator/results/`, including field-level accuracy and latency metrics to guide prompt iterations.
+
 ## Error Handling and Edge Cases
 - Ambiguous amounts ("twenty-three fifty") → clarify or default with lower confidence.
-- Unknown merchants → set Description accordingly and capture in tags/note if needed.
+- Unknown merchants → set Description accordingly and optionally flag with low confidence (no free-form notes field).
 - Split expenses with two amounts (share + overall) → validate consistency; ensure Amount ≤ Overall.
 - Offline posting → queue with visible status; notify when synced.
 - Auth failures → prompt re-auth; never drop transactions.
@@ -133,6 +146,9 @@ All dropdown fields must be configurable in the app settings. Users should be ab
    - Text input → parsing → confirmation UI workflow.
    - Offline queue to online sync transition.
    - Error recovery flows (auth refresh, network backoff).
+6. Offline evaluator harness:
+   - Build CLI via `./gradlew :cli:build`, then run `python evaluator/evaluate.py --model google/gemma-3-1b-it --test smoke`.
+   - Track evaluator summary accuracy and latency deltas before shipping prompt or heuristic changes.
 
 ## Product Principles
 1. Privacy-first and on-device AI only; transparent scopes and storage.
@@ -153,10 +169,10 @@ All dropdown fields must be configurable in the app settings. Users should be ab
 - Phase 1: Form interface with manual input, basic AI parsing, home screen history.
 - Phase 2: Apps Script posting with offline queue; Room persistence; exact column mapping.
 - Phase 3: Enhanced UI polish, configurable dropdowns, settings management.
-- Phase 4: Polish, battery/perf tuning, accessibility and internationalization pass.
+- Phase 4: Evaluation tooling (CLI + Python harness, diagnostics export), polish, battery/perf tuning, accessibility and internationalization pass.
 
 ## Risks and Mitigations
 - LLM format drift → enforce strict JSON schema with validators and retry on invalid output.
 - OAuth complexity → use proven libraries; narrow scopes; robust token handling.
 - Battery optimization → limit model context, defer work to background.
-- Small model accuracy → hybrid prompting strategies, field-by-field parsing fallbacks.
+- Small model accuracy → hybrid prompting strategies, staged refinement, and evaluator regression runs before shipping prompt changes.

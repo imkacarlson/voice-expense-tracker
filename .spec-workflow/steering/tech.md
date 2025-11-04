@@ -33,9 +33,10 @@ Event-driven architecture with MVVM pattern:
 - **Secure storage**: EncryptedSharedPreferences for OAuth tokens, Hardware-backed Keystore for sensitive data
 
 ### External Integrations (if applicable)
-- **APIs**: Google Apps Script HTTPS endpoint for transaction posting
+- **APIs**: Google Apps Script HTTPS endpoint for transaction posting, secured with script properties (spreadsheet id, allowed email, OAuth client id).
 - **Protocols**: HTTPS/REST
-- **Authentication**: OAuth 2.0 with Google Sign-In (userinfo.email access token) validated server-side by Apps Script
+- **Authentication**: OAuth 2.0 with Google Sign-In (userinfo.email access token) validated server-side by Apps Script (`tokeninfo` audience check, email whitelist).
+- **Server Controls**: Apps Script enforces 30-requests/10-minute rate limiting, appends hashed email logs to a capped audit sheet, and formats timestamps server-side.
 
 ### Monitoring & Dashboard Technologies (if applicable)
 - **Dashboard Framework**: Native Android UI (Activities/Fragments) with comprehensive form interface
@@ -62,9 +63,10 @@ Event-driven architecture with MVVM pattern:
   - Runs `./gradlew assembleDebug` (or `assembleRelease` with signing) and streams output.
   - Options: `--install` (adb install on connected device/emulator), `--release` (signed build), `--keystore <path>`/`--storepass`/`--keyalias` for release signing, `--module <app>` for multi-module builds.
   - Outputs the absolute path to the built APK: `app/build/outputs/apk/<variant>/app-<variant>.apk`.
-- **AI Model Setup**: Gemma 3 1B 4-bit quantized model (`.task` file) must be placed at `app-private-files/llm/model.task`
-  - **Setup Method A**: In-app import via Settings → "Import model (.task)"
+- **AI Model Setup**: Gemma 3 1B 4-bit quantized bundle (`.task` or `.litertlm`) must live under `app-private-files/llm/`
+  - **Setup Method A**: In-app import via Settings → "Import model (.task/.litertlm)"
   - **Setup Method B**: ADB push method documented in README.md
+  - Settings provides "Test AI setup" plus GPU/CPU backend toggles to validate availability and work around Pixel GPU driver issues.
 - **CI/CD**: The same Gradle commands run headless in CI. Example: `./gradlew clean assembleDebug` then archive `app/build/outputs/apk/debug/app-debug.apk`. For release, inject signing configs via environment variables or Gradle properties.
 
 ### Version Control & Collaboration
@@ -77,48 +79,55 @@ Event-driven architecture with MVVM pattern:
 - **Port Management**: ADB for device communication
 - **Multi-Instance Support**: Multiple emulator instances for testing
 
+## Module Layout & Reuse
+- `:app`: Android UI, Hilt wiring, data layer, and WorkManager. Injects the shared `TransactionParser` and listens to `StagedRefinementDispatcher` updates to stream Stage 2 results into the confirmation UI.
+- `:parsing`: Kotlin/JVM library containing heuristics, staged orchestrator (`StagedParsingOrchestrator`), confidence scoring, run-log capture, and the shared dispatcher. Published as an internal dependency for both the app and CLI.
+- `:cli`: Kotlin CLI (`com.voiceexpense.eval.CliMainKt`) that wraps the parsing module for off-device evaluation. Uses `PythonGenAiGateway` to capture stage prompts and replay model responses supplied by Python.
+- `evaluator/`: Python orchestrator (`evaluate.py`, `models.py`, `test_cases.md`) that drives the CLI, runs HuggingFace Gemma models (CPU or GPU), batches prompts, and emits Markdown summary/detail reports under `evaluator/results/`.
+- `backend/appscript`: Google Apps Script Web App with OAuth token validation, rate limiting, hashed logging, and column mapping that mirrors the Android client payload.
+- `prompts/`: Markdown workspace for prompt experiments and curated utterance fixtures used during evaluator runs.
+
 ## Deployment & Distribution (if applicable)
 - **Target Platform(s)**: Android 14+ (API level 34+), specifically Google Pixel 7a
 - **Distribution Method**: APK sideloading only (personal use; no Play Store)
-- **Installation Requirements**: Google Pixel device with MediaPipe Tasks support, Google account, Gemma 3 1B model file
+- **Installation Requirements**: Google Pixel device with MediaPipe Tasks support, Google account, Gemma 3 1B `.task` or `.litertlm` bundle staged under `files/llm/`
 - **Update Mechanism**: Manual APK updates via `adb install -r` or file transfer
 
 ## On-Device AI Processing Strategy
 
 ### Model Configuration
-- **Primary Model**: Gemma 3 1B 4-bit quantized via MediaPipe Tasks
-- **Model File**: `.task` format, approximately 500MB
-- **Inference Engine**: MediaPipe LlmInference API
-- **Fallback Strategy**: Heuristic parsing when model unavailable
+- **Primary Model**: Gemma 3 1B 4-bit quantized via MediaPipe Tasks (`.task` or `.litertlm` bundle).
+- **Backend Selection**: User-facing toggle chooses GPU (default) or CPU backends; persisted preference mitigates Pixel GPU driver crashes.
+- **Prewarm Strategy**: `MediaPipeGenAiClient` prewarms the interpreter on app launch to avoid cold-start latency spikes.
+- **Fallback Compatibility**: If the bundle fails to load, the heuristics-only pipeline remains active so drafts still materialize.
 
-### Prompting Strategy for Smaller Models
-Given the 1B parameter constraint, optimized prompting approach:
+### Hybrid Pipeline (Stage 1 → Stage 2)
+1. **Stage 1 Heuristics** — `HeuristicExtractor` parses amounts, merchants, categories, and accounts without touching the LLM; results seed the draft and run log.
+2. **Stage 2 Staged Refinement** — `StagedParsingOrchestrator` creates prioritized prompts for low-confidence fields. MediaPipe (app) or `PythonGenAiGateway` (CLI) fulfils requests, and responses are validated before merging.
+3. **Live Updates** — `StagedRefinementDispatcher` broadcasts per-field updates so UI components can animate loading indicators, highlight new values, and enable diagnostics export after completion.
+4. **Confidence & Metrics** — `ConfidenceScorer` plus `ProcessingMonitor` compute confidence scores, track durations, and log refined fields for analytics and evaluator summaries.
+5. **Heuristic Failover** — Timeouts or invalid AI outputs fall back to the Stage 1 draft with lower confidence, keeping the flow unblocked while signaling manual review.
 
-#### **Single-Shot Parsing (Primary)**
-- **System Instruction**: Concise, strict JSON schema specification
-- **Few-Shot Examples**: Limit to 6-8 targeted examples based on input type detection
-- **Context Integration**: Recent merchants/accounts/categories from user history
-- **Prompt Composition**: System + Context + Examples + Input (total <2000 tokens)
+### Focused Prompt Strategy
+- Prompts are field-specific and include allowed-value lists from `ParsingContext` (categories, tags, accounts) to keep outputs bounded.
+- Refinement priority: merchant → description → account → tags → category; we abort downstream prompts once upstream fields reach threshold confidence.
+- Prompt size is capped (<1k tokens) to fit the 5k-character budget enforced in the parser, and repeats are avoided through staged tracking.
+- Responses flow through `StructuredOutputValidator` and `TagNormalizer` to enforce casing, delimiters, and schema compliance before hitting the UI.
 
-#### **Field-by-Field Parsing (Fallback)**
-For complex transactions, optional multi-prompt approach:
-1. **Amount Extraction**: "Extract USD amount from: [input]"
-2. **Merchant Identification**: "Extract merchant/vendor from: [input]"
-3. **Category Classification**: "Classify expense category from: [input] Options: [categories]"
-4. **Account Detection**: "Identify payment account from: [input] Known: [accounts]"
-5. **Tag Extraction**: "Extract relevant tags from: [input]"
+## Evaluation Toolchain & Automation
+- **CLI Bridge (`:cli`)**: `com.voiceexpense.eval.CliMainKt` wraps the shared parser. It emits `needs_ai` payloads with heuristics and pending prompts, then consumes injected responses during the second pass.
+- **Python Orchestrator**: `evaluator/evaluate.py` batches prompts via HuggingFace (`models.py`), supports `google/gemma-3-1b-it` and `google/gemma-3n-E2B-it`, and writes Markdown summaries/detailed reports to `evaluator/results/`.
+- **Test Case Source**: `evaluator/test_cases.md` drives expectations per utterance (amount, merchant, type, etc.); blank cells indicate "don't care" fields.
+- **Metrics**: Aggregates overall accuracy, per-field accuracy, AI usage counts, and stage timings (Stage 0/1/total) mirroring `ProcessingMonitor`.
+- **Workflow**: Build CLI (`./gradlew :cli:build`), activate Python venv, run `python evaluate.py --model google/gemma-3-1b-it --test smoke`, review `*_summary.md` before shipping prompt changes.
+- **Continuous Usage**: Use evaluator when tweaking prompts, heuristics, or MediaPipe settings to quantify regressions without reinstalling the Android app.
 
-#### **Template-Based Parsing**
-For highly structured inputs:
-- **Expense Template**: "I spent $X at Y for Z"
-- **Income Template**: "Income: $X from Y, tag Z"
-- **Transfer Template**: "Transfer $X from Y to Z"
-
-### Hybrid Processing Architecture
-- **AI-First Path**: MediaPipe structured output with strict validation
-- **Heuristic Fallback**: Regex-based parsing for reliability
-- **Confidence Scoring**: Evaluate parsing quality and UI highlighting
-- **Performance Monitoring**: Track parsing success rates and latency
+## Logging & Diagnostics
+- **ParsingRunLog**: Stage 1 and Stage 2 events append to `ParsingRunLogBuilder`; entries cover heuristics, prompts, responses, validation, and summary results.
+- **Run Log Store**: `ParsingRunLogStore` keeps in-memory builders keyed by transactionId so the confirmation screen can export Markdown via the "Export diagnostics" button.
+- **CLI ConsoleLogger**: CLI routes parsing logs through `ConsoleLogger`, aligning evaluator output with app diagnostics for consistent troubleshooting.
+- **UI Surfacing**: `TransactionConfirmationActivity` enables export once at least one staged refinement completes, ensuring all prompts are captured.
+- **Apps Script Logging**: Backend writes hashed, rate-limited logs to a separate sheet for auditability without leaking personal data.
 
 ## Form Interface Technology
 
@@ -138,6 +147,7 @@ For highly structured inputs:
 ### UI/UX Patterns
 - **Scrollable Form**: All fields visible with ScrollView
 - **Field Highlighting**: Missing/low-confidence fields marked visually
+- **Staged Refinement Indicators**: Inline progress spinners and dimmed inputs for fields awaiting Stage 2 responses; highlight animations fire on completion.
 - **Progressive Disclosure**: Show relevant fields based on transaction type
 - **Accessibility**: Screen reader compatibility, large touch targets
 
@@ -154,7 +164,7 @@ For highly structured inputs:
 - **Platform Support**: Android 14+ (MediaPipe Tasks requirement)
 - **Device Support**: Google Pixel 7a and newer Pixel devices with sufficient RAM
 - **Dependency Versions**: MediaPipe Tasks GenAI 0.10.27+, Google Play Services
-- **Model Requirements**: Gemma 3 1B 4-bit quantized (.task format)
+- **Model Requirements**: Gemma 3 1B 4-bit quantized bundle (.task or .litertlm)
 - **Standards Compliance**: Android security best practices, OAuth 2.0 standard
 
 ### Security & Compliance
@@ -164,6 +174,7 @@ For highly structured inputs:
   - Minimal permissions (internet for sync only, no microphone required)
   - No sensitive data in logs or crash reports
   - Model file stored in app-private directory
+  - Apps Script backend validates OAuth tokens via `tokeninfo`, enforces 30-requests/10-minute rate limiting, hashes emails in logs, and trims audit sheets to 1,000 entries.
 - **Privacy Model**: User owns all data, no telemetry or analytics collection
 - **Threat Model**: Protect OAuth tokens, prevent data leakage, secure local storage
 
@@ -181,14 +192,17 @@ For highly structured inputs:
 4. **Form-First Confirmation**: Better UX than pure voice, allows precise editing
 5. **Configurable Dropdowns**: User-specific categories and accounts improve parsing accuracy
 6. **Field-by-Field Parsing Option**: Fallback strategy for smaller model limitations
-7. **Sequential Field Refinement**: Stage 2 now runs single-field prompts in priority order to keep prompts short, preserve modifiers, and eliminate cross-field drift.
-7. **Room Database**: Type-safe SQLite wrapper, excellent WorkManager integration for offline queue
+7. **Sequential Field Refinement**: Stage 2 runs single-field prompts in priority order to keep prompts short, preserve modifiers, and eliminate cross-field drift.
+8. **Shared Parsing Module & CLI**: Extract `TransactionParser`/hybrid logic into `:parsing` and expose it via `:cli` so evaluator runs identical code paths while keeping the Android bundle lean.
+9. **Evaluator Orchestration**: Python harness with HuggingFace models provides measurable accuracy/latency regressions before prompt or heuristic changes ship.
+10. **Room Database**: Type-safe SQLite wrapper, excellent WorkManager integration for offline queue
 
 ### AI Processing Trade-offs
 - **Accuracy vs Speed**: 1B model trades some accuracy for faster inference
-- **Sequential Single-Field Prompts**: We now favor one-field prompts in succession—latency stays acceptable while accuracy improves because instructions can be laser-focused per field.
+- **Sequential Single-Field Prompts**: Staged orchestrator + dispatcher keep prompts laser-focused per field. Latency rises slightly but accuracy and explainability improve.
 - **Examples vs Context**: Balance few-shot examples with user-specific context
 - **Validation Strictness**: Strict JSON validation prevents malformed outputs
+- **Evaluator Feedback Loop**: Offline evaluator catches regressions quickly but depends on well-maintained markdown fixtures.
 - **Text vs Voice Complexity**: Simplified text-only processing reduces complexity
 
 ## Known Limitations
