@@ -68,7 +68,7 @@ class FocusedPromptBuilder {
                 }
                 if (field == FieldKey.DESCRIPTION) {
                     heuristicDraft.merchant?.takeIf { it.isNotBlank() }?.let { merchant ->
-                        appendLine("Context: merchant already resolved as \"$merchant\". Do not repeat it.")
+                        appendLine("Context: merchant already resolved as \"$merchant\". Must exclude it from the description.")
                     }
                 }
                 appendLine("Instruction: ${instructionFor(field)}")
@@ -103,7 +103,7 @@ class FocusedPromptBuilder {
                 appendLine("Allowed values: $options")
             }
             if (FieldKey.DESCRIPTION in fields && resolvedMerchant != null) {
-                appendLine("Context: merchant already resolved as \"$resolvedMerchant\". Keep it out of the description.")
+                appendLine("Context: merchant already resolved as \"$resolvedMerchant\". Must exclude it from the description.")
             }
             appendGuidelines(fields)
         }
@@ -195,7 +195,7 @@ class FocusedPromptBuilder {
 
     private fun instructionFor(field: FieldKey): String = when (field) {
             FieldKey.MERCHANT -> "Return the merchant name exactly as a user would expect to see it (e.g., \"Starbucks\", \"Target\"). If the input mentions payment methods (e.g., payment apps like Splitwise, Venmo, PayPal, Zelle, etc; or payment cards), identify the actual merchant or service being paid for, NOT the payment method. Examples: 'my roommate put into Splitwise that they reloaded our E-ZPass' → \"E-ZPass\" (NOT \"Splitwise\"); 'my card was charged for the appointment' → null (provider unknown). Return null if the merchant is genuinely unknown."
-            FieldKey.DESCRIPTION -> "Provide a concise noun phrase describing what was actually purchased or the service received (e.g., \"Coffee and pastry\", \"Household items\", \"Utility bill\"). Preserve key numbers or modifiers from the input; do not mention payment methods or account names. Avoid verbs. Do not use generic placeholders—describe the specific goods or service mentioned. Do not repeat the merchant name in the description."
+            FieldKey.DESCRIPTION -> "Provide a concise noun phrase describing what was actually purchased or the service received (e.g., \"Coffee and pastry\", \"Household items\", \"Utility bill\"). Preserve key numbers or modifiers from the input; do not mention payment methods or account names. Avoid verbs. Do not use generic placeholders—describe the specific goods or service mentioned. The description must NOT contain the merchant name—exclude it entirely."
             FieldKey.EXPENSE_CATEGORY -> """Choose the best matching expense category based on what was purchased or the service received:
 - 'Eating Out': restaurant meals, takeout, coffee shops, fast food, snacks, drinks
 - 'Transportation': vehicle gas/gasoline/fuel for cars, parking, tolls, transit fares, rideshares, vehicle expenses
@@ -206,7 +206,7 @@ class FocusedPromptBuilder {
 Return null if none of these categories apply to the transaction."""
             FieldKey.INCOME_CATEGORY -> "Choose the best matching income category."
             FieldKey.ACCOUNT -> "Return the account or card name from the allowed list. Match phonetic variations, case differences, and minor spelling differences common in voice-to-text (e.g., 'built' → 'Bilt', 'siti' → 'Citi', 'chase sapphire' → 'Chase Sapphire Preferred'). Return null if no account name is mentioned."
-            FieldKey.TAGS -> "Return tags from the allowed list that match the transaction. Only include tags if explicitly mentioned or clearly implied in the input. Use fuzzy/phonetic matching (e.g., 'autopaid' → 'Auto-Paid', 'splitwise' → 'Splitwise'). For 'Auto-Paid': only if the input explicitly mentions automatic payment, autopay, or auto-charge. For 'Subscription': only if the input explicitly mentions it's a subscription or recurring payment. Return empty array if no tags clearly apply."
+            FieldKey.TAGS -> "Return tags from the allowed list based on semantic relevance to the transaction. Match tags even if the exact wording differs, using fuzzy matching and phonetic tolerance for voice-to-text variations. Include a tag only if it meaningfully describes the transaction or is clearly implied in the input. Return empty array if no tags apply."
             else -> "" // Should not be requested here.
     }
 
@@ -284,11 +284,11 @@ Return null if none of these categories apply to the transaction."""
 
         private fun guidelineFor(field: FieldKey): String? = when (field) {
             FieldKey.MERCHANT -> "Return only the merchant or vendor name—no verbs, adjectives, or trailing phrases. Avoid payment methods."
-            FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input and avoids payment method names. Do not repeat the merchant name."
+            FieldKey.DESCRIPTION -> "Provide a concise noun phrase that preserves meaningful numbers or modifiers from the input and avoids payment method names. Must NOT contain the merchant name."
             FieldKey.EXPENSE_CATEGORY -> "Choose exactly one expense category: 'Eating Out' for food/drinks, 'Home' for household items/utility bills (gas/electric/water/internet bills), 'Personal' for subscriptions/services, 'Transportation' for vehicle fuel/parking/transit, 'Groceries' for supermarket food, 'Health/medical' for medical services. Return null if none apply."
             FieldKey.INCOME_CATEGORY -> "Choose exactly one income category from the allowed list; return null if none apply."
             FieldKey.ACCOUNT -> "Return the account/card name from the allowed list, matching phonetic variations and spelling differences from voice-to-text (e.g., 'built' → 'Bilt', 'siti' → 'Citi'). Return null if none apply."
-            FieldKey.TAGS -> "Return an array of distinct tags chosen only from the allowed list. Only include tags that are explicitly mentioned or clearly implied in the input. If no allowed tag clearly applies, return an empty array."
+            FieldKey.TAGS -> "Return an array of distinct tags from the allowed list based on semantic relevance. Use fuzzy/phonetic matching for voice-to-text variations. Include tags that meaningfully describe the transaction or are clearly implied, even if exact wording differs. Return empty array if no tags apply."
             else -> null
         }
     }

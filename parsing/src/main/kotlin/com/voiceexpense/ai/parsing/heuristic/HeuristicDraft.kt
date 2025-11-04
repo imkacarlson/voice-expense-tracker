@@ -33,7 +33,8 @@ data class FieldConfidenceThresholds(
             FieldKey.USER_LOCAL_DATE to 0.75f,
             FieldKey.TYPE to 0.6f,
             FieldKey.MERCHANT to 0.85f,
-            FieldKey.ACCOUNT to 0.7f
+            FieldKey.ACCOUNT to 0.7f,
+            FieldKey.TAGS to 0.85f
         )
 
         val DEFAULT = FieldConfidenceThresholds()

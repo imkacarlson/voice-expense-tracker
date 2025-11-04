@@ -74,6 +74,7 @@ object FieldSelectionStrategy {
         val missingValue = isMissing(field, draft)
         val effectiveMissing = when {
             field == FieldKey.MERCHANT && belowThreshold -> true
+            field == FieldKey.TAGS && belowThreshold -> true
             else -> missingValue
         }
 
