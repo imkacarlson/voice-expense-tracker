@@ -173,7 +173,7 @@ class StagedParsingOrchestratorTest {
     @Test
     fun `tags keep heuristics when ai suggests unsupported values`() = runBlocking {
         val draft = HeuristicDraft(
-            tags = listOf("splitwise"),
+            tags = listOf("tagalpha"),
             confidences = mapOf(FieldKey.TAGS to 0.2f)
         )
         val gateway = FakeGenAiGateway().apply {
@@ -190,7 +190,7 @@ class StagedParsingOrchestratorTest {
             focusedPromptBuilder = focusedPromptBuilder,
             thresholds = thresholds
         )
-        val context = ParsingContext(allowedTags = listOf("Subscription", "Auto-Paid"))
+        val context = ParsingContext(allowedTags = listOf("TagAlpha", "TagBeta"))
         val snapshot = StagedParsingOrchestrator.Stage1Snapshot(
             heuristicDraft = draft,
             targetFields = listOf(FieldKey.TAGS),
@@ -203,7 +203,7 @@ class StagedParsingOrchestratorTest {
             snapshot
         )
 
-        assertThat(result.mergedResult.tags).containsExactly("Splitwise")
+        assertThat(result.mergedResult.tags).containsExactly("TagAlpha")
     }
 
     @Test

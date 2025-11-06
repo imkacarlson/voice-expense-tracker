@@ -120,4 +120,17 @@ class HeuristicExtractorTest {
 
         assertThat(parsed.tags).containsExactly("Splitwise")
     }
+
+    @Test
+    fun `heuristic parsed result keeps only allowed tags`() {
+        val context = ParsingContext(
+            defaultDate = LocalDate.of(2025, 10, 14),
+            allowedTags = listOf("Tag One", "TagTwo")
+        )
+        val parsed = HeuristicDraft(
+            tags = listOf("tag one", "watch repair", "TAGTWO")
+        ).toParsedResult(context)
+
+        assertThat(parsed.tags).containsExactly("Tag One", "TagTwo").inOrder()
+    }
 }
